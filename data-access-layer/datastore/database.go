@@ -459,6 +459,7 @@ func (database *RelationalDb) PerformJoinOneToMany(ctx context.Context, record1 
 /*
 Finds a single record that has the same primary key as record.
 record argument must be a pointer to a struct and will be modified in-place.
+Returns RecordNotFoundError if a record could not be found.
 */
 func (database *RelationalDb) Find(ctx context.Context, record Record) error {
 	return database.FindInTable(ctx, GetTableName(record), record)
@@ -467,6 +468,7 @@ func (database *RelationalDb) Find(ctx context.Context, record Record) error {
 /*
 Finds a single record in table tableName that has the same primary key as record.
 record argument must be a pointer to a struct and will be modified in-place.
+Returns RecordNotFoundError if a record could not be found.
 */
 func (database *RelationalDb) FindInTable(ctx context.Context, tableName string, record Record) error {
 	var err error
@@ -500,10 +502,15 @@ func (database *RelationalDb) FindInTable(ctx context.Context, tableName string,
 		if err = row.Err(); err != nil {
 			// rows.Next() failed because there is an error, not because query returned no results
 			err = ErrorExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, queryWithArgs)
-			logger.Errorln(err)
-			return err
+
+		} else {
+			err = RecordNotFoundError.WithMap(map[ErrorContextKey]string{
+				SQL_STMT:    queryWithArgs,
+				PRIMARY_KEY: fmt.Sprintf("%v", record.GetId()),
+			})
 		}
-		return nil
+		logger.Errorln(err)
+		return err
 	}
 	err = parseSqlRows(row, record)
 	if err != nil {

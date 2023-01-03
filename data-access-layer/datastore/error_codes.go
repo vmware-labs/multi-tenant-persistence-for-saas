@@ -38,6 +38,7 @@ const (
 	SQL_STMT          = ErrorContextKey("SqlStmt")
 	SSL_MODE          = ErrorContextKey("sslMode")
 	TABLE_NAME        = ErrorContextKey("TableName")
+	PRIMARY_KEY       = ErrorContextKey("PrimaryKey")
 )
 
 func contextToString(ctx interface{}) string {
@@ -172,6 +173,7 @@ var (
 	ErrorUnmarshalling               = BaseDbError.With("Cannot unmarshal binary to proto message")
 	ErrOperationNotAllowed           = BaseDbError.With("Not authorized to perform the operation on other tenant's data")
 	ErrorFetchingMetadataFromContext = BaseDbError.With("Error fetching metadata from GRPC context")
+	RecordNotFoundError              = BaseDbError.With("Record not found")
 
 	ErrAuthContext       = BaseDbError.With("Error extracting authContext from context")
 	ErrNoAuthContext     = BaseDbError.With("Permission denied because authContext is missing")

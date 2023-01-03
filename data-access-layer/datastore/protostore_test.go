@@ -686,7 +686,7 @@ func testProtoStoreCrud(t *testing.T, ctx context.Context, useUpsert bool) {
 	//Delete CPU message with an ID of P4. Memory message with an ID of P4 must remain intact
 	var cpumsg6 = pb.CPU{}
 	err = p.FindById(ctx, P4, &cpumsg6, nil)
-	assert.NoError(err)
+	assert.ErrorIs(err, RecordNotFoundError)
 	assert.Equal("", cpumsg6.String(), "Found a Protobuf message that was supposed to be deleted")
 
 	err = p.FindById(ctx, P4, &memmsg4, nil)
@@ -703,7 +703,7 @@ func testProtoStoreCrud(t *testing.T, ctx context.Context, useUpsert bool) {
 
 	var memmsg5 = pb.Memory{}
 	err = p.FindById(ctx, P4, &memmsg5, nil)
-	assert.NoError(err)
+	assert.ErrorIs(err, RecordNotFoundError)
 	assert.Equal("", memmsg5.String(), "Found a Protobuf message that was supposed to be deleted")
 }
 
@@ -723,8 +723,8 @@ func TestProtoStoreInDbMultitenancy(t *testing.T) {
 	assert.Equal(int64(1), md.Revision)
 
 	var queryResult = pb.CPU{}
-	err = p.FindById(cokeAdminCtx, cpumsg1.Name, &queryResult, nil)
-	assert.NoError(err)
+	err = p.FindById(cokeAdminCtx, cpumsg1.Name, &queryResult, nil) //Coke tries to read Pepsi's Protobuf message
+	assert.ErrorIs(err, RecordNotFoundError)                        //Coke won't be able to see that record due to RLS
 	assert.Empty(queryResult.GetName(), "Coke user found a record belonging to Pepsi tenant")
 }
 

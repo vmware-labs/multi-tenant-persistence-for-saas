@@ -255,7 +255,7 @@ func testFindInEmptyDataStore(t *testing.T) {
 	{
 		queryResult := appUser{Id: "non-existent user ID"}
 		err := DataStore.Find(cokeAdminCtx, &queryResult)
-		assert.NoError(err)
+		assert.ErrorIs(err, RecordNotFoundError)
 		assert.True(queryResult.areNonKeyFieldsEmpty())
 	}
 
@@ -336,7 +336,7 @@ func testCrud(t *testing.T, ctx context.Context) {
 		assert.EqualValues(1, rowsAffected)
 		queryResult := appUser{Id: record.Id}
 		err = DataStore.Find(ctx, &queryResult)
-		assert.NoError(err)
+		assert.ErrorIs(err, RecordNotFoundError)
 		assert.True(queryResult.areNonKeyFieldsEmpty())
 	}
 }
@@ -934,7 +934,7 @@ func testCrudWithMismatchingOrgId(t *testing.T, cokeCtx context.Context) {
 		//Another tenant's data should not be found because it should not have been inserted into the data store
 		queryResult := app{Id: newApp.Id, OrgId: newApp.OrgId}
 		err = DataStore.Find(cokeCtx, &queryResult)
-		assert.NoError(err)
+		assert.ErrorIs(err, RecordNotFoundError)
 		assert.True(queryResult.areNonKeyFieldsEmpty())
 	}
 

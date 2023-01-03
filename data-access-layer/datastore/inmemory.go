@@ -177,6 +177,7 @@ func (inMemory *InMemory) PerformJoinOneToMany(ctx context.Context, record1 Reco
 /*
 Finds a record that has the same primary key as record.
 record must be a pointer to a struct.
+Returns RecordNotFoundError if a record could not be found.
 */
 func (inMemory *InMemory) Find(ctx context.Context, record Record) error {
 	return inMemory.FindInTable(ctx, GetTableName(record), record)
@@ -196,7 +197,7 @@ func (inMemory *InMemory) FindInTable(ctx context.Context, cacheName string, rec
 
 	queryResult, ok := cache[id]
 	if !ok {
-		return nil
+		return RecordNotFoundError.WithValue(PRIMARY_KEY, fmt.Sprintf("%v", record.GetId()))
 	}
 
 	copyRecord(queryResult, record)
