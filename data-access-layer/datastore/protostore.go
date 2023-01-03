@@ -20,6 +20,7 @@ package datastore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 
@@ -251,12 +252,12 @@ when the updates are already ordered by some other service/app
 */
 func (p ProtobufDataStore) Upsert(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, md Metadata, err error) {
 	md, err = p.GetMetadata(ctx, id, msg)
-	if err != nil {
+	if err != nil && !errors.Is(err, RecordNotFoundError) {
 		return 0, Metadata{}, err
 	}
 
 	// If Protobuf record was not found, then Upsert will be an insertion and initial revision of 1 will be used
-	if md.Revision == 0 {
+	if errors.Is(err, RecordNotFoundError) {
 		md.Revision = 1
 	}
 	return p.UpsertWithMetadata(ctx, id, msg, md)
