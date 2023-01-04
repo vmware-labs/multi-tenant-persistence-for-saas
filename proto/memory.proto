@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package proto;
+
+option go_package = ".;pb";
+
+message Memory {
+  string brand = 1;
+  uint32 size = 2;
+  uint32 speed = 3;
+  string type = 4;
+}

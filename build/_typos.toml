@@ -1,0 +1,8 @@
+[default.extend-identifiers]
+# *sigh* this just isn't worth the cost of fixing
+
+[default.extend-words]
+# Accepted words to be ignored by typos
+
+[files]
+extend-exclude = [".golangci.yml"]
