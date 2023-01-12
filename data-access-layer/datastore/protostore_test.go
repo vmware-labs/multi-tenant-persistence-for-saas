@@ -191,6 +191,81 @@ func setupInMemoryContext(t *testing.T) {
 	}
 }
 
+func TestProtoStoreInDbFindWithInvalidParams(t *testing.T) {
+	setupDbContext(t)
+	testProtoStoreFindWithInvalidParams(t, pepsiAdminCtx)
+}
+
+func TestProtoStoreInMemoryFindWithInvalidParams(t *testing.T) {
+	setupInMemoryContext(t)
+	testProtoStoreFindWithInvalidParams(t, cokeAdminCtx)
+}
+
+/*
+Checks that ProtobufDataStore.FindAll and ProtobufDataStore.FindAllAsMap reject requests containing invalid arguments
+where query results are supposed to be stored and do not reject those that contain valid arguments.
+*/
+func testProtoStoreFindWithInvalidParams(t *testing.T, ctx context.Context) {
+	assert := assert.New(t)
+	var p ProtoStore = GetProtoStore()
+
+	//FIND ALL
+	{
+		var invalidParams = []interface{}{
+			pb.CPU{},
+			&pb.CPU{},
+			[]pb.CPU{},
+			[]*pb.CPU{},
+			map[string]*pb.CPU{},
+		}
+
+		for i := range invalidParams {
+			var invalidParam = invalidParams[i]
+			_, err := p.FindAll(ctx, invalidParam)
+			assert.ErrorIs(err, IllegalArgumentError)
+		}
+
+		var validParams = []interface{}{
+			&[]pb.CPU{},
+			&[]*pb.CPU{},
+		}
+
+		for i := range validParams {
+			var validParam = validParams[i]
+			_, err := p.FindAll(ctx, validParam)
+			assert.NoError(err)
+		}
+	}
+
+	//FIND ALL AS MAP
+	{
+		var invalidParams = []interface{}{
+			pb.CPU{},
+			&pb.CPU{},
+			[]pb.CPU{},
+			[]*pb.CPU{},
+			&(map[string]*pb.CPU{}),
+		}
+
+		for i := range invalidParams {
+			var invalidParam = invalidParams[i]
+			_, err := p.FindAllAsMap(ctx, invalidParam)
+			assert.ErrorIs(err, IllegalArgumentError)
+		}
+
+		var validParams = []interface{}{
+			map[string]*pb.CPU{},
+			map[string]pb.CPU{},
+		}
+
+		for i := range validParams {
+			var validParam = validParams[i]
+			_, err := p.FindAllAsMap(ctx, validParam)
+			assert.NoError(err)
+		}
+	}
+}
+
 func TestProtoStoreInDbFindAll(t *testing.T) {
 	setupDbContext(t)
 	testProtoStoreFindAll(t, pepsiAdminCtx)
