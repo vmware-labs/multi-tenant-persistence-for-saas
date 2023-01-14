@@ -22,8 +22,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vmware-labs/multi-tenant-persistence-for-saas/test/pb"
-
 	"github.com/stretchr/testify/assert"
 )
 
@@ -182,12 +180,6 @@ func TestGettingTableName(t *testing.T) {
 	assert.Equal("\"appUser\"", GetTableNameFromSlice(&[]appUser{}))
 	assert.Equal("\"appUser\"", GetTableNameFromSlice([]*appUser{}))
 	assert.Equal("\"appUser\"", GetTableNameFromSlice(&[]*appUser{}))
-	memoryWithProtobuf := ProtobufWithMetadata{
-		&pb.Memory{},
-		Metadata{Id: "12345"},
-	}
-
-	assert.Equal(GetTableName(&pb.Memory{}), GetTableName(memoryWithProtobuf.Message))
 }
 
 func TestReplacingPlaceholders(t *testing.T) {

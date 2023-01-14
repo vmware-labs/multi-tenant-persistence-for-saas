@@ -105,7 +105,7 @@ func (s MetadataBasedAuthorizer) IsOperationAllowed(ctx context.Context, tableNa
 	// If the DB role is tenant-specific (TENANT_READER or TENANT_WRITER) and the table is multi-tenant,
 	//make sure that the record being inserted/modified/updated/deleted/queried belongs to the user's org.
 	//If operation is SELECT but no specific tenant's data is being queried (e.g., FindAll() was called), allow the operation to proceed
-	if dbRole.isTenantDbRole() && isMultitenant(record, tableName) {
+	if dbRole.IsTenantDbRole() && IsMultitenant(record, tableName) {
 		orgId, err := s.GetOrgFromContext(ctx)
 		// OrgId check required for Tenant DB roles only
 		if err != nil {

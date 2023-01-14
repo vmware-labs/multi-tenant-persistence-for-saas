@@ -78,7 +78,7 @@ func isRevisioningSupported(tableName string, x Record) bool {
 /*
 Checks if any of the tables in tableNames are multi-tenant.
 */
-func isMultitenant(x Record, tableNames ...string) bool {
+func IsMultitenant(x Record, tableNames ...string) bool {
 	for _, tableName := range tableNames {
 		if _, ok := multitenancyMap[tableName]; !ok {
 			_, multitenancyMap[tableName] = getFieldNoPanic(ORG_ID_COLUMN_NAME, x)

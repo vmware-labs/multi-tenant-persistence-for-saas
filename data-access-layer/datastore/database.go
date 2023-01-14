@@ -55,7 +55,7 @@ func (a DbRoleSlice) Len() int {
 	return len(a)
 }
 
-func (dbRole DbRole) isTenantDbRole() bool {
+func (dbRole DbRole) IsTenantDbRole() bool {
 	return dbRole == TENANT_READER || dbRole == TENANT_WRITER
 }
 
@@ -922,7 +922,7 @@ func (database *RelationalDb) RegisterWithDALHelper(_ context.Context, roleMappi
 	}
 
 	// Enable row-level security in a multi-tenant table
-	if isMultitenant(record, tableName) {
+	if IsMultitenant(record, tableName) {
 		stmt = getEnableRLSStmt(tableName, record)
 		if _, err = database.dbMap[adminUsername].Exec(stmt); err != nil {
 			err = ErrorRegisteringWithDAL.Wrap(err).WithValue(TABLE_NAME, tableName)
@@ -981,7 +981,7 @@ func (database *RelationalDb) createDbUser(dbUserSpecs dbUserSpecs, tableName st
 		return err
 	}
 
-	if isMultitenant(record, tableName) {
+	if IsMultitenant(record, tableName) {
 		stmt = getCreatePolicyStmt(tableName, record, dbUserSpecs)
 		if _, err := database.dbMap[adminUsername].Exec(stmt); err != nil {
 			// err = ErrorRegisteringWithDAL.Wrap(err).WithValue(TABLE_NAME, tableName)
@@ -1113,7 +1113,7 @@ func (database *RelationalDb) getTenantInfoFromCtx(ctx context.Context, tableNam
 		return err, "", "", false
 	}
 
-	isMultitenant = dbRole.isTenantDbRole()
+	isMultitenant = dbRole.IsTenantDbRole()
 	orgId, err = database.authorizer.GetOrgFromContext(ctx)
 	if !isMultitenant && errors.Is(err, ErrorMissingOrgId) {
 		err = nil

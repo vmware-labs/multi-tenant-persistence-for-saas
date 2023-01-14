@@ -79,18 +79,6 @@ Work in progress:
 
 - **Metadata support**
 
-### Prerequisites
-
-- [Golang](https://go.dev/)
-- [Postgres](https://www.postgresql.org/) or any similar database
-- [Make](https://man7.org/linux/man-pages/man1/make.1.html)
-
-### Build & Run
-
-- For building the code, run `make build`
-- For linting the code, run `make lint`
-- For running unit tests, run `make unit_tests`
-
 ## Documentation
 
 Following interfaces are exposed by the Golang library to be consumed by the user of this library,
@@ -405,10 +393,11 @@ protoStore.DeleteById(ctx, id, &pb.Memory{})
 
 ## Contributing
 
-The multi-tenant-persistence-for-saas project team welcomes contributions from the community. Before you start working with multi-tenant-persistence-for-saas, please
-read our [Developer Certificate of Origin](https://cla.vmware.com/dco). All contributions to this repository must be
-signed as described on that page. Your signature certifies that you wrote the patch or have the right to pass it on
-as an open-source patch. For more detailed information, refer to [CONTRIBUTING.md](CONTRIBUTING_CLA.md).
+The multi-tenant-persistence-for-saas project team welcomes contributions from the community. Before you start
+working with multi-tenant-persistence-for-saas, please read our [CONTRIBUTING.md](CONTRIBUTING_CLA.md). All
+contributions to this repository must be signed as described on that page. Your signature certifies that you
+wrote the patch or have the right to pass it on as an open-source patch. For more detailed information,
+refer to [CONTRIBUTING.md](CONTRIBUTING_CLA.md).
 
 ## License
 

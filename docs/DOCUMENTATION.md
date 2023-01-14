@@ -14,6 +14,7 @@ import "github.com/vmware-labs/multi-tenant-persistence-for-saas/data-access-lay
 - [func GetRlsPolicyName(username DbRole, tableName string) string](<#func-getrlspolicyname>)
 - [func GetTableName(x interface{}) string](<#func-gettablename>)
 - [func GetTableNameFromSlice(x interface{}) string](<#func-gettablenamefromslice>)
+- [func IsMultitenant(x Record, tableNames ...string) bool](<#func-ismultitenant>)
 - [func ToBytes(message proto.Message) ([]byte, error)](<#func-tobytes>)
 - [type Authorizer](<#type-authorizer>)
 - [type DataStoreHelper](<#type-datastorehelper>)
@@ -31,13 +32,13 @@ import "github.com/vmware-labs/multi-tenant-persistence-for-saas/data-access-lay
   - [func (e *DbError) WithValue(key ErrorContextKey, value string) *DbError](<#func-dberror-withvalue>)
   - [func (e *DbError) Wrap(err error) *DbError](<#func-dberror-wrap>)
 - [type DbRole](<#type-dbrole>)
+  - [func (dbRole DbRole) IsTenantDbRole() bool](<#func-dbrole-istenantdbrole>)
 - [type DbRoleSlice](<#type-dbroleslice>)
   - [func (a DbRoleSlice) Len() int](<#func-dbroleslice-len>)
   - [func (a DbRoleSlice) Less(i, j int) bool](<#func-dbroleslice-less>)
   - [func (a DbRoleSlice) Swap(i, j int)](<#func-dbroleslice-swap>)
 - [type ErrorContextKey](<#type-errorcontextkey>)
   - [func (c ErrorContextKey) String() string](<#func-errorcontextkey-string>)
-- [type IRealizationStore](<#type-irealizationstore>)
 - [type InMemory](<#type-inmemory>)
   - [func (inMemory *InMemory) Configure(_ context.Context, isDataStoreInMemory bool, authorizer Authorizer)](<#func-inmemory-configure>)
   - [func (inMemory *InMemory) Delete(ctx context.Context, record Record) (int64, error)](<#func-inmemory-delete>)
@@ -111,18 +112,6 @@ import "github.com/vmware-labs/multi-tenant-persistence-for-saas/data-access-lay
   - [func (p ProtobufDataStore) UpdateWithMetadata(ctx context.Context, id string, msg proto.Message, metadata Metadata) (rowsAffected int64, md Metadata, err error)](<#func-protobufdatastore-updatewithmetadata>)
   - [func (p ProtobufDataStore) Upsert(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, md Metadata, err error)](<#func-protobufdatastore-upsert>)
   - [func (p ProtobufDataStore) UpsertWithMetadata(ctx context.Context, id string, msg proto.Message, metadata Metadata) (rowsAffected int64, md Metadata, err error)](<#func-protobufdatastore-upsertwithmetadata>)
-- [type ProtobufWithMetadata](<#type-protobufwithmetadata>)
-- [type RealizationStore](<#type-realizationstore>)
-  - [func (r *RealizationStore) Delete(ctx context.Context, resource ProtobufWithMetadata) error](<#func-realizationstore-delete>)
-  - [func (r *RealizationStore) FindById(ctx context.Context, id string, resource *ProtobufWithMetadata) error](<#func-realizationstore-findbyid>)
-  - [func (r *RealizationStore) GetOverallStatus(ctx context.Context, resource ProtobufWithMetadata) (Status, error)](<#func-realizationstore-getoverallstatus>)
-  - [func (r *RealizationStore) GetOverallStatusWithEnforcementDetails(ctx context.Context, resource ProtobufWithMetadata) (Status, map[string]Status, error)](<#func-realizationstore-getoverallstatuswithenforcementdetails>)
-  - [func (r *RealizationStore) MarkEnforcementAsDeletionPending(ctx context.Context, enforcementPoint string, resources ...ProtobufWithMetadata) error](<#func-realizationstore-markenforcementasdeletionpending>)
-  - [func (r *RealizationStore) MarkEnforcementAsDeletionRealized(ctx context.Context, enforcementPoint string, resources ...ProtobufWithMetadata) error](<#func-realizationstore-markenforcementasdeletionrealized>)
-  - [func (r *RealizationStore) MarkEnforcementAsError(ctx context.Context, enforcementPoint string, error string, resources ...ProtobufWithMetadata) error](<#func-realizationstore-markenforcementaserror>)
-  - [func (r *RealizationStore) MarkEnforcementAsPending(ctx context.Context, enforcementPoint string, resources ...ProtobufWithMetadata) error](<#func-realizationstore-markenforcementaspending>)
-  - [func (r *RealizationStore) MarkEnforcementAsSuccess(ctx context.Context, enforcementPoint string, resources ...ProtobufWithMetadata) error](<#func-realizationstore-markenforcementassuccess>)
-  - [func (r *RealizationStore) Upsert(ctx context.Context, resource ProtobufWithMetadata) error](<#func-realizationstore-upsert>)
 - [type Record](<#type-record>)
   - [func GetRecordInstanceFromSlice(x interface{}) Record](<#func-getrecordinstancefromslice>)
 - [type RelationalDb](<#type-relationaldb>)
@@ -150,7 +139,6 @@ import "github.com/vmware-labs/multi-tenant-persistence-for-saas/data-access-lay
   - [func (database *RelationalDb) UpdateInTable(ctx context.Context, tableName string, record Record) (int64, error)](<#func-relationaldb-updateintable>)
   - [func (database *RelationalDb) Upsert(ctx context.Context, record Record) (int64, error)](<#func-relationaldb-upsert>)
   - [func (database *RelationalDb) UpsertInTable(ctx context.Context, tableName string, record Record) (int64, error)](<#func-relationaldb-upsertintable>)
-- [type Status](<#type-status>)
 
 
 ## Constants
@@ -283,6 +271,14 @@ func GetTableNameFromSlice(x interface{}) string
 ```
 
 Extracts name of a struct comprising the input slice
+
+## func [IsMultitenant](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/sql_struct.go#L81>)
+
+```go
+func IsMultitenant(x Record, tableNames ...string) bool
+```
+
+Checks if any of the tables in tableNames are multi\-tenant.
 
 ## func [ToBytes](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/protostore.go#L119>)
 
@@ -427,6 +423,12 @@ Database roles/users
 type DbRole string
 ```
 
+### func \(DbRole\) [IsTenantDbRole](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L58>)
+
+```go
+func (dbRole DbRole) IsTenantDbRole() bool
+```
+
 ## type [DbRoleSlice](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L53>)
 
 ```go
@@ -465,26 +467,6 @@ type ErrorContextKey string
 
 ```go
 func (c ErrorContextKey) String() string
-```
-
-## type [IRealizationStore](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/realization_store.go#L42-L56>)
-
-```go
-type IRealizationStore interface {
-    FindById(ctx context.Context, id string, resource *ProtobufWithMetadata) error
-
-    Upsert(ctx context.Context, resource ProtobufWithMetadata) error
-    MarkEnforcementAsPending(ctx context.Context, enforcementPoint string, resources ...ProtobufWithMetadata) error
-    MarkEnforcementAsSuccess(ctx context.Context, enforcementPoint string, resources ...ProtobufWithMetadata) error
-    MarkEnforcementAsError(ctx context.Context, enforcementPoint string, error string, resources ...ProtobufWithMetadata) error
-
-    Delete(ctx context.Context, resource ProtobufWithMetadata) error
-    MarkEnforcementAsDeletionPending(ctx context.Context, enforcementPoint string, resources ...ProtobufWithMetadata) error
-    MarkEnforcementAsDeletionRealized(ctx context.Context, enforcementPoint string, resources ...ProtobufWithMetadata) error
-
-    GetOverallStatus(ctx context.Context, resource ProtobufWithMetadata) (Status, error)
-    GetOverallStatusWithEnforcementDetails(ctx context.Context, resource ProtobufWithMetadata) (Status, map[string]Status, error)
-}
 ```
 
 ## type [InMemory](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/inmemory.go#L32-L37>)
@@ -1044,116 +1026,6 @@ Fetches metadata for the record and upserts the Protobuf message. NOTE: Avoid us
 func (p ProtobufDataStore) UpsertWithMetadata(ctx context.Context, id string, msg proto.Message, metadata Metadata) (rowsAffected int64, md Metadata, err error)
 ```
 
-## type [ProtobufWithMetadata](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/realization_store.go#L37-L40>)
-
-```go
-type ProtobufWithMetadata struct {
-    proto.Message
-    Metadata
-}
-```
-
-## type [RealizationStore](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/realization_store.go#L58-L61>)
-
-```go
-type RealizationStore struct {
-    //Helper function provided by the user that determines enforcement points for a resource
-    GetEnforcementPoints func(ctx context.Context, resource ProtobufWithMetadata) (enforcementPoints []string)
-}
-```
-
-### func \(\*RealizationStore\) [Delete](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/realization_store.go#L113>)
-
-```go
-func (r *RealizationStore) Delete(ctx context.Context, resource ProtobufWithMetadata) error
-```
-
-Deletes a resource from the DB. Sets overall status as DELETION\_PENDING.
-
-Operation fails if the revision\(s\) is/are out\-of\-date.
-
-### func \(\*RealizationStore\) [FindById](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/realization_store.go#L66>)
-
-```go
-func (r *RealizationStore) FindById(ctx context.Context, id string, resource *ProtobufWithMetadata) error
-```
-
-Finds a resource by ID.
-
-### func \(\*RealizationStore\) [GetOverallStatus](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/realization_store.go#L139>)
-
-```go
-func (r *RealizationStore) GetOverallStatus(ctx context.Context, resource ProtobufWithMetadata) (Status, error)
-```
-
-Returns overall status of a resource.
-
-### func \(\*RealizationStore\) [GetOverallStatusWithEnforcementDetails](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/realization_store.go#L146-L149>)
-
-```go
-func (r *RealizationStore) GetOverallStatusWithEnforcementDetails(ctx context.Context, resource ProtobufWithMetadata) (Status, map[string]Status, error)
-```
-
-Returns overall status of a resource, along with the statuses at all enforcement points.
-
-### func \(\*RealizationStore\) [MarkEnforcementAsDeletionPending](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/realization_store.go#L122>)
-
-```go
-func (r *RealizationStore) MarkEnforcementAsDeletionPending(ctx context.Context, enforcementPoint string, resources ...ProtobufWithMetadata) error
-```
-
-Sets enforcement status as DELETION\_PENDING for the resources at the given enforcement point.
-
-Operation fails if the revision\(s\) is/are out\-of\-date.
-
-### func \(\*RealizationStore\) [MarkEnforcementAsDeletionRealized](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/realization_store.go#L132>)
-
-```go
-func (r *RealizationStore) MarkEnforcementAsDeletionRealized(ctx context.Context, enforcementPoint string, resources ...ProtobufWithMetadata) error
-```
-
-Sets enforcement status as DELETION\_REALIZED for the resources at the given enforcement point. Sets overall status for a resource as DELETION\_REALIZED if it has been deleted successfully from all enforcement points.
-
-Operation fails if the revision\(s\) is/are out\-of\-date.
-
-### func \(\*RealizationStore\) [MarkEnforcementAsError](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/realization_store.go#L104>)
-
-```go
-func (r *RealizationStore) MarkEnforcementAsError(ctx context.Context, enforcementPoint string, error string, resources ...ProtobufWithMetadata) error
-```
-
-Sets enforcement status as ERROR for the resources at the given enforcement point. Sets overall status as ERROR for these resources.
-
-Operation fails if the revision\(s\) is/are out\-of\-date.
-
-### func \(\*RealizationStore\) [MarkEnforcementAsPending](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/realization_store.go#L84>)
-
-```go
-func (r *RealizationStore) MarkEnforcementAsPending(ctx context.Context, enforcementPoint string, resources ...ProtobufWithMetadata) error
-```
-
-Sets enforcement status as PENDING for the resources at the given enforcement point. Sets overall status as PENDING for these resources.
-
-Operation fails if the revision\(s\) is/are out\-of\-date.
-
-### func \(\*RealizationStore\) [MarkEnforcementAsSuccess](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/realization_store.go#L94>)
-
-```go
-func (r *RealizationStore) MarkEnforcementAsSuccess(ctx context.Context, enforcementPoint string, resources ...ProtobufWithMetadata) error
-```
-
-Sets enforcement status as REALIZED for the resources at the given enforcement point. Sets overall status for a resource as REALIZED if it has been realized successfully at all enforcement points.
-
-Operation fails if the revision\(s\) is/are out\-of\-date.
-
-### func \(\*RealizationStore\) [Upsert](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/realization_store.go#L74>)
-
-```go
-func (r *RealizationStore) Upsert(ctx context.Context, resource ProtobufWithMetadata) error
-```
-
-Upserts a resource into DB. Sets overall status for the resource to PENDING. Upsert is going to be rejected if this is an update of an existing resource and if the revision is out\-of\-date.
-
 ## type [Record](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/record.go#L23-L29>)
 
 ```go
@@ -1371,22 +1243,6 @@ func (database *RelationalDb) UpsertInTable(ctx context.Context, tableName strin
 ```
 
 Upserts a record in DB table tableName
-
-## type [Status](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/realization_store.go#L27>)
-
-```go
-type Status int
-```
-
-```go
-const (
-    PENDING Status = iota //Indicates that enforcement needs to be established after resource is created/modified
-    REALIZED
-    ERROR
-    DELETION_PENDING
-    DELETION_REALIZED //TODO consider deleting this status value
-)
-```
 
 
 
