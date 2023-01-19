@@ -36,22 +36,28 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Organizations
-const COKE = "Coke"
-const PEPSI = "Pepsi"
+// Organizations.
+const (
+	COKE  = "Coke"
+	PEPSI = "Pepsi"
+)
 
-// Service roles for test cases
-const TENANT_AUDITOR = "tenant_auditor"
-const TENANT_ADMIN = "tenant_admin"
-const SERVICE_AUDITOR = "service_auditor"
-const SERVICE_ADMIN = "service_admin"
-const RANDOM_ID = "SomeRandomId"
+// Service roles for test cases.
+const (
+	TENANT_AUDITOR  = "tenant_auditor"
+	TENANT_ADMIN    = "tenant_admin"
+	SERVICE_AUDITOR = "service_auditor"
+	SERVICE_ADMIN   = "service_admin"
+	RANDOM_ID       = "SomeRandomId"
+)
 
-var serviceAdminCtx = DataStore.GetAuthorizer().GetAuthContext("", SERVICE_ADMIN)
-var cokeAdminCtx = DataStore.GetAuthorizer().GetAuthContext(COKE, TENANT_ADMIN)
-var cokeAuditorCtx = DataStore.GetAuthorizer().GetAuthContext(COKE, TENANT_AUDITOR)
-var pepsiAdminCtx = DataStore.GetAuthorizer().GetAuthContext(PEPSI, TENANT_ADMIN)
-var pepsiAuditorCtx = DataStore.GetAuthorizer().GetAuthContext(PEPSI, TENANT_AUDITOR)
+var (
+	serviceAdminCtx = DataStore.GetAuthorizer().GetAuthContext("", SERVICE_ADMIN)
+	cokeAdminCtx    = DataStore.GetAuthorizer().GetAuthContext(COKE, TENANT_ADMIN)
+	cokeAuditorCtx  = DataStore.GetAuthorizer().GetAuthContext(COKE, TENANT_AUDITOR)
+	pepsiAdminCtx   = DataStore.GetAuthorizer().GetAuthContext(PEPSI, TENANT_ADMIN)
+	pepsiAuditorCtx = DataStore.GetAuthorizer().GetAuthContext(PEPSI, TENANT_AUDITOR)
+)
 
 var allResources = []Record{
 	app{},
@@ -77,7 +83,7 @@ var datastoreDbTableNames = []string{
 	GetTableName(group{}),
 }
 
-//TODO - add a test that would show that the DB users are not able to create, drop, or truncate tables
+// TODO - add a test that would show that the DB users are not able to create, drop, or truncate tables
 
 type appUser struct {
 	Id             string `db_column:"app_user_id" primary_key:"true"`
@@ -90,10 +96,11 @@ type appUser struct {
 	Msg            []byte `db_column:"msg"`
 }
 
-type appUserSlice []appUser //Needed for sorting
+type appUserSlice []appUser // Needed for sorting
 func (a appUserSlice) Len() int {
 	return len(a)
 }
+
 func (a appUserSlice) Less(x, y int) bool {
 	boolToInt := func(input bool) int {
 		var output int = 0
@@ -106,11 +113,11 @@ func (a appUserSlice) Less(x, y int) bool {
 	for i := 0; i < len(a[x].GetId()); i++ {
 		first, second := a[x].GetId()[i], a[y].GetId()[i]
 		if first == second {
-			//Two columns of the composite key are equal - proceed to the next column
+			// Two columns of the composite key are equal - proceed to the next column
 			continue
 		}
 
-		//Two columns of the composite key are not equal - decide which one is smaller
+		// Two columns of the composite key are not equal - decide which one is smaller
 		switch t := first.(type) {
 		case int, int32, int64, int8, int16:
 			return first.(int64) < second.(int64)
@@ -158,10 +165,12 @@ func (a app) areNonKeyFieldsEmpty() bool {
 	return cmp.Equal(a, app{})
 }
 
-// Input for all test cases. Inserted into data store by prepareInput()
-var myCokeApp app
-var user1 appUser
-var user2 appUser
+// Input for all test cases. Inserted into data store by prepareInput().
+var (
+	myCokeApp app
+	user1     appUser
+	user2     appUser
+)
 
 /*
 Prepared input for all test cases. Stores the input in global variables.
@@ -179,8 +188,8 @@ func prepareInput() (app, appUser, appUser) {
 		Name:           "Jeyhun",
 		Email:          "jeyhun@mail.com",
 		EmailConfirmed: true,
-		NumFollowing:   2147483647,          //int32 type
-		NumFollowers:   9223372036854775807, //int64 type
+		NumFollowing:   2147483647,          // int32 type
+		NumFollowers:   9223372036854775807, // int64 type
 		AppId:          myCokeApp.Id,
 		Msg:            []byte("msg1234"),
 	}
@@ -196,15 +205,12 @@ func prepareInput() (app, appUser, appUser) {
 		Msg:            []byte("msg9876"),
 	}
 
-	//Make sure the 2 users  are sorted in ascending order by ID
+	// Make sure the 2 users  are sorted in ascending order by ID
 	if user1.Id >= user2.Id {
-		tempUser := user1
-		user1 = user2
-		user2 = tempUser
+		user1, user2 = user2, user1
 	}
 
 	return myCokeApp, user1, user2
-
 }
 
 func createDbTables(ctx context.Context) error {
@@ -227,7 +233,7 @@ func TestTruncate(t *testing.T) {
 
 	setupDbTables(t)
 
-	var queryResults = make([]app, 0)
+	queryResults := make([]app, 0)
 	if err := DataStore.FindAll(cokeAdminCtx, &queryResults); err != nil {
 		assert.FailNow(fmt.Sprintf("Failed to query DB table %s: %s", GetTableName(app{}), err.Error()))
 	} else if len(queryResults) == 0 {
@@ -289,7 +295,7 @@ func testCrud(t *testing.T, ctx context.Context) {
 
 	var err error
 
-	//Querying of previously inserted records should succeed
+	// Querying of previously inserted records should succeed
 	for _, record := range []appUser{user1, user2} {
 		var queryResult appUser = appUser{Id: record.Id}
 		err = DataStore.Find(ctx, &queryResult)
@@ -297,7 +303,7 @@ func testCrud(t *testing.T, ctx context.Context) {
 		assert.Equal(record, queryResult)
 	}
 
-	//Updating non-key fields in a record should succeed
+	// Updating non-key fields in a record should succeed
 	user1.Name = "Jeyhun G."
 	user1.Email = "jeyhun111@mail.com"
 	user1.EmailConfirmed = !user1.EmailConfirmed
@@ -316,7 +322,7 @@ func testCrud(t *testing.T, ctx context.Context) {
 		assert.Equal(record, queryResult)
 	}
 
-	//Upsert operation should be an update for already existing records
+	// Upsert operation should be an update for already existing records
 	user1.NumFollowers++
 	user2.NumFollowers--
 	for _, record := range []appUser{user1, user2} {
@@ -329,7 +335,7 @@ func testCrud(t *testing.T, ctx context.Context) {
 		assert.Equal(record, queryResult)
 	}
 
-	//Deletion of existing records should not fail, and the records should no longer be found in the DB
+	// Deletion of existing records should not fail, and the records should no longer be found in the DB
 	for _, record := range []appUser{user1, user2} {
 		rowsAffected, err := DataStore.Delete(ctx, record)
 		assert.NoError(err)
@@ -433,7 +439,7 @@ func TestCrudInMemory(t *testing.T) {
 func testFindAll(t *testing.T, ctx context.Context) {
 	assert := assert.New(t)
 
-	//FindAll should return all (two) records
+	// FindAll should return all (two) records
 	queryResults := make([]appUser, 0)
 	err := DataStore.FindAll(ctx, &queryResults)
 	sort.Sort(appUserSlice(queryResults))
@@ -452,16 +458,16 @@ func testFindWithCriteria(t *testing.T, ctx context.Context) {
 
 	expected := []appUser{user1, user2}
 
-	//Pass filtering criteria
+	// Pass filtering criteria
 	for _, user := range expected {
-		//Search by all fields
+		// Search by all fields
 		queryResults := make([]appUser, 0)
 		err := DataStore.FindWithFilter(ctx, &user, &queryResults)
 		assert.NoError(err)
 		assert.Len(queryResults, 1)
 		assert.Equal(user, queryResults[0])
 
-		//Search only by name
+		// Search only by name
 		queryResults = make([]appUser, 0)
 		err = DataStore.FindWithFilter(ctx, &appUser{Name: user.Name}, &queryResults)
 		assert.NoError(err)
@@ -490,115 +496,115 @@ func TestCrudWithMissingOrgId(t *testing.T) {
 	setupEmptyDbTables(t)
 	_, apps := make([]appUser, 0), make([]app, 0)
 
-	//Insert some data, to make sure that DAL methods fail not due to data missing in data store
+	// Insert some data, to make sure that DAL methods fail not due to data missing in data store
 	rowsAffected, err := DataStore.Insert(cokeAdminCtx, appUser{Id: RANDOM_ID})
 	assert.NoError(err)
 	assert.Equal(int64(1), rowsAffected)
 
-	//FIND ALL
-	err = DataStore.FindAll(context.Background(), &apps) //Missing org. ID in context
+	// FIND ALL
+	err = DataStore.FindAll(context.Background(), &apps) // Missing org. ID in context
 	assert.ErrorIs(err, ErrorFetchingMetadataFromContext)
 
-	//FIND BY ID
-	err = DataStore.Find(context.Background(), &app{Id: "random ID"}) //Missing org. ID in context
+	// FIND BY ID
+	err = DataStore.Find(context.Background(), &app{Id: "random ID"}) // Missing org. ID in context
 	assert.ErrorIs(err, ErrorFetchingMetadataFromContext)
 
-	//DELETE
-	_, err = DataStore.Delete(context.Background(), app{Id: "random ID"}) //Missing org. ID in context
+	// DELETE
+	_, err = DataStore.Delete(context.Background(), app{Id: "random ID"}) // Missing org. ID in context
 	assert.ErrorIs(err, ErrorFetchingMetadataFromContext)
 
-	//INSERT
-	rowsAffected, err = DataStore.Insert(context.Background(), app{Id: RANDOM_ID}) //Missing org. ID in context
+	// INSERT
+	rowsAffected, err = DataStore.Insert(context.Background(), app{Id: RANDOM_ID}) // Missing org. ID in context
 	assert.ErrorIs(err, ErrorFetchingMetadataFromContext)
 	assert.Equal(int64(0), rowsAffected)
 
-	//UPDATE
-	_, err = DataStore.Update(context.Background(), app{Id: RANDOM_ID}) //Missing org. ID in context
+	// UPDATE
+	_, err = DataStore.Update(context.Background(), app{Id: RANDOM_ID}) // Missing org. ID in context
 	assert.ErrorIs(err, ErrorFetchingMetadataFromContext)
 
 	_, err = DataStore.Delete(cokeAdminCtx, appUser{Id: RANDOM_ID})
 	assert.NoError(err)
 
-	//JOIN ONE TO MANY
+	// JOIN ONE TO MANY
 	var queryResult2 appUserSlice = make([]appUser, 1)
-	err = DataStore.PerformJoinOneToMany(context.Background(), &app{}, RANDOM_ID, "app_id", &queryResult2) //Missing org. ID
+	err = DataStore.PerformJoinOneToMany(context.Background(), &app{}, RANDOM_ID, "app_id", &queryResult2) // Missing org. ID
 	assert.ErrorIs(err, ErrorFetchingMetadataFromContext)
 
-	err = DataStore.PerformJoinOneToOne(context.Background(), &app{}, RANDOM_ID, &appUser{}, "app_id") //Missing org. ID
+	err = DataStore.PerformJoinOneToOne(context.Background(), &app{}, RANDOM_ID, &appUser{}, "app_id") // Missing org. ID
 	assert.ErrorIs(err, ErrorFetchingMetadataFromContext)
 }
 
 func testCrudWithInvalidParams(t *testing.T, ctx context.Context) {
 	assert := assert.New(t)
 
-	//Insert some data, to make sure that DAL methods fail not due to data missing in data store
+	// Insert some data, to make sure that DAL methods fail not due to data missing in data store
 	rowsAffected, err := DataStore.Insert(ctx, appUser{Id: RANDOM_ID})
 	assert.NoError(err)
 	assert.Equal(int64(1), rowsAffected)
 
-	//FIND ALL
+	// FIND ALL
 	var apps []app
-	err = DataStore.FindAll(ctx, apps) //Passing a nil slice
+	err = DataStore.FindAll(ctx, apps) // Passing a nil slice
 	assert.ErrorIs(err, IllegalArgumentError)
 
 	apps = make([]app, 0)
 
-	//FIND ALL
-	err = DataStore.FindAll(ctx, apps) //Passing slice by value
+	// FIND ALL
+	err = DataStore.FindAll(ctx, apps) // Passing slice by value
 	assert.ErrorIs(err, IllegalArgumentError)
 
-	//FIND ALL
-	err = DataStore.FindAll(ctx, &app{}) //Passing a struct by reference (instead of a slice of structs by reference)
+	// FIND ALL
+	err = DataStore.FindAll(ctx, &app{}) // Passing a struct by reference (instead of a slice of structs by reference)
 	assert.ErrorIs(err, IllegalArgumentError)
 
-	//FIND BY ID
-	err = DataStore.Find(ctx, appUser{}) //Passing a struct instead of a pointer to a struct
+	// FIND BY ID
+	err = DataStore.Find(ctx, appUser{}) // Passing a struct instead of a pointer to a struct
 	assert.ErrorIs(err, IllegalArgumentError)
 
-	//JOIN ONE TO MANY
+	// JOIN ONE TO MANY
 	var queryResult2 appUserSlice = make([]appUser, 1)
-	err = DataStore.PerformJoinOneToMany(ctx, app{}, RANDOM_ID, "app_id", &queryResult2) //Passing a struct instead of a pointer to a struct
+	err = DataStore.PerformJoinOneToMany(ctx, app{}, RANDOM_ID, "app_id", &queryResult2) // Passing a struct instead of a pointer to a struct
 	assert.ErrorIs(err, IllegalArgumentError)
 
-	err = DataStore.PerformJoinOneToMany(ctx, &app{}, "", "app_id", &queryResult2) //Passing an empty ID
+	err = DataStore.PerformJoinOneToMany(ctx, &app{}, "", "app_id", &queryResult2) // Passing an empty ID
 	assert.ErrorIs(err, IllegalArgumentError)
 
-	err = DataStore.PerformJoinOneToMany(ctx, &app{}, "    ", "app_id", &queryResult2) //Passing a blank ID
+	err = DataStore.PerformJoinOneToMany(ctx, &app{}, "    ", "app_id", &queryResult2) // Passing a blank ID
 	assert.ErrorIs(err, IllegalArgumentError)
 
-	err = DataStore.PerformJoinOneToMany(ctx, &app{}, RANDOM_ID, "app_id", make([]appUser, 1)) //Passing a slice instead of a pointer to a slice
+	err = DataStore.PerformJoinOneToMany(ctx, &app{}, RANDOM_ID, "app_id", make([]appUser, 1)) // Passing a slice instead of a pointer to a slice
 	assert.ErrorIs(err, IllegalArgumentError)
 
-	err = DataStore.PerformJoinOneToMany(ctx, &app{}, RANDOM_ID, "app_id", &appUser{}) //Passing a pointer but not to a slice
+	err = DataStore.PerformJoinOneToMany(ctx, &app{}, RANDOM_ID, "app_id", &appUser{}) // Passing a pointer but not to a slice
 	assert.ErrorIs(err, IllegalArgumentError)
 
-	err = DataStore.PerformJoinOneToMany(ctx, &app{}, RANDOM_ID, "", &queryResult2) //Passing an empty join column name
+	err = DataStore.PerformJoinOneToMany(ctx, &app{}, RANDOM_ID, "", &queryResult2) // Passing an empty join column name
 	assert.ErrorIs(err, IllegalArgumentError)
 
-	err = DataStore.PerformJoinOneToMany(ctx, &app{}, RANDOM_ID, "    ", &queryResult2) //Passing a blank join column name
+	err = DataStore.PerformJoinOneToMany(ctx, &app{}, RANDOM_ID, "    ", &queryResult2) // Passing a blank join column name
 	assert.ErrorIs(err, IllegalArgumentError)
 
 	queryResult2 = make([]appUser, 0)
-	err = DataStore.PerformJoinOneToMany(ctx, &app{}, RANDOM_ID, "app_id", &queryResult2) //Passing an empty slice
+	err = DataStore.PerformJoinOneToMany(ctx, &app{}, RANDOM_ID, "app_id", &queryResult2) // Passing an empty slice
 	assert.ErrorIs(err, IllegalArgumentError)
 
-	//JOIN ONE TO ONE
-	err = DataStore.PerformJoinOneToOne(ctx, app{}, RANDOM_ID, &appUser{}, "app_id") //Passing a struct instead of a pointer to a struct
+	// JOIN ONE TO ONE
+	err = DataStore.PerformJoinOneToOne(ctx, app{}, RANDOM_ID, &appUser{}, "app_id") // Passing a struct instead of a pointer to a struct
 	assert.ErrorIs(err, IllegalArgumentError)
 
-	err = DataStore.PerformJoinOneToOne(ctx, &app{}, "", &appUser{}, "app_id") //Passing an empty ID
+	err = DataStore.PerformJoinOneToOne(ctx, &app{}, "", &appUser{}, "app_id") // Passing an empty ID
 	assert.ErrorIs(err, IllegalArgumentError)
 
-	err = DataStore.PerformJoinOneToOne(ctx, &app{}, "    ", &appUser{}, "app_id") //Passing a blank ID
+	err = DataStore.PerformJoinOneToOne(ctx, &app{}, "    ", &appUser{}, "app_id") // Passing a blank ID
 	assert.ErrorIs(err, IllegalArgumentError)
 
-	err = DataStore.PerformJoinOneToOne(ctx, &app{}, RANDOM_ID, appUser{}, "app_id") //Passing a struct instead of a pointer to a struct
+	err = DataStore.PerformJoinOneToOne(ctx, &app{}, RANDOM_ID, appUser{}, "app_id") // Passing a struct instead of a pointer to a struct
 	assert.ErrorIs(err, IllegalArgumentError)
 
-	err = DataStore.PerformJoinOneToOne(ctx, &app{}, RANDOM_ID, &appUser{}, "") //Passing an empty join column name
+	err = DataStore.PerformJoinOneToOne(ctx, &app{}, RANDOM_ID, &appUser{}, "") // Passing an empty join column name
 	assert.ErrorIs(err, IllegalArgumentError)
 
-	err = DataStore.PerformJoinOneToOne(ctx, &app{}, RANDOM_ID, &appUser{}, "    ") //Passing a blank column name
+	err = DataStore.PerformJoinOneToOne(ctx, &app{}, RANDOM_ID, &appUser{}, "    ") // Passing a blank column name
 	assert.ErrorIs(err, IllegalArgumentError)
 }
 
@@ -622,7 +628,7 @@ func testJoins(t *testing.T, ctx context.Context) {
 	assert := assert.New(t)
 
 	{
-		//Perform join
+		// Perform join
 		var queryResult1 app = app{}
 		var queryResult2 appUserSlice = make([]appUser, 1)
 		err := DataStore.PerformJoinOneToMany(ctx, &queryResult1, myCokeApp.GetId()[0].(string), "app_id", &queryResult2)
@@ -631,16 +637,16 @@ func testJoins(t *testing.T, ctx context.Context) {
 
 		assert.Equal(myCokeApp, queryResult1)
 
-		//There should be 2 output records
+		// There should be 2 output records
 		assert.Len(queryResult2, 2)
 
-		//First and second output record should contain first and second user's info, respectively
+		// First and second output record should contain first and second user's info, respectively
 		assert.Equal(user1, queryResult2[0])
 		assert.Equal(user2, queryResult2[1])
 	}
 
 	{
-		//Perform join, while making an assumption that the relationship between app and appUser is one-to-one
+		// Perform join, while making an assumption that the relationship between app and appUser is one-to-one
 		var queryResult1 app = app{}
 		var queryResult2 appUser = appUser{}
 		err := DataStore.PerformJoinOneToOne(ctx, &queryResult1, myCokeApp.GetId()[0].(string), &queryResult2, "app_id")
@@ -657,12 +663,12 @@ func TestJoinsDatabase(t *testing.T) {
 }
 
 func TestJoinsInMemory(t *testing.T) {
-	t.SkipNow() //Skip this test case for now - joins in an in-memory cache do not work for now. Would need to change the signature of join methods to make it work
+	t.SkipNow() // Skip this test case for now - joins in an in-memory cache do not work for now. Would need to change the signature of join methods to make it work
 	setupInMemoryCache(t)
 	testJoins(t, cokeAdminCtx)
 }
 
-// Not all fields contain a tag for column name
+// Not all fields contain a tag for column name.
 type appUserInvalid struct {
 	Id             string `db_column:"id" primary_key:"true"`
 	Name           string
@@ -677,7 +683,7 @@ func (appUser appUserInvalid) GetId() []interface{} {
 	return []interface{}{appUser.Id}
 }
 
-// Does not contain a tag for primary key
+// Does not contain a tag for primary key.
 type appUserInvalid2 struct {
 	Id             string `db_column:"id"`
 	Name           string `db_column:"name"`
@@ -692,7 +698,7 @@ func (appUser appUserInvalid2) GetId() []interface{} {
 	return []interface{}{appUser.Id}
 }
 
-// Contains a field with an unsupported data type (unsigned int)
+// Contains a field with an unsupported data type (unsigned int).
 type appUserInvalid3 struct {
 	Id             string `db_column:"id" primary_key:"true"`
 	Name           string `db_column:"name"`
@@ -707,7 +713,7 @@ func (appUser appUserInvalid3) GetId() []interface{} {
 	return []interface{}{appUser.Id}
 }
 
-// Contains a field with an unexported field
+// Contains a field with an unexported field.
 type appUserInvalid4 struct {
 	Id             string `db_column:"id" primary_key:"true"`
 	Name           string `db_column:"name"`
@@ -722,7 +728,7 @@ func (appUser appUserInvalid4) GetId() []interface{} {
 	return []interface{}{appUser.Id}
 }
 
-// Contains a primary_key tag that doesn't have a boolean value
+// Contains a primary_key tag that doesn't have a boolean value.
 type appUserInvalid5 struct {
 	Id             string `db_column:"id" primary_key:"xxx"`
 	Name           string `db_column:"name"`
@@ -737,7 +743,7 @@ func (appUser appUserInvalid5) GetId() []interface{} {
 	return []interface{}{appUser.Id}
 }
 
-// Contains duplicate values for db_column tag
+// Contains duplicate values for db_column tag.
 type appUserInvalid6 struct {
 	Id             string `db_column:"id" primary_key:"true"`
 	Name           string `db_column:"name"`
@@ -766,33 +772,33 @@ func testDALRegistration(t *testing.T, ctx context.Context) {
 	assert := assert.New(t)
 	roleMapping := map[string]DbRole{SERVICE_AUDITOR: READER}
 
-	//Not all fields contain a tag for column name
+	// Not all fields contain a tag for column name
 	assert.Panics(func() { _ = DataStore.RegisterWithDAL(ctx, roleMapping, appUserInvalid{}) })
 
-	//Does not contain a tag for primary key
+	// Does not contain a tag for primary key
 	assert.Panics(func() { _ = DataStore.RegisterWithDAL(ctx, roleMapping, appUserInvalid2{}) })
 
-	//Contains a field with an unsupported data type (unsigned int)
+	// Contains a field with an unsupported data type (unsigned int)
 	assert.Panics(func() { _ = DataStore.RegisterWithDAL(ctx, roleMapping, appUserInvalid3{}) })
 
-	//Contains a field with an unexported field
+	// Contains a field with an unexported field
 	assert.Panics(func() { _ = DataStore.RegisterWithDAL(ctx, roleMapping, appUserInvalid4{}) })
-	logger.Debug(appUserInvalid4{}.appId) //Need to use this field to pass lint
+	logger.Debug(appUserInvalid4{}.appId) // Need to use this field to pass lint
 
-	//Contains a primary_key tag that doesn't have a boolean value
+	// Contains a primary_key tag that doesn't have a boolean value
 	assert.Panics(func() { _ = DataStore.RegisterWithDAL(ctx, roleMapping, appUserInvalid5{}) })
 
-	//Contains duplicate DB column names (duplicate values for TAG_DB_COLUMN tag)
+	// Contains duplicate DB column names (duplicate values for TAG_DB_COLUMN tag)
 	assert.Panics(func() { _ = DataStore.RegisterWithDAL(ctx, roleMapping, appUserInvalid6{}) })
 
-	//When registering a struct with DAL, you should be able to pass it either by value or by reference
+	// When registering a struct with DAL, you should be able to pass it either by value or by reference
 	err := DataStore.RegisterWithDAL(ctx, roleMapping, app{})
 	assert.NoError(err)
 
 	err = DataStore.RegisterWithDAL(ctx, roleMapping, &appUser{})
 	assert.NoError(err)
 
-	//You should be able to register a struct that happens to have a name that's a reserved keyword in Postgres
+	// You should be able to register a struct that happens to have a name that's a reserved keyword in Postgres
 	err = DataStore.RegisterWithDAL(ctx, roleMapping, &group{})
 	assert.NoError(err)
 }
@@ -802,11 +808,10 @@ func TestDALRegistrationDatabase(t *testing.T) {
 	testDALRegistration(t, cokeAdminCtx)
 
 	assert := assert.New(t)
-	//Remove DB connections. Check if RegisterWithDAL() is still able to reconnect to DB
+	// Remove DB connections. Check if RegisterWithDAL() is still able to reconnect to DB
 	relationalDb.dbMap = make(map[DbRole]*sql.DB)
 	err := DataStore.RegisterWithDAL(cokeAdminCtx, map[string]DbRole{SERVICE_AUDITOR: READER}, &appUser{})
 	assert.NoError(err)
-
 }
 
 func TestDALRegistrationInMemory(t *testing.T) {
@@ -821,7 +826,7 @@ func TestDeleteWithMultipleCSPRoles(t *testing.T) {
 	const APP_ADMIN = "app_admin"
 	assert := assert.New(t)
 
-	//Create context for custom admin who will have 2 service roles
+	// Create context for custom admin who will have 2 service roles
 	customCtx := DataStore.GetAuthorizer().GetAuthContext(COKE, APP_ADMIN, SERVICE_ADMIN)
 	DataStore.Configure(customCtx, false, DataStore.GetAuthorizer())
 
@@ -829,47 +834,47 @@ func TestDeleteWithMultipleCSPRoles(t *testing.T) {
 		assert.FailNow("Failed to drop DB tables for the following reason:\n" + err.Error())
 	}
 
-	//The custom admin will have a read access being an app admin and read & write access being a service admin
+	// The custom admin will have a read access being an app admin and read & write access being a service admin
 	roleMapping := map[string]DbRole{APP_ADMIN: READER, SERVICE_ADMIN: WRITER}
 	err := DataStore.RegisterWithDAL(customCtx, roleMapping, app{})
 	if err != nil {
 		assert.FailNow("Failed to setup the test case for the following reason:\n")
 	}
 
-	//Add some data to the app table
+	// Add some data to the app table
 	prepareInput()
 	if _, err = DataStore.Insert(cokeAdminCtx, myCokeApp); err != nil {
 		assert.FailNow("Failed to prepare data for the test case for the following reason:\n" + err.Error())
 	}
 
-	//Make sure that the custom admin is able to delete the data
+	// Make sure that the custom admin is able to delete the data
 	rowsAffected, err := DataStore.Delete(customCtx, myCokeApp)
 	assert.NoError(err)
 	assert.EqualValues(1, rowsAffected)
 }
 
 /*
-Tries to perform a query with a service role that has not been authorized to access the table
+Tries to perform a query with a service role that has not been authorized to access the table.
 */
 func TestUnauthorizedAccess(t *testing.T) {
 	assert := assert.New(t)
 	setupDbTables(t)
 
 	ctx := DataStore.GetAuthorizer().GetAuthContext(COKE, "unauthorized service role")
-	var queryResult = app{Id: myCokeApp.Id, OrgId: PEPSI}
+	queryResult := app{Id: myCokeApp.Id, OrgId: PEPSI}
 	err := DataStore.Find(ctx, &queryResult)
 	assert.ErrorIs(err, ErrOperationNotAllowed)
 }
 
 /*
-Tries CRUD operations with Pepsi's org ID in the context, while the data in DB belongs to Coke
+Tries CRUD operations with Pepsi's org ID in the context, while the data in DB belongs to Coke.
 */
 func testCrudWithMismatchingOrgId(t *testing.T, cokeCtx context.Context) {
 	assert := assert.New(t)
 	tenantStr := "tenant=Pepsi"
 	orgIdStr := "orgIdCol=Coke"
 
-	//Try to perform CRUD operations on Coke's data as a user from Pepsi
+	// Try to perform CRUD operations on Coke's data as a user from Pepsi
 	{
 		var queryResult1 app = app{}
 		var queryResult2 appUserSlice = make([]appUser, 1)
@@ -891,7 +896,7 @@ func testCrudWithMismatchingOrgId(t *testing.T, cokeCtx context.Context) {
 	{
 		var queryResult app = app{Id: myCokeApp.Id, OrgId: myCokeApp.OrgId}
 		err := DataStore.Find(pepsiAdminCtx, &queryResult)
-		assert.ErrorIs(err, ErrOperationNotAllowed) //Trying to read another tenant's data should return an error
+		assert.ErrorIs(err, ErrOperationNotAllowed) // Trying to read another tenant's data should return an error
 		assert.True(strings.Contains(err.Error(), tenantStr), err.Error())
 		assert.True(strings.Contains(err.Error(), orgIdStr), err.Error())
 	}
@@ -899,10 +904,10 @@ func testCrudWithMismatchingOrgId(t *testing.T, cokeCtx context.Context) {
 	{
 		queryResult := make([]app, 0)
 		err := DataStore.FindAll(pepsiAdminCtx, &queryResult)
-		assert.NoError(err)       //Pepsi tried to read all the records in DB - no error should be returned
-		assert.Empty(queryResult) //But Pepsi should not see Coke's data
+		assert.NoError(err)       // Pepsi tried to read all the records in DB - no error should be returned
+		assert.Empty(queryResult) // But Pepsi should not see Coke's data
 
-		//Try to read a specific record from DB that definitely exists but belongs to another tenant
+		// Try to read a specific record from DB that definitely exists but belongs to another tenant
 		queryResult = make([]app, 0)
 		err = DataStore.FindWithFilter(pepsiAdminCtx, &myCokeApp, &queryResult)
 		assert.ErrorIs(err, ErrOperationNotAllowed)
@@ -912,9 +917,9 @@ func testCrudWithMismatchingOrgId(t *testing.T, cokeCtx context.Context) {
 
 	{
 		_, err := DataStore.Delete(pepsiAdminCtx, myCokeApp)
-		assert.ErrorIs(err, ErrOperationNotAllowed) //Trying to delete another tenant's data should return an error
+		assert.ErrorIs(err, ErrOperationNotAllowed) // Trying to delete another tenant's data should return an error
 		queryResult := app{Id: myCokeApp.Id, OrgId: myCokeApp.OrgId}
-		err = DataStore.Find(cokeCtx, &queryResult) //Since the previous delete has failed, the data should still be in the DB
+		err = DataStore.Find(cokeCtx, &queryResult) // Since the previous delete has failed, the data should still be in the DB
 		assert.NoError(err)
 		assert.NotEmpty(queryResult)
 	}
@@ -926,12 +931,12 @@ func testCrudWithMismatchingOrgId(t *testing.T, cokeCtx context.Context) {
 			OrgId: COKE,
 		}
 
-		//You should not be able to insert another tenant's data into data store
+		// You should not be able to insert another tenant's data into data store
 		rowsAffected, err := DataStore.Insert(pepsiAdminCtx, newApp)
 		assert.ErrorIs(err, ErrOperationNotAllowed)
 		assert.Equal(int64(0), rowsAffected)
 
-		//Another tenant's data should not be found because it should not have been inserted into the data store
+		// Another tenant's data should not be found because it should not have been inserted into the data store
 		queryResult := app{Id: newApp.Id, OrgId: newApp.OrgId}
 		err = DataStore.Find(cokeCtx, &queryResult)
 		assert.ErrorIs(err, RecordNotFoundError)
@@ -939,13 +944,13 @@ func testCrudWithMismatchingOrgId(t *testing.T, cokeCtx context.Context) {
 	}
 
 	{
-		//App without an org. ID
+		// App without an org. ID
 		newApp := app{
 			Id:   "id-" + strconv.Itoa(rand.Int()),
 			Name: "New app",
 		}
 
-		//You should not be able to insert a "multi-tenant" record that lacks the org. ID
+		// You should not be able to insert a "multi-tenant" record that lacks the org. ID
 		rowsAffected, err := DataStore.Insert(pepsiAdminCtx, newApp)
 		assert.ErrorIs(err, ErrorExecutingSqlStmt)
 		assert.Equal(int64(0), rowsAffected)
@@ -954,14 +959,14 @@ func testCrudWithMismatchingOrgId(t *testing.T, cokeCtx context.Context) {
 	{
 		updatedApp := myCokeApp
 		updatedApp.Name = "new name"
-		_, err := DataStore.Update(pepsiAdminCtx, updatedApp) //You shouldn't be able to update another tenant's data with a tenant-specific role
+		_, err := DataStore.Update(pepsiAdminCtx, updatedApp) // You shouldn't be able to update another tenant's data with a tenant-specific role
 		assert.ErrorIs(err, ErrOperationNotAllowed)
 
 		queryResult := app{Id: myCokeApp.Id, OrgId: myCokeApp.OrgId}
 		err = DataStore.Find(cokeCtx, &queryResult)
 		assert.NoError(err)
-		assert.NotEqual(updatedApp.Name, queryResult.Name) //Record should not have been updated
-		assert.Equal(myCokeApp.Name, queryResult.Name)     //Record should not have been updated
+		assert.NotEqual(updatedApp.Name, queryResult.Name) // Record should not have been updated
+		assert.Equal(myCokeApp.Name, queryResult.Name)     // Record should not have been updated
 	}
 }
 
@@ -1009,13 +1014,13 @@ func TestWithBlankEnvVar(t *testing.T) {
 
 /*
 Checks that you can correctly sort DB roles based how restrictive they are (most restrictive to the least restrictive roles).
-E.g., tenant_reader more restrictive than reader
+E.g., tenant_reader more restrictive than reader.
 */
 func TestDbRoleSorting(t *testing.T) {
 	assert := assert.New(t)
 
 	var roles DbRoleSlice = []DbRole{WRITER, TENANT_WRITER, READER, TENANT_READER}
-	var writerIndex, tenantWriterIndex, readerIndex, tenantReaderIndex = 0, 1, 2, 3
+	writerIndex, tenantWriterIndex, readerIndex, tenantReaderIndex := 0, 1, 2, 3
 	assert.False(roles.Less(writerIndex, tenantWriterIndex))
 	assert.False(roles.Less(tenantWriterIndex, readerIndex))
 	assert.False(roles.Less(readerIndex, tenantReaderIndex))
@@ -1026,7 +1031,7 @@ func TestDbRoleSorting(t *testing.T) {
 }
 
 /*
-Tests revision blocking updates that are outdated
+Tests revision blocking updates that are outdated.
 */
 func TestRevision(t *testing.T) {
 	assert := assert.New(t)
@@ -1044,20 +1049,20 @@ func TestRevision(t *testing.T) {
 
 	err := DataStore.RegisterWithDAL(cokeAdminCtx, roleMapping, group{})
 	assert.NoError(err)
-	var myGroup = group{Id: "withRevisionId-12345", Name: "withRevisionName"}
+	myGroup := group{Id: "withRevisionId-12345", Name: "withRevisionName"}
 
-	//FIXME Initial revision should be 1
+	// FIXME Initial revision should be 1
 	const initialRevision int = 0
 
 	_, err = DataStore.Insert(cokeAdminCtx, myGroup)
 	assert.NoError(err)
 
-	var actualQueryResult, expectedQueryResult = group{Id: myGroup.Id}, group{Id: "withRevisionId-12345", Name: "withRevisionName", Revision: initialRevision}
+	actualQueryResult, expectedQueryResult := group{Id: myGroup.Id}, group{Id: "withRevisionId-12345", Name: "withRevisionName", Revision: initialRevision}
 	err = DataStore.Find(cokeAdminCtx, &actualQueryResult)
 	assert.NoError(err)
 	assert.Equal(expectedQueryResult, actualQueryResult)
 
-	//update should  succeed when revision is the same as the value in the db
+	// update should  succeed when revision is the same as the value in the db
 	updatedGroup := group{Id: myGroup.Id, Name: "updatedGroup", Revision: initialRevision}
 	rowsAffected, err := DataStore.Update(cokeAdminCtx, updatedGroup)
 	assert.NoError(err)
@@ -1068,7 +1073,7 @@ func TestRevision(t *testing.T) {
 	assert.Equal(initialRevision+1, actualQueryResult.Revision, "Expected revision to be incremented by 1 after update")
 	assert.Equal(updatedGroup.Name, actualQueryResult.Name)
 
-	//upsert should  succeed when revision is the same as the value in the db
+	// upsert should  succeed when revision is the same as the value in the db
 	updatedGroup = group{Id: myGroup.Id, Name: "updatedGroup2", Revision: actualQueryResult.Revision}
 	rowsAffected, err = DataStore.Upsert(cokeAdminCtx, updatedGroup)
 	assert.NoError(err)
@@ -1079,7 +1084,7 @@ func TestRevision(t *testing.T) {
 	assert.Equal(initialRevision+2, actualQueryResult.Revision, "Expected revision to be incremented by 1 after upsert")
 	assert.Equal(updatedGroup.Name, actualQueryResult.Name)
 
-	//update should fail when revision is not equal to the value in the db
+	// update should fail when revision is not equal to the value in the db
 	updatedGroup = group{Id: myGroup.Id, Name: "updatedGroup3", Revision: initialRevision + 100}
 	_, err = DataStore.Update(cokeAdminCtx, updatedGroup)
 	assert.ErrorIs(err, RevisionConflictError)
@@ -1089,7 +1094,7 @@ func TestRevision(t *testing.T) {
 	assert.NotEqual(updatedGroup.Revision+1, actualQueryResult.Revision)
 	assert.NotEqual(updatedGroup.Name, actualQueryResult.Name)
 
-	//upsert should fail when revision is not equal to the value in the db
+	// upsert should fail when revision is not equal to the value in the db
 	updatedGroup = group{Id: myGroup.Id, Name: "updatedGroup4", Revision: initialRevision + 100}
 	_, err = DataStore.Upsert(cokeAdminCtx, updatedGroup)
 	assert.ErrorIs(err, RevisionConflictError)
@@ -1099,9 +1104,8 @@ func TestRevision(t *testing.T) {
 	assert.NotEqual(updatedGroup.Revision+1, actualQueryResult.Revision)
 	assert.NotEqual(updatedGroup.Name, actualQueryResult.Name)
 
-	//upsert should fail when revision is less than the value in the db
+	// upsert should fail when revision is less than the value in the db
 	updatedGroup = group{Id: myGroup.Id, Name: "updatedGroup4", Revision: 1}
 	_, err = DataStore.Upsert(cokeAdminCtx, updatedGroup)
 	assert.ErrorIs(err, RevisionConflictError)
-
 }

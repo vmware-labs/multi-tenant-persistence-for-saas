@@ -24,7 +24,7 @@ import (
 )
 
 /*
-Datastore: Interface to be implemented by the persistence library
+Datastore: Interface to be implemented by the persistence library.
 */
 type dataStore interface {
 	GetAuthorizer() Authorizer
@@ -60,9 +60,11 @@ type DataStoreTestHelper interface {
 	Truncate(tableNames ...string) error // Truncates DB tables
 }
 
-var DataStore dataStore = &relationalDb
-var Helper DataStoreHelper = &relationalDb
-var TestHelper DataStoreTestHelper = &relationalDb
+var (
+	DataStore  dataStore           = &relationalDb
+	Helper     DataStoreHelper     = &relationalDb
+	TestHelper DataStoreTestHelper = &relationalDb
+)
 
 func configureDataStore(isDataStoreInMemory bool, authorizer Authorizer) {
 	if authorizer == nil {

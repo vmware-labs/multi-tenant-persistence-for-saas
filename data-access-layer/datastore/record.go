@@ -29,7 +29,7 @@ type Record interface {
 }
 
 func GetRecordInstanceFromSlice(x interface{}) Record {
-	var sliceType = reflect.TypeOf(x)
+	sliceType := reflect.TypeOf(x)
 	if sliceType.Kind() == reflect.Ptr {
 		sliceType = sliceType.Elem()
 	}
@@ -40,7 +40,7 @@ func GetRecordInstanceFromSlice(x interface{}) Record {
 	*/
 	var areSliceElemPtrs bool = sliceType.Elem().Kind() == reflect.Ptr
 
-	var sliceElemType = sliceType.Elem()
+	sliceElemType := sliceType.Elem()
 	if sliceElemType.Kind() == reflect.Ptr {
 		sliceElemType = sliceElemType.Elem()
 	}

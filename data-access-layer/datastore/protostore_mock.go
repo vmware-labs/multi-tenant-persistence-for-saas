@@ -88,19 +88,22 @@ func (p *ProtoStoreMock) DeleteById(ctx context.Context, id string, msg proto.Me
 }
 
 func (p *ProtoStoreMock) InsertWithMetadata(ctx context.Context, id string, msg proto.Message, metadata Metadata) (
-	rowsAffected int64, md Metadata, err error) {
+	rowsAffected int64, md Metadata, err error,
+) {
 	args := p.Called(ctx, id, msg, metadata)
 	return args.Get(0).(int64), args.Get(1).(Metadata), args.Error(2)
 }
 
 func (p *ProtoStoreMock) UpdateWithMetadata(ctx context.Context, id string, msg proto.Message, metadata Metadata) (
-	rowsAffected int64, md Metadata, err error) {
+	rowsAffected int64, md Metadata, err error,
+) {
 	args := p.Called(ctx, id, msg, metadata)
 	return args.Get(0).(int64), args.Get(1).(Metadata), args.Error(2)
 }
 
 func (p *ProtoStoreMock) UpsertWithMetadata(ctx context.Context, id string, msg proto.Message, metadata Metadata) (
-	rowsAffected int64, md Metadata, err error) {
+	rowsAffected int64, md Metadata, err error,
+) {
 	args := p.Called(ctx, id, msg, metadata)
 	return args.Get(0).(int64), args.Get(1).(Metadata), args.Error(2)
 }

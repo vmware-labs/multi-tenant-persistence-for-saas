@@ -32,16 +32,16 @@ Library processing all the golang tags in the struct into SQL domain
 */
 
 const (
-	// Golang Tags
+	// Golang Tags.
 	TAG_DB_COLUMN = "db_column"
 	TAG_PRIMARY   = "primary_key"
 	TAG_INDEX     = "db_index"
 
-	// SQL Columns
+	// SQL Columns.
 	ORG_ID_COLUMN_NAME   = "org_id"
 	REVISION_COLUMN_NAME = "_revision"
 
-	// Messages
+	// Messages.
 	REVISION_OUTDATED_MSG = "Invalid update - outdated "
 )
 
@@ -52,21 +52,21 @@ type DatabaseColumn struct {
 	index    bool
 }
 
-// Maps a DB table name to its columns
+// Maps a DB table name to its columns.
 var databaseColumns map[string]*[]DatabaseColumn = make(map[string]*[]DatabaseColumn)
 
-// Maps a DB table name to booleans showing if the table is multitenant
+// Maps a DB table name to booleans showing if the table is multitenant.
 var multitenancyMap map[string]bool = make(map[string]bool)
 
-// Maps a DB table name to the names of DB columns that comprise the primary key
+// Maps a DB table name to the names of DB columns that comprise the primary key.
 var primaryKeyMap map[string][]string = make(map[string][]string)
 
-// Maps DB table name to boolean showing if the table is concurrent with _revision column
+// Maps DB table name to boolean showing if the table is concurrent with _revision column.
 var revisionSupportMap map[string]bool = make(map[string]bool)
 
 /*
 Checks if revisioning is supported in the given table (if
-the struct contains a field with tag "db_column" equal to "_revision")
+the struct contains a field with tag "db_column" equal to "_revision").
 */
 func isRevisioningSupported(tableName string, x Record) bool {
 	if _, ok := revisionSupportMap[tableName]; !ok {
@@ -93,7 +93,7 @@ func IsMultitenant(x Record, tableNames ...string) bool {
 }
 
 /*
-Returns columns comprising a primary key of a table
+Returns columns comprising a primary key of a table.
 */
 func getPrimaryKey(tableName string, x Record) []string {
 	if _, ok := primaryKeyMap[tableName]; !ok {
@@ -164,7 +164,7 @@ func getDatabaseColumnDatatype(structField reflect.StructField) string {
 }
 
 /*
-Wraps IF NOT EXISTS around the given statement
+Wraps IF NOT EXISTS around the given statement.
 */
 func addIfNotExists(stmt, cond string) string {
 	var wrapper strings.Builder
@@ -193,7 +193,7 @@ func addIfExists(stmt, cond string) string {
 Returns a SQL statement that sets a Postgres config. parameter
 settingName - parameter name
 settingValue - parameter value
-isLocal - if true, the new value for the parameter will apply only for current transaction; otherwise, the new value will be visible outside this transaction
+isLocal - if true, the new value for the parameter will apply only for current transaction; otherwise, the new value will be visible outside this transaction.
 */
 func getSetConfigStmt(settingName, settingValue string, isLocal bool) string {
 	var stmt strings.Builder
@@ -209,9 +209,9 @@ func getSetConfigStmt(settingName, settingValue string, isLocal bool) string {
 }
 
 /*
-Returns a SQL statement that enables row-level security in a DB table
+Returns a SQL statement that enables row-level security in a DB table.
 */
-func getEnableRLSStmt(tableName string, x Record) string {
+func getEnableRLSStmt(tableName string, _ Record) string {
 	var stmt strings.Builder
 	stmt.WriteString("ALTER TABLE ")
 	stmt.WriteString(tableName)
@@ -221,7 +221,7 @@ func getEnableRLSStmt(tableName string, x Record) string {
 }
 
 /*
-Returns a SQL statement that creates a DB user with the given specs, if it does not exist yet
+Returns a SQL statement that creates a DB user with the given specs, if it does not exist yet.
 */
 func getCreateUserStmt(username DbRole, password string) string {
 	var findRoleQuery, createUserStmt strings.Builder
@@ -241,7 +241,7 @@ func getCreateUserStmt(username DbRole, password string) string {
 	return stmt
 }
 
-func getGrantPrivilegesStmt(tableName string, x Record, username DbRole, commands []string) string {
+func getGrantPrivilegesStmt(tableName string, _ Record, username DbRole, commands []string) string {
 	var stmt strings.Builder
 	stmt.WriteString("GRANT ")
 	stmt.WriteString(strings.Join(commands, ", "))
@@ -255,9 +255,9 @@ func getGrantPrivilegesStmt(tableName string, x Record, username DbRole, command
 }
 
 /*
-Returns a SQL statement that creates an RLS-policy with the given specs, if it does not exist yet
+Returns a SQL statement that creates an RLS-policy with the given specs, if it does not exist yet.
 */
-func getCreatePolicyStmt(tableName string, x Record, userSpecs dbUserSpecs) string {
+func getCreatePolicyStmt(tableName string, _ Record, userSpecs dbUserSpecs) string {
 	if userSpecs.existingRowsCond == "" || userSpecs.newRowsCond == "" {
 		panic(userSpecs)
 	}
@@ -291,7 +291,7 @@ Validates that the given struct satisfied the following preconditions:
 - Each field is exported
 - Each field has a tag for DB column name with a unique value
 - At least one field has a tag marking it as a primary key
-- Only supported data types are used in the struct
+- Only supported data types are used in the struct.
 */
 func validateStruct(x Record) {
 	structValue := reflect.ValueOf(x)
@@ -301,9 +301,9 @@ func validateStruct(x Record) {
 	structType := structValue.Type()
 
 	// Each field in the struct has to be exported, have a 'db_column' tag, be of one of the supported types
-	//The struct has to have a primary key consisting of one field
+	// The struct has to have a primary key consisting of one field
 	numPrimaryKeyTags := 0
-	var dbColumnNamesSet = make(map[string]struct{}) // Set that will contain the [unique] names of DB columns'
+	dbColumnNamesSet := make(map[string]struct{}) // Set that will contain the [unique] names of DB columns'
 	for i := 0; i < structType.NumField(); i++ {
 		dbColumnNamesSet[structType.Field(i).Tag.Get(TAG_DB_COLUMN)] = struct{}{}
 
@@ -374,15 +374,15 @@ func GetTableName(x interface{}) string {
 }
 
 /*
-Extracts name of a struct comprising the input slice
+Extracts name of a struct comprising the input slice.
 */
 func GetTableNameFromSlice(x interface{}) string {
-	var sliceType = reflect.TypeOf(x)
+	sliceType := reflect.TypeOf(x)
 	if sliceType.Kind() == reflect.Ptr {
 		sliceType = sliceType.Elem()
 	}
 
-	var sliceElemType = sliceType.Elem()
+	sliceElemType := sliceType.Elem()
 	if sliceElemType.Kind() == reflect.Ptr {
 		sliceElemType = sliceElemType.Elem()
 	}
@@ -391,7 +391,7 @@ func GetTableNameFromSlice(x interface{}) string {
 }
 
 /*
-Generates RLS-policy name based on database role/user and table name
+Generates RLS-policy name based on database role/user and table name.
 */
 func GetRlsPolicyName(username DbRole, tableName string) string {
 	policyName := strings.ToLower(string(username) + "_" + tableName + "_policy")
@@ -408,7 +408,7 @@ func getCreateTableStmt(tableName string, x Record) string {
 	validateStruct(x)
 
 	var stmt strings.Builder
-	var primaryKeys = make([]string, 0, 4 /* init. capacity */)
+	primaryKeys := make([]string, 0, 4 /* init. capacity */)
 	stmt.WriteString("CREATE TABLE IF NOT EXISTS ")
 	stmt.WriteString(tableName)
 	stmt.WriteString(" (\n")
@@ -500,7 +500,7 @@ func getTruncateTableStmt(tableName string) string {
 	return addIfExists(truncateTableStmt.String(), findTableQuery.String())
 }
 
-// Returns a DROP TABLE statement
+// Returns a DROP TABLE statement.
 func getDropTableStmt(tableName string) string {
 	stmt := fmt.Sprintf("DROP TABLE IF EXISTS %s ;", tableName)
 	logger.Infof("Executing Statement %s", stmt)
@@ -508,9 +508,9 @@ func getDropTableStmt(tableName string) string {
 }
 
 // Returns a SELECT statement with no WHERE condition(s) and arguments to be used in place of placeholders.
-// Considers non-empty fields of x as filters for WHERE clause
+// Considers non-empty fields of x as filters for WHERE clause.
 func getSelectStmt(tableName string, x Record) (string, []interface{}) {
-	var placeholderIndex = 1
+	placeholderIndex := 1
 	structValue := reflect.ValueOf(x)
 	if structValue.Kind() == reflect.Ptr {
 		structValue = structValue.Elem()
@@ -543,9 +543,8 @@ func getSelectStmt(tableName string, x Record) (string, []interface{}) {
 	return query.String(), args
 }
 
-// Returns a SELECT statement with a single WHERE condition for the primary key
+// Returns a SELECT statement with a single WHERE condition for the primary key.
 func getSelectSingleStmt(tableName string, x Record) string {
-
 	placeholderIndex := 1
 	var query strings.Builder
 	query.WriteString("SELECT ")
@@ -569,7 +568,6 @@ func getSelectSingleStmt(tableName string, x Record) string {
 }
 
 func getSelectJoinStmt(table1Name string, table2Name string, record1 Record, record2 Record, record2JoinOnColumn string, limit int) string {
-
 	var query strings.Builder
 	table1Columns := *getColumnNames(table1Name, record1)
 	table2Columns := *getColumnNames(table2Name, record2)
@@ -747,7 +745,6 @@ func getUpsertStmt(tableName string, x Record) (string, []interface{}) {
 
 // Returns a DELETE statement.
 func getDeleteStmt(tableName string, x Record) string {
-
 	placeholderIndex := 1
 	var stmt strings.Builder
 	stmt.WriteString("DELETE FROM ")

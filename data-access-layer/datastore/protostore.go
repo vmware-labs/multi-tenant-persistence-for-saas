@@ -133,8 +133,7 @@ func MetadataFrom(protoStoreMsg ProtoStoreMsg) Metadata {
 	}
 }
 
-type ProtobufDataStore struct {
-}
+type ProtobufDataStore struct{}
 
 func (p ProtobufDataStore) GetAuthorizer() Authorizer {
 	return Helper.GetAuthorizer()
@@ -160,7 +159,7 @@ func (p ProtobufDataStore) Register(ctx context.Context, roleMapping map[string]
 }
 
 /*
-Inserts a Protobuf message with the given id and belonging to the given org. into data store
+Inserts a Protobuf message with the given id and belonging to the given org. into data store.
 */
 func (p ProtobufDataStore) Insert(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, md Metadata, err error) {
 	return p.InsertWithMetadata(ctx, id, msg, Metadata{})
@@ -177,7 +176,7 @@ func (p ProtobufDataStore) InsertWithMetadata(ctx context.Context, id string, ms
 		return 0, Metadata{}, err
 	}
 
-	var protoStoreMsg = ProtoStoreMsg{
+	protoStoreMsg := ProtoStoreMsg{
 		Id:       id,
 		Msg:      bytes,
 		ParentId: metadata.ParentId,
@@ -203,7 +202,7 @@ func (p ProtobufDataStore) InsertWithMetadata(ctx context.Context, id string, ms
 /*
 Fetches metadata for the record and updates the Protobuf message.
 NOTE: Avoid using this method in user-workflows and only in service-to-service workflows
-when the updates are already ordered by some other service/app
+when the updates are already ordered by some other service/app.
 */
 func (p ProtobufDataStore) Update(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, md Metadata, err error) {
 	md, err = p.GetMetadata(ctx, id, msg)
@@ -214,7 +213,7 @@ func (p ProtobufDataStore) Update(ctx context.Context, id string, msg proto.Mess
 }
 
 /*
-Updates a Protobuf message
+Updates a Protobuf message.
 */
 func (p ProtobufDataStore) UpdateWithMetadata(ctx context.Context, id string, msg proto.Message, metadata Metadata) (rowsAffected int64, md Metadata, err error) {
 	bytes, err := ToBytes(msg)
@@ -227,7 +226,7 @@ func (p ProtobufDataStore) UpdateWithMetadata(ctx context.Context, id string, ms
 		return 0, Metadata{}, err
 	}
 
-	var protoStoreMsg = ProtoStoreMsg{
+	protoStoreMsg := ProtoStoreMsg{
 		Id:       id,
 		Msg:      bytes,
 		ParentId: metadata.ParentId,
@@ -248,7 +247,7 @@ func (p ProtobufDataStore) UpdateWithMetadata(ctx context.Context, id string, ms
 /*
 Fetches metadata for the record and upserts the Protobuf message.
 NOTE: Avoid using this method in user-workflows and only in service-to-service workflows
-when the updates are already ordered by some other service/app
+when the updates are already ordered by some other service/app.
 */
 func (p ProtobufDataStore) Upsert(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, md Metadata, err error) {
 	md, err = p.GetMetadata(ctx, id, msg)
@@ -264,7 +263,8 @@ func (p ProtobufDataStore) Upsert(ctx context.Context, id string, msg proto.Mess
 }
 
 func (p ProtobufDataStore) UpsertWithMetadata(ctx context.Context, id string, msg proto.Message, metadata Metadata) (
-	rowsAffected int64, md Metadata, err error) {
+	rowsAffected int64, md Metadata, err error,
+) {
 	bytes, err := ToBytes(msg)
 	if err != nil {
 		return 0, Metadata{}, err
@@ -275,7 +275,7 @@ func (p ProtobufDataStore) UpsertWithMetadata(ctx context.Context, id string, ms
 		return 0, Metadata{}, err
 	}
 
-	var protoStoreMsg = ProtoStoreMsg{
+	protoStoreMsg := ProtoStoreMsg{
 		Id:       id,
 		Msg:      bytes,
 		ParentId: metadata.ParentId,
@@ -301,13 +301,12 @@ Finds a Protobuf message by ID.
 If metadata arg. is non-nil, fills it with the metadata (parent ID & revision) of the Protobuf message that was found.
 */
 func (p ProtobufDataStore) FindById(ctx context.Context, id string, msg proto.Message, metadata *Metadata) error {
-
 	orgId, err := Helper.GetAuthorizer().GetOrgFromContext(ctx)
 	if err != nil {
 		return err
 	}
 
-	var protoStoreMsg = ProtoStoreMsg{
+	protoStoreMsg := ProtoStoreMsg{
 		Id:    id,
 		OrgId: orgId,
 	}
@@ -322,13 +321,12 @@ func (p ProtobufDataStore) FindById(ctx context.Context, id string, msg proto.Me
 }
 
 func (p ProtobufDataStore) GetMetadata(ctx context.Context, id string, msg proto.Message) (md Metadata, err error) {
-
 	orgId, err := Helper.GetAuthorizer().GetOrgFromContext(ctx)
 	if err != nil {
 		return md, err
 	}
 
-	var protoStoreMsg = ProtoStoreMsg{
+	protoStoreMsg := ProtoStoreMsg{
 		Id:    id,
 		OrgId: orgId,
 	}
@@ -374,7 +372,7 @@ func (p ProtobufDataStore) FindAllAsMap(ctx context.Context, msgsMap interface{}
 		False if msgsMap is a map of strings to STRUCTS
 	*/
 	var isMsgsElemPtrToStructs bool = reflect.TypeOf(msgsMap).Elem().Kind() == reflect.Ptr
-	var tableName = GetTableNameFromSlice(msgsMap)
+	tableName := GetTableNameFromSlice(msgsMap)
 
 	protoStoreMsgs := make([]ProtoStoreMsg, 0)
 	err = Helper.FindAllInTable(ctx, tableName, &protoStoreMsgs)
@@ -383,7 +381,7 @@ func (p ProtobufDataStore) FindAllAsMap(ctx context.Context, msgsMap interface{}
 	}
 
 	metadataMap = make(map[string]Metadata, len(protoStoreMsgs))
-	var msgsMapValue = reflect.ValueOf(msgsMap)
+	msgsMapValue := reflect.ValueOf(msgsMap)
 
 	for _, protoStoreMsg := range protoStoreMsgs {
 		// Empty instance of a Protobuf message
@@ -425,7 +423,7 @@ func (p ProtobufDataStore) FindAll(ctx context.Context, msgs interface{}) (metad
 		False if msgs is a pointer to a slice of structs
 	*/
 	var isSlicePtrToStructs bool = reflect.TypeOf(msgs).Elem().Elem().Kind() == reflect.Ptr
-	var tableName = GetTableNameFromSlice(msgs)
+	tableName := GetTableNameFromSlice(msgs)
 
 	protoStoreMsgs := make([]ProtoStoreMsg, 0)
 	err = Helper.FindAllInTable(ctx, tableName, &protoStoreMsgs)
@@ -466,7 +464,7 @@ func (p ProtobufDataStore) DeleteById(ctx context.Context, id string, msg proto.
 		return 0, err
 	}
 
-	var protoStoreMsg = ProtoStoreMsg{
+	protoStoreMsg := ProtoStoreMsg{
 		Id:    id,
 		OrgId: orgId,
 	}

@@ -47,7 +47,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Database roles/users
+// Database roles/users.
 type DbRole string
 
 type DbRoleSlice []DbRole // Needed for sorting records
@@ -65,39 +65,41 @@ the second role has more permissions.
 A reader role is always considered to have fewer permissions than a writer role.
 and a tenant-specific reader/writer role is always considered to have fewer permissions than a non-tenant specific reader/writer role, respectively.
 
-TENANT_READER < READER < TENANT_WRITER < WRITER
+TENANT_READER < READER < TENANT_WRITER < WRITER.
 */
 func (a DbRoleSlice) Less(i, j int) bool {
 	var roleI, roleJ string = string(a[i]), string(a[j])
-	if roleI == roleJ {
+	switch {
+	case roleI == roleJ:
 		return true
-	} else if strings.Contains(roleI, "reader") && strings.Contains(roleJ, "writer") {
+	case strings.Contains(roleI, "reader") && strings.Contains(roleJ, "writer"):
 		return true
-	} else if strings.Contains(roleI, "writer") && strings.Contains(roleJ, "reader") {
+	case strings.Contains(roleI, "writer") && strings.Contains(roleJ, "reader"):
 		return false
-	} else if strings.Contains(roleI, "reader") && strings.Contains(roleJ, "reader") {
+	case strings.Contains(roleI, "reader") && strings.Contains(roleJ, "reader"):
 		return DbRole(roleI) == TENANT_READER
-	} else if strings.Contains(roleI, "writer") && strings.Contains(roleJ, "writer") {
+	case strings.Contains(roleI, "writer") && strings.Contains(roleJ, "writer"):
 		return DbRole(roleI) == TENANT_WRITER
+	default:
+		panic("Unable to compare " + roleI + " and " + roleJ)
 	}
-
-	panic("Unable to compare " + roleI + " and " + roleJ)
 }
+
 func (a DbRoleSlice) Swap(i, j int) {
 	a[i], a[j] = a[j], a[i]
 }
 
 const (
-	// DB Runtime Parameters
+	// DB Runtime Parameters.
 	DB_CONFIG_ORG_ID = "multitenant.orgId" // Name of Postgres run-time config. parameter that will store current user's org. ID
 
-	// DB Roles
+	// DB Roles.
 	TENANT_READER DbRole = "tenant_reader"
 	TENANT_WRITER DbRole = "tenant_writer"
 	READER        DbRole = "reader"
 	WRITER        DbRole = "writer"
 
-	// Env. variable names
+	// Env. variable names.
 	DB_NAME_ENV_VAR           = "DB_NAME"
 	DB_PORT_ENV_VAR           = "DB_PORT"
 	DB_HOST_ENV_VAR           = "DB_HOST"
@@ -107,7 +109,7 @@ const (
 	LOGGER_LEVEL_ENV_VAR      = "LOG_LEVEL"
 )
 
-// Specifications for database user
+// Specifications for database user.
 type dbUserSpecs struct {
 	username         DbRole // Username/role name (in Postgres, users and roles are equivalent)
 	password         string
@@ -148,7 +150,6 @@ func init() {
 }
 
 func (database *RelationalDb) initialize() error {
-
 	// Ensure all the needed environment variables are present and non-empty
 	for _, envVar := range []string{DB_ADMIN_USERNAME_ENV_VAR, DB_ADMIN_PASSWORD_ENV_VAR, DB_NAME_ENV_VAR, DB_PORT_ENV_VAR, DB_HOST_ENV_VAR, SSL_MODE_ENV_VAR} {
 		if _, isPresent := os.LookupEnv(envVar); !isPresent {
@@ -164,11 +165,11 @@ func (database *RelationalDb) initialize() error {
 
 	var err error
 	var dbPort int
-	var dbAdminUsername = getAdminUsername()
-	var dbAdminPassword = strings.TrimSpace(os.Getenv(DB_ADMIN_PASSWORD_ENV_VAR))
-	var dbName = strings.TrimSpace(os.Getenv(DB_NAME_ENV_VAR))
-	var dbHost = strings.TrimSpace(os.Getenv(DB_HOST_ENV_VAR))
-	var sslMode = strings.TrimSpace(os.Getenv(SSL_MODE_ENV_VAR))
+	dbAdminUsername := getAdminUsername()
+	dbAdminPassword := strings.TrimSpace(os.Getenv(DB_ADMIN_PASSWORD_ENV_VAR))
+	dbName := strings.TrimSpace(os.Getenv(DB_NAME_ENV_VAR))
+	dbHost := strings.TrimSpace(os.Getenv(DB_HOST_ENV_VAR))
+	sslMode := strings.TrimSpace(os.Getenv(SSL_MODE_ENV_VAR))
 
 	// Ensure port number is valid
 	if dbPort, err = strconv.Atoi(strings.TrimSpace(os.Getenv(DB_PORT_ENV_VAR))); err != nil {
@@ -216,14 +217,13 @@ func (database *RelationalDb) initialize() error {
 			logger.Error(err)
 			return err
 		}
-
 	}
 
 	return nil
 }
 
 /*
-Opens a Postgres DB using the provided config. parameters
+Opens a Postgres DB using the provided config. parameters.
 */
 func openDb(dbHost string, dbPort int, dbUsername DbRole, dbPassword string, dbName string, sslMode string) (*sql.DB, error) {
 	logger.Infof("Connecting to database %s:%d[%s]", dbHost, dbPort, dbName)
@@ -270,9 +270,9 @@ func getTx(db *sql.DB, orgId string, isMultitenant bool) (*sql.Tx, error) {
 }
 
 /*
-Validates tenancy information and returns a transaction with right dbRole
+Validates tenancy information and returns a transaction with right dbRole.
 */
-func (database *RelationalDb) validateAndGetTx(ctx context.Context, tableName string, record Record, sqlStmt string) (*sql.Tx, error) {
+func (database *RelationalDb) validateAndGetTx(ctx context.Context, tableName string, record Record, _ string) (*sql.Tx, error) {
 	err, orgId, dbRole, isMultitenant := database.getTenantInfoFromCtx(ctx, tableName)
 	if err != nil {
 		return nil, err
@@ -297,7 +297,7 @@ func (database *RelationalDb) validateAndGetTx(ctx context.Context, tableName st
 	return tx, nil
 }
 
-// Resets DB connection pools
+// Resets DB connection pools.
 func (database *RelationalDb) Reset() {
 	for _, db := range database.dbMap {
 		if db != nil {
@@ -321,7 +321,7 @@ Assumes the following:
 Requires a unique ID of the record in the first table to be passed, which leads to only one record to be returned.
 record1 and record2 must be pointers to structs implementing Record interface and represent entities persisted to the 2 DB tables.
 record1 and record2 will be filled with data retrieved from the 2 DB tables.
-TODO return ErrOperationNotAllowed if the library user is trying to access other tenant's data
+TODO return ErrOperationNotAllowed if the library user is trying to access other tenant's data.
 */
 func (database *RelationalDb) PerformJoinOneToOne(ctx context.Context, record1 Record, record1Id string, record2 Record, record2JoinOnColumn string) error {
 	if err := validateIdAndRecordPtr(record1Id, record1); err != nil {
@@ -502,7 +502,6 @@ func (database *RelationalDb) FindInTable(ctx context.Context, tableName string,
 		if err = row.Err(); err != nil {
 			// rows.Next() failed because there is an error, not because query returned no results
 			err = ErrorExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, queryWithArgs)
-
 		} else {
 			err = RecordNotFoundError.WithMap(map[ErrorContextKey]string{
 				SQL_STMT:    queryWithArgs,
@@ -621,7 +620,7 @@ func (database *RelationalDb) FindWithFilterInTable(ctx context.Context, tableNa
 }
 
 /*
-Inserts a record into a DB table
+Inserts a record into a DB table.
 */
 func (database *RelationalDb) Insert(ctx context.Context, record Record) (int64, error) {
 	return database.InsertInTable(ctx, GetTableName(record), record)
@@ -659,19 +658,19 @@ func (database *RelationalDb) InsertInTable(ctx context.Context, tableName strin
 		logger.Error(err)
 		return 0, err
 	}
-	var rowsAffected, _ = result.RowsAffected()
+	rowsAffected, _ := result.RowsAffected()
 	return rowsAffected, nil
 }
 
 /*
-Deletes a record from a DB table
+Deletes a record from a DB table.
 */
 func (database *RelationalDb) Delete(ctx context.Context, record Record) (int64, error) {
 	return database.DeleteInTable(ctx, GetTableName(record), record)
 }
 
 /*
- * Drops the DB tables given by Records
+ * Drops the DB tables given by Records.
  */
 func (database *RelationalDb) DropTables(records ...Record) error {
 	// Initialize DB connection
@@ -745,7 +744,7 @@ func (database *RelationalDb) Truncate(tableNames ...string) error {
 }
 
 /*
-Deletes a record from DB table tableName
+Deletes a record from DB table tableName.
 */
 func (database *RelationalDb) DeleteInTable(ctx context.Context, tableName string, record Record) (int64, error) {
 	stmt := getDeleteStmt(tableName, record)
@@ -776,19 +775,19 @@ func (database *RelationalDb) DeleteInTable(ctx context.Context, tableName strin
 		return 0, err
 	}
 
-	var rowsAffected, _ = result.RowsAffected()
+	rowsAffected, _ := result.RowsAffected()
 	return rowsAffected, nil
 }
 
 /*
-Updates a record in a DB table
+Updates a record in a DB table.
 */
 func (database *RelationalDb) Update(ctx context.Context, record Record) (int64, error) {
 	return database.UpdateInTable(ctx, GetTableName(record), record)
 }
 
 /*
-Updates a record in DB table tableName
+Updates a record in DB table tableName.
 */
 func (database *RelationalDb) UpdateInTable(ctx context.Context, tableName string, record Record) (int64, error) {
 	// Execute query
@@ -822,19 +821,19 @@ func (database *RelationalDb) UpdateInTable(ctx context.Context, tableName strin
 		logger.Error(err)
 		return 0, err
 	}
-	var rowsAffected, _ = result.RowsAffected()
+	rowsAffected, _ := result.RowsAffected()
 	return rowsAffected, nil
 }
 
 /*
-Upserts a record in a DB table
+Upserts a record in a DB table.
 */
 func (database *RelationalDb) Upsert(ctx context.Context, record Record) (int64, error) {
 	return database.UpsertInTable(ctx, GetTableName(record), record)
 }
 
 /*
-Upserts a record in DB table tableName
+Upserts a record in DB table tableName.
 */
 func (database *RelationalDb) UpsertInTable(ctx context.Context, tableName string, record Record) (int64, error) {
 	// Execute query
@@ -868,7 +867,7 @@ func (database *RelationalDb) UpsertInTable(ctx context.Context, tableName strin
 		logger.Error(err)
 		return 0, err
 	}
-	var rowsAffected, _ = result.RowsAffected()
+	rowsAffected, _ := result.RowsAffected()
 	return rowsAffected, nil
 }
 
@@ -891,7 +890,7 @@ There are 4 possible DB roles to choose from:
 Panics if the struct doesn't pass the following validations:
 - Each field has to have a tag indicating the name of the relevant column in DB table
 - Each field has to be exported
-- Each field has to be of a supported data type (signed integral data types, boolean, strings)
+- Each field has to be of a supported data type (signed integral data types, boolean, strings).
 */
 func (database *RelationalDb) RegisterWithDALHelper(_ context.Context, roleMapping map[string]DbRole, tableName string, record Record) error {
 	if roleMapping == nil {
@@ -1005,7 +1004,7 @@ Generates specifications of 4 DB users:
 - user with read-only access to his org
 - user with read & write access to his org
 - user with read-only access to all orgs
-- user with read & write access to all orgs
+- user with read & write access to all orgs.
 */
 func getDbUsers(tableName string) []dbUserSpecs {
 	writer := dbUserSpecs{
@@ -1046,7 +1045,7 @@ func getDbUsers(tableName string) []dbUserSpecs {
 
 /*
 Generates a password for a DB user by getting a hash of DB admin. password concatenated with a DB username and
-converting the hash to hex
+converting the hash to hex.
 */
 func getPassword(username DbRole) string {
 	h := fnv.New32a()
@@ -1072,7 +1071,7 @@ in given structs are.
 The record must be pointers to structs.
 */
 func parseSqlRows(rows *sql.Rows, records ...Record) error {
-	var initCapacity = reflect.ValueOf(records[0]).Elem().NumField()
+	initCapacity := reflect.ValueOf(records[0]).Elem().NumField()
 	dest := make([]interface{}, 0, initCapacity)
 
 	// TODO(jeyhun): Ordering of DB vs struct is tightly coupled here, will
@@ -1094,7 +1093,7 @@ func parseSqlRows(rows *sql.Rows, records ...Record) error {
 		return err
 	}
 
-	var destIndex = 0
+	destIndex := 0
 	for _, record := range records {
 		structValue := reflect.ValueOf(record).Elem()
 		for i := 0; i < structValue.NumField(); i++ {
