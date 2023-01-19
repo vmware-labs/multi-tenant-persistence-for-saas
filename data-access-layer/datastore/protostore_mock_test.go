@@ -47,8 +47,8 @@ func TestProtoStoreMock(t *testing.T) {
 	myMockProtoStore.On("Configure", mock.Anything, mock.Anything, mock.Anything).Return()
 	myMockProtoStore.On("GetAuthorizer").Return(MetadataBasedAuthorizer{})
 
-	//Confirm that ProtoStoreMock implements all methods of ProtoStore
-	//Modifying the signature of any method of ProtoStore will lead to the line below not compiling
+	// Confirm that ProtoStoreMock implements all methods of ProtoStore
+	// Modifying the signature of any method of ProtoStore will lead to the line below not compiling
 	var myProtoStore ProtoStore = myMockProtoStore
 
 	ctx := context.TODO()
@@ -69,7 +69,7 @@ func TestProtoStoreMock(t *testing.T) {
 	_, _ = myProtoStore.GetRevision(ctx, "001", &pb.CPU{})
 	_ = myProtoStore.GetAuthorizer()
 
-	//Check that each ProtoStore method invocation is actually registered in the mock
+	// Check that each ProtoStore method invocation is actually registered in the mock
 	myMockProtoStore.AssertCalled(t, "DropTables", mock.Anything)
 	myMockProtoStore.AssertCalled(t, "Register", mock.Anything, mock.Anything, mock.Anything)
 	myMockProtoStore.AssertCalled(t, "Insert", mock.Anything, mock.Anything, mock.Anything)
@@ -84,5 +84,4 @@ func TestProtoStoreMock(t *testing.T) {
 	myMockProtoStore.AssertCalled(t, "GetRevision", mock.Anything, mock.Anything, mock.Anything)
 	myMockProtoStore.AssertCalled(t, "Configure", mock.Anything, mock.Anything, mock.Anything)
 	myMockProtoStore.AssertCalled(t, "GetAuthorizer")
-
 }

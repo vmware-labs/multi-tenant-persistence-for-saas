@@ -42,7 +42,7 @@ const (
 )
 
 func contextToString(ctx interface{}) string {
-	var ctxStr = ""
+	ctxStr := ""
 	contextValues := reflect.ValueOf(ctx).Elem()
 	contextKeys := reflect.TypeOf(ctx).Elem()
 
@@ -56,11 +56,12 @@ func contextToString(ctx interface{}) string {
 			if reflectField.Name == "Context" {
 				ctxStr += contextToString(reflectValue.Interface())
 			} else {
-				if reflectField.Name == "key" {
+				switch reflectField.Name {
+				case "key":
 					ctxStr += fmt.Sprintf(" %+v=", reflectValue.Interface())
-				} else if reflectField.Name == "val" {
+				case "val":
 					ctxStr += fmt.Sprintf("%+v,", reflectValue.Interface())
-				} else {
+				default:
 					ctxStr += fmt.Sprintf("%+v=%+v,", reflectField.Name, reflectValue.Interface())
 				}
 			}
@@ -76,7 +77,7 @@ type DbError struct {
 }
 
 func (e *DbError) Error() string {
-	var str = e.msg
+	str := e.msg
 	if e.err != nil {
 		str = str + ": " + e.err.Error()
 	}
@@ -127,7 +128,7 @@ func (c ErrorContextKey) String() string {
 }
 
 func (e *DbError) WithValue(key ErrorContextKey, value string) *DbError {
-	var ctx = e.ctx
+	ctx := e.ctx
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -139,7 +140,7 @@ func (e *DbError) WithValue(key ErrorContextKey, value string) *DbError {
 }
 
 func (e *DbError) WithMap(kvMap map[ErrorContextKey]string) *DbError {
-	var ctx = e.ctx
+	ctx := e.ctx
 	if ctx == nil {
 		ctx = context.Background()
 	}

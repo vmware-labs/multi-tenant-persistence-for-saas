@@ -52,8 +52,7 @@ const (
 	METADATA_ROLE_AUDITOR         = "auditor" // can be tenant_auditor, *_auditor
 )
 
-type MetadataBasedAuthorizer struct {
-}
+type MetadataBasedAuthorizer struct{}
 
 func (s MetadataBasedAuthorizer) GetOrgFromContext(ctx context.Context) (string, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
@@ -103,8 +102,9 @@ func (s MetadataBasedAuthorizer) IsOperationAllowed(ctx context.Context, tableNa
 	}
 
 	// If the DB role is tenant-specific (TENANT_READER or TENANT_WRITER) and the table is multi-tenant,
-	//make sure that the record being inserted/modified/updated/deleted/queried belongs to the user's org.
-	//If operation is SELECT but no specific tenant's data is being queried (e.g., FindAll() was called), allow the operation to proceed
+	// make sure that the record being inserted/modified/updated/deleted/queried belongs to the user's org.
+	// If operation is SELECT but no specific tenant's data is being queried (e.g., FindAll() was called),
+	// allow the operation to proceed
 	if dbRole.IsTenantDbRole() && IsMultitenant(record, tableName) {
 		orgId, err := s.GetOrgFromContext(ctx)
 		// OrgId check required for Tenant DB roles only
@@ -128,6 +128,7 @@ func (s MetadataBasedAuthorizer) Configure(_ ...interface{}) {
 func (s MetadataBasedAuthorizer) GetAuthContext(orgId string, roles ...string) context.Context {
 	return metadata.NewIncomingContext(context.Background(), metadata.Pairs(METADATA_KEY_ORGID, orgId, METADATA_KEY_ROLE, roles[0]))
 }
+
 func (s MetadataBasedAuthorizer) GetDefaultOrgAdminContext() context.Context {
 	return s.GetAuthContext(GLOBAL_DEFAULT_ORG_ID, METADATA_ROLE_ADMIN)
 }

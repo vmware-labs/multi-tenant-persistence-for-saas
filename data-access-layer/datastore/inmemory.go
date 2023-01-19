@@ -54,7 +54,7 @@ func (inMemory *InMemory) GetAuthorizer() Authorizer {
 }
 
 /*
-Reset all the caches in memory and mutexes
+Reset all the caches in memory and mutexes.
 */
 func (inMemory *InMemory) Reset() {
 	inMemory.caches = make(map[string](map[string]Record))
@@ -63,7 +63,7 @@ func (inMemory *InMemory) Reset() {
 }
 
 /*
-Initializes the in-memory caches and their mutexes
+Initializes the in-memory caches and their mutexes.
 */
 func (inMemory *InMemory) initialize(cacheName string) {
 	// If registered caches map hasn't been initialized, do so
@@ -129,7 +129,7 @@ Assumes the relationship between record1 and record2 is one-to-many.
 Stores the retrieved record from the first cache in record1 argument, and the matching
 records from the second cache in query2Output argument.
 */
-// TODO - if the first cache contains the record but the second one doesn't, don't return anything
+// TODO - if the first cache contains the record but the second one doesn't, don't return anything.
 func (inMemory *InMemory) PerformJoinOneToMany(ctx context.Context, record1 Record, record1Id string, record2JoinOnColumn string, query2Output interface{}) error {
 	if err := validateIdAndRecordPtr(record1Id, record1); err != nil {
 		return err
@@ -160,7 +160,7 @@ func (inMemory *InMemory) PerformJoinOneToMany(ctx context.Context, record1 Reco
 	}
 
 	query2OutputValue := reflect.ValueOf(query2Output).Elem()
-	var size = query2OutputValue.Len()
+	size := query2OutputValue.Len()
 	for i := 0; i < size; i++ {
 		record := query2OutputValue.Index(i)
 
@@ -234,6 +234,7 @@ records must be a pointer to a slice of structs.
 func (inMemory *InMemory) FindWithFilter(ctx context.Context, record Record, records interface{}) error {
 	return inMemory.FindWithFilterInTable(ctx, GetTableName(record), record, records)
 }
+
 func (inMemory *InMemory) FindWithFilterInTable(ctx context.Context, cacheName string, record Record, records interface{}) error {
 	// Validate arguments
 	if reflect.TypeOf(records).Kind() != reflect.Ptr || reflect.TypeOf(records).Elem().Kind() != reflect.Slice {
@@ -273,6 +274,7 @@ record must be a struct.
 func (inMemory *InMemory) Insert(ctx context.Context, record Record) (int64, error) {
 	return inMemory.InsertInTable(ctx, GetTableName(record), record)
 }
+
 func (inMemory *InMemory) InsertInTable(_ context.Context, cacheName string, record Record) (int64, error) {
 	var id string = record.GetId()[0].(string)
 	if err := validateIdAndRecordStruct(id, record); err != nil {
@@ -341,7 +343,7 @@ func (inMemory *InMemory) Drop(tableNames ...string) error {
 }
 
 /*
-Deletes all records from cache
+Deletes all records from cache.
 */
 func (inMemory *InMemory) Truncate(tableNames ...string) error {
 	inMemory.cacheMapMutex.Lock()
@@ -407,6 +409,7 @@ func (inMemory *InMemory) UpsertInTable(ctx context.Context, cacheName string, r
 func (inMemory *InMemory) RegisterWithDAL(ctx context.Context, roleMapping map[string]DbRole, record Record) error {
 	return inMemory.RegisterWithDALHelper(ctx, roleMapping, GetTableName(record), record)
 }
+
 func (inMemory *InMemory) RegisterWithDALHelper(_ context.Context, roleMapping map[string]DbRole, cacheName string, record Record) error {
 	logger.Debugf("Registering the struct %q with DAL (backed by an in-memory cache)... Using authorizer %s...", cacheName, GetTableName(inMemory.authorizer))
 
@@ -416,14 +419,14 @@ func (inMemory *InMemory) RegisterWithDALHelper(_ context.Context, roleMapping m
 }
 
 /*
-Configures data store to use Postgres or an in-memory cache
+Configures data store to use Postgres or an in-memory cache.
 */
 func (inMemory *InMemory) Configure(_ context.Context, isDataStoreInMemory bool, authorizer Authorizer) {
 	configureDataStore(isDataStoreInMemory, authorizer)
 }
 
 /*
-Copies contents of source, which is a struct, to dest, which is a pointer to a struct
+Copies contents of source, which is a struct, to dest, which is a pointer to a struct.
 */
 func copyRecord(source, dest Record) {
 	destRecordValue := reflect.ValueOf(dest).Elem()

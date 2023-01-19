@@ -26,16 +26,16 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-// Checks that it's possible to extract org. ID from auth. context
+// Checks that it's possible to extract org. ID from auth. context.
 func testGettingOrgFromContext(t *testing.T, authorizer Authorizer) {
 	t.Helper()
 	assert := assert.New(t)
 
-	//Negative test case - no auth. context in ctx
+	// Negative test case - no auth. context in ctx
 	_, err := authorizer.GetOrgFromContext(context.Background())
 	assert.ErrorIs(err, ErrorFetchingMetadataFromContext)
 
-	//Negative test cases - missing org. ID
+	// Negative test cases - missing org. ID
 	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(METADATA_KEY_ROLE, "admin"))
 	_, err = authorizer.GetOrgFromContext(ctx)
 	assert.ErrorIs(err, ErrorMissingOrgId)
@@ -50,7 +50,7 @@ func TestGettingOrgFromContextWithMetadataAuthorizer(t *testing.T) {
 	testGettingOrgFromContext(t, MetadataBasedAuthorizer{})
 }
 
-// Positive test case
+// Positive test case.
 func TestGettingMatchingDbRoleWithMetadataBasedAuthorizer(t *testing.T) {
 	assert := assert.New(t)
 
@@ -70,7 +70,7 @@ func TestGettingMatchingDbRoleWithMetadataBasedAuthorizer(t *testing.T) {
 /*
 Positive test case.
 Checks that MetadataBasedAuthorizer permits access to other tenants' data for READER & WRITER roles
-and does not permit access to other tenants' data for TENANT_READER & TENANT_WRITER roles
+and does not permit access to other tenants' data for TENANT_READER & TENANT_WRITER roles.
 */
 func TestAllowingOperationsWithMetadataBasedAuthorizer(t *testing.T) {
 	assert := assert.New(t)
@@ -81,18 +81,18 @@ func TestAllowingOperationsWithMetadataBasedAuthorizer(t *testing.T) {
 
 	someApp := app{
 		Id:    "001",
-		OrgId: COKE, //Another tenant's record
+		OrgId: COKE, // Another tenant's record
 	}
 
-	//You should not be able to access other tenants' data with TENANT_READER role
+	// You should not be able to access other tenants' data with TENANT_READER role
 	err := authorizer.IsOperationAllowed(tenantAuditorCtx, "app", someApp)
 	assert.ErrorIs(err, ErrOperationNotAllowed)
 
-	//You should be able to access other tenants' data with TENANT_WRITER role
+	// You should be able to access other tenants' data with TENANT_WRITER role
 	err = authorizer.IsOperationAllowed(serviceAdminCtx, "app", someApp)
 	assert.ErrorIs(err, ErrOperationNotAllowed)
 
-	//You should always be able to perform a SELECT operation if you're not adding a filter with another tenant's org. ID
+	// You should always be able to perform a SELECT operation if you're not adding a filter with another tenant's org. ID
 	err = authorizer.IsOperationAllowed(serviceAdminCtx, "app", app{})
 	assert.Nil(err)
 }
