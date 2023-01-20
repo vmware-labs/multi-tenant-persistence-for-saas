@@ -55,9 +55,12 @@ type DataStoreHelper interface {
 }
 
 type DataStoreTestHelper interface {
-	DropTables(records ...Record) error  // Drop DB tables by records
-	Drop(tableNames ...string) error     // Drops DB tables
-	Truncate(tableNames ...string) error // Truncates DB tables
+	DropTables(records ...Record) error                       // Drop DB tables by records
+	Drop(tableNames ...string) error                          // Drops DB tables
+	DropCascade(cascade bool, tableNames ...string) error     // Drops DB tables, with an option to drop them in a cascading fashion
+	Truncate(tableNames ...string) error                      // Truncates DB tables
+	TruncateCascade(cascade bool, tableNames ...string) error // Truncates DB tables, with an option to truncate them in a cascading fashion
+	DoesTableExist(tableName string) error                    // Checks if table exists
 }
 
 var (

@@ -174,6 +174,7 @@ var (
 	ErrorUnmarshalling               = BaseDbError.With("Cannot unmarshal binary to proto message")
 	ErrOperationNotAllowed           = BaseDbError.With("Not authorized to perform the operation on other tenant's data")
 	ErrorFetchingMetadataFromContext = BaseDbError.With("Error fetching metadata from GRPC context")
+	ErrorTableDoesNotExist           = BaseDbError.With("Table does not exist")
 	RecordNotFoundError              = BaseDbError.With("Record not found")
 
 	ErrAuthContext       = BaseDbError.With("Error extracting authContext from context")

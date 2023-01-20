@@ -40,7 +40,7 @@ var inMemoryDataStore InMemory = InMemory{
 	caches:        make(map[string](map[string]Record)),
 	cacheMutexes:  make(map[string]*sync.RWMutex),
 	cacheMapMutex: sync.RWMutex{},
-	authorizer:    MetadataBasedAuthorizer{}, // dummy authorizer that allows all operations and just used to extract org. ID from context
+	authorizer:    MetadataBasedAuthorizer{},
 }
 
 func (inMemory *InMemory) SetAuthorizer(authorizer Authorizer) {
@@ -197,7 +197,7 @@ func (inMemory *InMemory) FindInTable(ctx context.Context, cacheName string, rec
 
 	queryResult, ok := cache[id]
 	if !ok {
-		return RecordNotFoundError.WithValue(PRIMARY_KEY, fmt.Sprintf("%v", record.GetId()))
+		return RecordNotFoundError.WithValue(PRIMARY_KEY, fmt.Sprintf("%+v", record.GetId()))
 	}
 
 	copyRecord(queryResult, record)
@@ -319,38 +319,59 @@ func (inMemory *InMemory) DeleteInTable(ctx context.Context, cacheName string, r
 	return rowsAffected, nil
 }
 
-func (inMemory *InMemory) clearCache(tableName string) {
-	if _, present := inMemory.cacheMutexes[tableName]; !present {
+func (inMemory *InMemory) clearCache(cacheName string) {
+	if _, present := inMemory.cacheMutexes[cacheName]; !present {
 		return
 	}
 
-	inMemory.cacheMutexes[tableName].Lock()
-	inMemory.caches[tableName] = make(map[string]Record)
-	inMemory.cacheMutexes[tableName].Unlock()
+	inMemory.cacheMutexes[cacheName].Lock()
+	inMemory.caches[cacheName] = make(map[string]Record)
+	inMemory.cacheMutexes[cacheName].Unlock()
 }
 
-func (inMemory *InMemory) DropTables(records ...Record) error {
-	for _, record := range records {
-		inMemory.clearCache(GetTableName(record))
+func (inMemory *InMemory) DropTables(caches ...Record) error {
+	cacheNames := make([]string, 0, len(caches))
+	for _, cache := range caches {
+		cacheNames = append(cacheNames, GetTableName(cache))
 	}
 
-	return nil
+	return inMemory.Drop(cacheNames...)
 }
 
-func (inMemory *InMemory) Drop(tableNames ...string) error {
-	inMemory.Reset()
-	return nil
+func (inMemory *InMemory) Drop(cacheNames ...string) error {
+	return inMemory.DropCascade(false, cacheNames...)
+}
+
+func (inMemory *InMemory) DropCascade(_ bool, cacheNames ...string) error {
+	return inMemory.Truncate(cacheNames...)
 }
 
 /*
 Deletes all records from cache.
 */
-func (inMemory *InMemory) Truncate(tableNames ...string) error {
+func (inMemory *InMemory) Truncate(cacheNames ...string) error {
+	return inMemory.TruncateCascade(false, cacheNames...)
+}
+
+func (inMemory *InMemory) TruncateCascade(_ bool, cacheNames ...string) error {
 	inMemory.cacheMapMutex.Lock()
 	defer inMemory.cacheMapMutex.Unlock()
 
 	for tableName := range inMemory.caches {
 		inMemory.clearCache(tableName)
+	}
+	return nil
+}
+
+/*
+Checks if a cache with the given name exists.
+*/
+func (inMemory *InMemory) DoesTableExist(cacheName string) error {
+	inMemory.cacheMapMutex.Lock()
+	defer inMemory.cacheMapMutex.Unlock()
+
+	if _, present := inMemory.caches[cacheName]; !present {
+		return ErrorTableDoesNotExist.WithValue("table_name", cacheName)
 	}
 	return nil
 }

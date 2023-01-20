@@ -102,12 +102,31 @@ func TestUpdateStmtGeneration(t *testing.T) {
 	assert.Equal(2, strings.Count(whereClause, "$"))
 }
 
+type structWithCompoundPrimaryKey struct {
+	A string `db_column:"a" primary_key:"true"`
+	D string `db_column:"d" primary_key:"true"`
+	C string `db_column:"c" primary_key:"true"`
+	E string `db_column:"e"`
+	B string `db_column:"b" primary_key:"true"`
+}
+
+func (s structWithCompoundPrimaryKey) GetId() []interface{} {
+	return []interface{}{s.A, s.D, s.C, s.B}
+}
+
+/*
+Checks if the SQL stmt. for upserting a record is correct.
+*/
 func TestUpsertStmtGeneration(t *testing.T) {
 	assert := assert.New(t)
-	myApp, _, _ := prepareInput()
-	tableName := GetTableName(myApp)
+	myStructWithCompoundPrimaryKey := structWithCompoundPrimaryKey{A: "A", D: "D", C: "C", E: "E", B: "B"}
 
-	stmt, args := getUpsertStmt(tableName, myApp)
+	tableName := GetTableName(myStructWithCompoundPrimaryKey)
+
+	stmt, args := getUpsertStmt(tableName, myStructWithCompoundPrimaryKey)
+	logger.Infof("SQL statement (with placeholders):\n%s\n", stmt)
+	stmtWithArgs := replacePlaceholdersInSqlStmt(stmt, args...)
+	logger.Infof("SQL statement (no placeholders):\n%s\n", stmtWithArgs)
 	assert.Equal(len(args), strings.Count(stmt, "$"))
 
 	onConflictClause := stmt[strings.Index(stmt, "ON CONFLICT"):strings.Index(stmt, "DO UPDATE SET")]
@@ -115,16 +134,26 @@ func TestUpsertStmtGeneration(t *testing.T) {
 	columnNames := onConflictClause[len("ON CONFLICT ("):]
 	columnNames = strings.TrimRight(columnNames, ")")
 	split := strings.Split(columnNames, ",")
-	primaryKey := getPrimaryKey(GetTableName(myApp), myApp)
+	primaryKey := getPrimaryKey(tableName, myStructWithCompoundPrimaryKey)
 	assert.Len(split, len(primaryKey), "Expected ON CONFLICT clause to contain only primary key columns")
 
 	valuesClause := stmt[strings.Index(stmt, "VALUES"):strings.Index(stmt, "ON CONFLICT")]
-	assert.Equal(3, strings.Count(valuesClause, "$"),
-		"Expected the number of dollar signs in VALUES clause to be equal to the number of primary columns")
+	assert.Equal(5, strings.Count(valuesClause, "$"),
+		"Expected the number of dollar signs in VALUES clause to be equal to the number of columns")
+	expectedArgs := []interface{}{
+		myStructWithCompoundPrimaryKey.A,
+		myStructWithCompoundPrimaryKey.D,
+		myStructWithCompoundPrimaryKey.C,
+		myStructWithCompoundPrimaryKey.E,
+		myStructWithCompoundPrimaryKey.B,
+	}
+	assert.Equal(expectedArgs, args[0:5])
 
 	updateClause := stmt[strings.Index(stmt, "ON CONFLICT"):]
 	assert.Equal(1, strings.Count(updateClause, "$"),
 		"Expected the number of dollar signs in UPDATE clause to be equal to the number of non-primary columns")
+	expectedArgs = []interface{}{myStructWithCompoundPrimaryKey.E}
+	assert.Equal(expectedArgs, args[5:6])
 }
 
 /*

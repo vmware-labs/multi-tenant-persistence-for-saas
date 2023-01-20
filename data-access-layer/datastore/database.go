@@ -107,6 +107,10 @@ const (
 	DB_ADMIN_USERNAME_ENV_VAR = "DB_ADMIN_USERNAME"
 	DB_ADMIN_PASSWORD_ENV_VAR = "DB_ADMIN_PASSWORD"
 	LOGGER_LEVEL_ENV_VAR      = "LOG_LEVEL"
+
+	// Constants for logger field names & values.
+	COMP             = "comp"
+	SAAS_PERSISTENCE = "saas-persistence"
 )
 
 // Specifications for database user.
@@ -146,7 +150,7 @@ func init() {
 	} else {
 		rawLogger.SetLevel(level)
 	}
-	logger = rawLogger.WithField("comp", "saas-persistence")
+	logger = rawLogger.WithField(COMP, SAAS_PERSISTENCE)
 }
 
 func (database *RelationalDb) initialize() error {
@@ -201,6 +205,8 @@ func (database *RelationalDb) initialize() error {
 	for _, dbUserSpecs := range users {
 		stmt := getCreateUserStmt(dbUserSpecs.username, dbUserSpecs.password)
 		if _, err = database.dbMap[dbAdminUsername].Exec(stmt); err != nil {
+			err = ErrorExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, stmt)
+			logger.Errorln(err)
 			return err
 		}
 
@@ -262,6 +268,8 @@ func getTx(db *sql.DB, orgId string, isMultitenant bool) (*sql.Tx, error) {
 		// Set org. ID
 		stmt := getSetConfigStmt(DB_CONFIG_ORG_ID, orgId, true)
 		if _, err = tx.Exec(stmt); err != nil {
+			err = ErrorExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, stmt)
+			logger.Errorln(err)
 			return nil, err
 		}
 	}
@@ -490,7 +498,6 @@ func (database *RelationalDb) FindInTable(ctx context.Context, tableName string,
 
 	row, err := tx.Query(query, record.GetId()...)
 	queryWithArgs := replacePlaceholdersInSqlStmt(query, record.GetId()...) // Replace placeholders with actual values for logging purposes
-	logger.Debugln(queryWithArgs)
 	if err != nil {
 		err = ErrorExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, queryWithArgs)
 		logger.Errorln(err)
@@ -503,10 +510,7 @@ func (database *RelationalDb) FindInTable(ctx context.Context, tableName string,
 			// rows.Next() failed because there is an error, not because query returned no results
 			err = ErrorExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, queryWithArgs)
 		} else {
-			err = RecordNotFoundError.WithMap(map[ErrorContextKey]string{
-				SQL_STMT:    queryWithArgs,
-				PRIMARY_KEY: fmt.Sprintf("%v", record.GetId()),
-			})
+			err = RecordNotFoundError.WithMap(map[ErrorContextKey]string{PRIMARY_KEY: fmt.Sprintf("%+v", record.GetId())})
 		}
 		logger.Errorln(err)
 		return err
@@ -673,32 +677,21 @@ func (database *RelationalDb) Delete(ctx context.Context, record Record) (int64,
  * Drops the DB tables given by Records.
  */
 func (database *RelationalDb) DropTables(records ...Record) error {
-	// Initialize DB connection
-	if err := relationalDb.initialize(); err != nil {
-		return err
-	}
-
-	if _, ok := os.LookupEnv(DB_ADMIN_USERNAME_ENV_VAR); !ok {
-		return ErrorMissingEnvVar.WithValue(ENV_VAR, DB_ADMIN_USERNAME_ENV_VAR)
-	}
-
-	adminUsername := getAdminUsername()
-
-	// Drop DB tables
+	tableNames := make([]string, 0, len(records))
 	for _, record := range records {
-		tableName := GetTableName(record)
-		stmt := getDropTableStmt(tableName)
-		if _, err := relationalDb.dbMap[adminUsername].Exec(stmt); err != nil {
-			return err
-		}
+		tableNames = append(tableNames, GetTableName(record))
 	}
-	return nil
+	return database.DropCascade(false, tableNames...)
 }
 
 /*
 Drops given DB tables.
 */
 func (database *RelationalDb) Drop(tableNames ...string) error {
+	return database.DropCascade(false, tableNames...)
+}
+
+func (database *RelationalDb) DropCascade(cascade bool, tableNames ...string) error {
 	// Initialize DB connection
 	if err := relationalDb.initialize(); err != nil {
 		return err
@@ -712,8 +705,10 @@ func (database *RelationalDb) Drop(tableNames ...string) error {
 
 	// Drop DB tables
 	for _, tableName := range tableNames {
-		stmt := getDropTableStmt(tableName)
+		stmt := getDropTableStmt(tableName, cascade)
 		if _, err := relationalDb.dbMap[adminUsername].Exec(stmt); err != nil {
+			err = ErrorExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, stmt)
+			logger.Errorln(err)
 			return err
 		}
 	}
@@ -721,6 +716,10 @@ func (database *RelationalDb) Drop(tableNames ...string) error {
 }
 
 func (database *RelationalDb) Truncate(tableNames ...string) error {
+	return database.TruncateCascade(false, tableNames...)
+}
+
+func (database *RelationalDb) TruncateCascade(cascade bool, tableNames ...string) error {
 	// Initialize DB connection
 	if err := relationalDb.initialize(); err != nil {
 		return err
@@ -734,10 +733,44 @@ func (database *RelationalDb) Truncate(tableNames ...string) error {
 
 	// Truncate DB tables
 	for _, tableName := range tableNames {
-		stmt := getTruncateTableStmt(tableName)
+		stmt := getTruncateTableStmt(tableName, cascade)
 		if _, err := relationalDb.dbMap[adminUsername].Exec(stmt); err != nil {
+			err = ErrorExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, stmt)
+			logger.Errorln(err)
 			return err
 		}
+	}
+
+	return nil
+}
+
+func (database *RelationalDb) DoesTableExist(tableName string) error {
+	// Initialize DB connection
+	if err := relationalDb.initialize(); err != nil {
+		return err
+	}
+
+	if _, ok := os.LookupEnv(DB_ADMIN_USERNAME_ENV_VAR); !ok {
+		return ErrorMissingEnvVar.WithValue(ENV_VAR, DB_ADMIN_USERNAME_ENV_VAR)
+	}
+
+	adminUsername := getAdminUsername()
+	stmt := getFindTableStmt(tableName)
+	row, err := relationalDb.dbMap[adminUsername].Query(stmt)
+	if err != nil {
+		err = ErrorExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, stmt)
+		return err
+	}
+
+	defer row.Close()
+	if !row.Next() {
+		if err = row.Err(); err != nil {
+			// rows.Next() failed because there is an error, not because query returned no results
+			err = ErrorExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, stmt)
+			logger.Errorln(err)
+			return err
+		}
+		return ErrorTableDoesNotExist.WithValue("table_name", tableName)
 	}
 
 	return nil
@@ -915,7 +948,10 @@ func (database *RelationalDb) RegisterWithDALHelper(_ context.Context, roleMappi
 	var err error
 	stmt := getCreateTableStmt(tableName, record)
 	if _, err = database.dbMap[adminUsername].Exec(stmt); err != nil {
-		err = ErrorRegisteringWithDAL.Wrap(err).WithValue(TABLE_NAME, tableName)
+		err = ErrorRegisteringWithDAL.Wrap(err).WithMap(map[ErrorContextKey]string{
+			TABLE_NAME: tableName,
+			SQL_STMT:   stmt,
+		})
 		logger.Error(err)
 		return err
 	}
@@ -931,7 +967,10 @@ func (database *RelationalDb) RegisterWithDALHelper(_ context.Context, roleMappi
 	if IsMultitenant(record, tableName) {
 		stmt = getEnableRLSStmt(tableName, record)
 		if _, err = database.dbMap[adminUsername].Exec(stmt); err != nil {
-			err = ErrorRegisteringWithDAL.Wrap(err).WithValue(TABLE_NAME, tableName)
+			err = ErrorRegisteringWithDAL.Wrap(err).WithMap(map[ErrorContextKey]string{
+				TABLE_NAME: tableName,
+				SQL_STMT:   stmt,
+			})
 			logger.Error(err)
 			return err
 		}
@@ -941,7 +980,10 @@ func (database *RelationalDb) RegisterWithDALHelper(_ context.Context, roleMappi
 	users := getDbUsers(tableName)
 	for _, dbUserSpecs := range users {
 		if err = database.createDbUser(dbUserSpecs, tableName, record); err != nil {
-			err = ErrorRegisteringWithDAL.Wrap(err).WithValue(TABLE_NAME, tableName)
+			err = ErrorRegisteringWithDAL.Wrap(err).WithMap(map[ErrorContextKey]string{
+				TABLE_NAME: tableName,
+				SQL_STMT:   stmt,
+			})
 			return err
 		}
 	}
@@ -957,16 +999,25 @@ If not, update is rejected.
 func (database *RelationalDb) enforceRevisioning(tableName string) error {
 	adminUsername := getAdminUsername()
 
-	stmt := getCreateRevisionFunctionStmt()
+	functionName, functionBody := getCheckAndUpdateRevisionFunc()
+	stmt := getCreateTriggerFunctionStmt(functionName, functionBody)
 	if _, err := database.dbMap[adminUsername].Exec(stmt); err != nil {
+		err = ErrorExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, stmt)
+		logger.Error(err)
 		return err
 	}
-	stmt = getDropIfExistsRevisionTriggerStmt(tableName)
+
+	stmt = getDropTriggerStmt(tableName, functionName)
 	if _, err := database.dbMap[adminUsername].Exec(stmt); err != nil {
+		err = ErrorExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, stmt)
+		logger.Error(err)
 		return err
 	}
-	stmt = getCreateRevisionTriggerStmt(tableName)
+
+	stmt = getCreateTriggerStmt(tableName, functionName)
 	if _, err := database.dbMap[adminUsername].Exec(stmt); err != nil {
+		err = ErrorExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, stmt)
+		logger.Error(err)
 		return err
 	}
 
@@ -982,7 +1033,7 @@ func (database *RelationalDb) createDbUser(dbUserSpecs dbUserSpecs, tableName st
 
 	stmt := getGrantPrivilegesStmt(tableName, record, dbUserSpecs.username, dbUserSpecs.commands)
 	if _, err := database.dbMap[adminUsername].Exec(stmt); err != nil {
-		// err = ErrorRegisteringWithDAL.Wrap(err).WithValue(TABLE_NAME, tableName)
+		err = ErrorExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, stmt)
 		logger.Error(err)
 		return err
 	}
@@ -990,7 +1041,7 @@ func (database *RelationalDb) createDbUser(dbUserSpecs dbUserSpecs, tableName st
 	if IsMultitenant(record, tableName) {
 		stmt = getCreatePolicyStmt(tableName, record, dbUserSpecs)
 		if _, err := database.dbMap[adminUsername].Exec(stmt); err != nil {
-			// err = ErrorRegisteringWithDAL.Wrap(err).WithValue(TABLE_NAME, tableName)
+			err = ErrorExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, stmt)
 			logger.Error(err)
 			return err
 		}

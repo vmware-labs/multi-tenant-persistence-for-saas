@@ -43,8 +43,10 @@ import "github.com/vmware-labs/multi-tenant-persistence-for-saas/data-access-lay
   - [func (inMemory *InMemory) Configure(_ context.Context, isDataStoreInMemory bool, authorizer Authorizer)](<#func-inmemory-configure>)
   - [func (inMemory *InMemory) Delete(ctx context.Context, record Record) (int64, error)](<#func-inmemory-delete>)
   - [func (inMemory *InMemory) DeleteInTable(ctx context.Context, cacheName string, record Record) (int64, error)](<#func-inmemory-deleteintable>)
-  - [func (inMemory *InMemory) Drop(tableNames ...string) error](<#func-inmemory-drop>)
-  - [func (inMemory *InMemory) DropTables(records ...Record) error](<#func-inmemory-droptables>)
+  - [func (inMemory *InMemory) DoesTableExist(cacheName string) error](<#func-inmemory-doestableexist>)
+  - [func (inMemory *InMemory) Drop(cacheNames ...string) error](<#func-inmemory-drop>)
+  - [func (inMemory *InMemory) DropCascade(_ bool, cacheNames ...string) error](<#func-inmemory-dropcascade>)
+  - [func (inMemory *InMemory) DropTables(caches ...Record) error](<#func-inmemory-droptables>)
   - [func (inMemory *InMemory) Find(ctx context.Context, record Record) error](<#func-inmemory-find>)
   - [func (inMemory *InMemory) FindAll(ctx context.Context, records interface{}) error](<#func-inmemory-findall>)
   - [func (inMemory *InMemory) FindAllInTable(ctx context.Context, cacheName string, records interface{}) error](<#func-inmemory-findallintable>)
@@ -60,7 +62,8 @@ import "github.com/vmware-labs/multi-tenant-persistence-for-saas/data-access-lay
   - [func (inMemory *InMemory) RegisterWithDALHelper(_ context.Context, roleMapping map[string]DbRole, cacheName string, record Record) error](<#func-inmemory-registerwithdalhelper>)
   - [func (inMemory *InMemory) Reset()](<#func-inmemory-reset>)
   - [func (inMemory *InMemory) SetAuthorizer(authorizer Authorizer)](<#func-inmemory-setauthorizer>)
-  - [func (inMemory *InMemory) Truncate(tableNames ...string) error](<#func-inmemory-truncate>)
+  - [func (inMemory *InMemory) Truncate(cacheNames ...string) error](<#func-inmemory-truncate>)
+  - [func (inMemory *InMemory) TruncateCascade(_ bool, cacheNames ...string) error](<#func-inmemory-truncatecascade>)
   - [func (inMemory *InMemory) Update(ctx context.Context, record Record) (int64, error)](<#func-inmemory-update>)
   - [func (inMemory *InMemory) UpdateInTable(ctx context.Context, cacheName string, record Record) (int64, error)](<#func-inmemory-updateintable>)
   - [func (inMemory *InMemory) Upsert(ctx context.Context, record Record) (int64, error)](<#func-inmemory-upsert>)
@@ -118,7 +121,9 @@ import "github.com/vmware-labs/multi-tenant-persistence-for-saas/data-access-lay
   - [func (database *RelationalDb) Configure(_ context.Context, isDataStoreInMemory bool, authorizer Authorizer)](<#func-relationaldb-configure>)
   - [func (database *RelationalDb) Delete(ctx context.Context, record Record) (int64, error)](<#func-relationaldb-delete>)
   - [func (database *RelationalDb) DeleteInTable(ctx context.Context, tableName string, record Record) (int64, error)](<#func-relationaldb-deleteintable>)
+  - [func (database *RelationalDb) DoesTableExist(tableName string) error](<#func-relationaldb-doestableexist>)
   - [func (database *RelationalDb) Drop(tableNames ...string) error](<#func-relationaldb-drop>)
+  - [func (database *RelationalDb) DropCascade(cascade bool, tableNames ...string) error](<#func-relationaldb-dropcascade>)
   - [func (database *RelationalDb) DropTables(records ...Record) error](<#func-relationaldb-droptables>)
   - [func (database *RelationalDb) Find(ctx context.Context, record Record) error](<#func-relationaldb-find>)
   - [func (database *RelationalDb) FindAll(ctx context.Context, records interface{}) error](<#func-relationaldb-findall>)
@@ -135,6 +140,7 @@ import "github.com/vmware-labs/multi-tenant-persistence-for-saas/data-access-lay
   - [func (database *RelationalDb) RegisterWithDALHelper(_ context.Context, roleMapping map[string]DbRole, tableName string, record Record) error](<#func-relationaldb-registerwithdalhelper>)
   - [func (database *RelationalDb) Reset()](<#func-relationaldb-reset>)
   - [func (database *RelationalDb) Truncate(tableNames ...string) error](<#func-relationaldb-truncate>)
+  - [func (database *RelationalDb) TruncateCascade(cascade bool, tableNames ...string) error](<#func-relationaldb-truncatecascade>)
   - [func (database *RelationalDb) Update(ctx context.Context, record Record) (int64, error)](<#func-relationaldb-update>)
   - [func (database *RelationalDb) UpdateInTable(ctx context.Context, tableName string, record Record) (int64, error)](<#func-relationaldb-updateintable>)
   - [func (database *RelationalDb) Upsert(ctx context.Context, record Record) (int64, error)](<#func-relationaldb-upsert>)
@@ -173,6 +179,10 @@ const (
     DB_ADMIN_USERNAME_ENV_VAR = "DB_ADMIN_USERNAME"
     DB_ADMIN_PASSWORD_ENV_VAR = "DB_ADMIN_PASSWORD"
     LOGGER_LEVEL_ENV_VAR      = "LOG_LEVEL"
+
+    // Constants for logger field names & values.
+    COMP             = "comp"
+    SAAS_PERSISTENCE = "saas-persistence"
 )
 ```
 
@@ -242,6 +252,7 @@ var (
     ErrorUnmarshalling               = BaseDbError.With("Cannot unmarshal binary to proto message")
     ErrOperationNotAllowed           = BaseDbError.With("Not authorized to perform the operation on other tenant's data")
     ErrorFetchingMetadataFromContext = BaseDbError.With("Error fetching metadata from GRPC context")
+    ErrorTableDoesNotExist           = BaseDbError.With("Table does not exist")
     RecordNotFoundError              = BaseDbError.With("Record not found")
 
     ErrAuthContext       = BaseDbError.With("Error extracting authContext from context")
@@ -258,7 +269,7 @@ var (
 func FromBytes(bytes []byte, message proto.Message) error
 ```
 
-## func [GetRlsPolicyName](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/sql_struct.go#L396>)
+## func [GetRlsPolicyName](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/sql_struct.go#L406>)
 
 ```go
 func GetRlsPolicyName(username DbRole, tableName string) string
@@ -266,7 +277,7 @@ func GetRlsPolicyName(username DbRole, tableName string) string
 
 Generates RLS\-policy name based on database role/user and table name.
 
-## func [GetTableName](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/sql_struct.go#L363>)
+## func [GetTableName](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/sql_struct.go#L374>)
 
 ```go
 func GetTableName(x interface{}) string
@@ -274,7 +285,7 @@ func GetTableName(x interface{}) string
 
 Extracts struct's name, which will serve as DB table name, using reflection.
 
-## func [GetTableNameFromSlice](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/sql_struct.go#L379>)
+## func [GetTableNameFromSlice](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/sql_struct.go#L389>)
 
 ```go
 func GetTableNameFromSlice(x interface{}) string
@@ -282,7 +293,7 @@ func GetTableNameFromSlice(x interface{}) string
 
 Extracts name of a struct comprising the input slice.
 
-## func [IsMultitenant](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/sql_struct.go#L81>)
+## func [IsMultitenant](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/sql_struct.go#L80>)
 
 ```go
 func IsMultitenant(x Record, tableNames ...string) bool
@@ -331,29 +342,32 @@ type DataStoreHelper interface {
 }
 ```
 
-### func [DatastoreHelperInDatabase](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/datastore.go#L94>)
+### func [DatastoreHelperInDatabase](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/datastore.go#L97>)
 
 ```go
 func DatastoreHelperInDatabase() DataStoreHelper
 ```
 
-### func [DatastoreHelperInMemory](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/datastore.go#L88>)
+### func [DatastoreHelperInMemory](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/datastore.go#L91>)
 
 ```go
 func DatastoreHelperInMemory() DataStoreHelper
 ```
 
-## type [DataStoreTestHelper](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/datastore.go#L57-L61>)
+## type [DataStoreTestHelper](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/datastore.go#L57-L64>)
 
 ```go
 type DataStoreTestHelper interface {
-    DropTables(records ...Record) error  // Drop DB tables by records
-    Drop(tableNames ...string) error     // Drops DB tables
-    Truncate(tableNames ...string) error // Truncates DB tables
+    DropTables(records ...Record) error                       // Drop DB tables by records
+    Drop(tableNames ...string) error                          // Drops DB tables
+    DropCascade(cascade bool, tableNames ...string) error     // Drops DB tables, with an option to drop them in a cascading fashion
+    Truncate(tableNames ...string) error                      // Truncates DB tables
+    TruncateCascade(cascade bool, tableNames ...string) error // Truncates DB tables, with an option to truncate them in a cascading fashion
+    DoesTableExist(tableName string) error                    // Checks if table exists
 }
 ```
 
-## type [DatabaseColumn](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/sql_struct.go#L48-L53>)
+## type [DatabaseColumn](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/sql_struct.go#L47-L52>)
 
 ```go
 type DatabaseColumn struct {
@@ -481,7 +495,7 @@ type InMemory struct {
 }
 ```
 
-### func \(\*InMemory\) [Configure](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/inmemory.go#L424>)
+### func \(\*InMemory\) [Configure](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/inmemory.go#L445>)
 
 ```go
 func (inMemory *InMemory) Configure(_ context.Context, isDataStoreInMemory bool, authorizer Authorizer)
@@ -503,16 +517,30 @@ Deletes a record from cache. record must be a struct.
 func (inMemory *InMemory) DeleteInTable(ctx context.Context, cacheName string, record Record) (int64, error)
 ```
 
-### func \(\*InMemory\) [Drop](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/inmemory.go#L340>)
+### func \(\*InMemory\) [DoesTableExist](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/inmemory.go#L369>)
 
 ```go
-func (inMemory *InMemory) Drop(tableNames ...string) error
+func (inMemory *InMemory) DoesTableExist(cacheName string) error
+```
+
+Checks if a cache with the given name exists.
+
+### func \(\*InMemory\) [Drop](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/inmemory.go#L341>)
+
+```go
+func (inMemory *InMemory) Drop(cacheNames ...string) error
+```
+
+### func \(\*InMemory\) [DropCascade](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/inmemory.go#L345>)
+
+```go
+func (inMemory *InMemory) DropCascade(_ bool, cacheNames ...string) error
 ```
 
 ### func \(\*InMemory\) [DropTables](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/inmemory.go#L332>)
 
 ```go
-func (inMemory *InMemory) DropTables(records ...Record) error
+func (inMemory *InMemory) DropTables(caches ...Record) error
 ```
 
 ### func \(\*InMemory\) [Find](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/inmemory.go#L182>)
@@ -595,13 +623,13 @@ func (inMemory *InMemory) PerformJoinOneToOne(ctx context.Context, record1 Recor
 
 Performs an inner join of in\-memory caches for records record1 and record2. Assumes the relationship between record1 and record2 is one\-to\-one. Stores the retrieved record from the first cache in record1 argument, and the matching records from the second cache in query2Output argument.
 
-### func \(\*InMemory\) [RegisterWithDAL](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/inmemory.go#L409>)
+### func \(\*InMemory\) [RegisterWithDAL](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/inmemory.go#L430>)
 
 ```go
 func (inMemory *InMemory) RegisterWithDAL(ctx context.Context, roleMapping map[string]DbRole, record Record) error
 ```
 
-### func \(\*InMemory\) [RegisterWithDALHelper](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/inmemory.go#L413>)
+### func \(\*InMemory\) [RegisterWithDALHelper](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/inmemory.go#L434>)
 
 ```go
 func (inMemory *InMemory) RegisterWithDALHelper(_ context.Context, roleMapping map[string]DbRole, cacheName string, record Record) error
@@ -621,15 +649,21 @@ Reset all the caches in memory and mutexes.
 func (inMemory *InMemory) SetAuthorizer(authorizer Authorizer)
 ```
 
-### func \(\*InMemory\) [Truncate](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/inmemory.go#L348>)
+### func \(\*InMemory\) [Truncate](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/inmemory.go#L352>)
 
 ```go
-func (inMemory *InMemory) Truncate(tableNames ...string) error
+func (inMemory *InMemory) Truncate(cacheNames ...string) error
 ```
 
 Deletes all records from cache.
 
-### func \(\*InMemory\) [Update](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/inmemory.go#L362>)
+### func \(\*InMemory\) [TruncateCascade](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/inmemory.go#L356>)
+
+```go
+func (inMemory *InMemory) TruncateCascade(_ bool, cacheNames ...string) error
+```
+
+### func \(\*InMemory\) [Update](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/inmemory.go#L383>)
 
 ```go
 func (inMemory *InMemory) Update(ctx context.Context, record Record) (int64, error)
@@ -637,19 +671,19 @@ func (inMemory *InMemory) Update(ctx context.Context, record Record) (int64, err
 
 Updates a record in cache. record must be a struct.
 
-### func \(\*InMemory\) [UpdateInTable](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/inmemory.go#L366>)
+### func \(\*InMemory\) [UpdateInTable](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/inmemory.go#L387>)
 
 ```go
 func (inMemory *InMemory) UpdateInTable(ctx context.Context, cacheName string, record Record) (int64, error)
 ```
 
-### func \(\*InMemory\) [Upsert](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/inmemory.go#L387>)
+### func \(\*InMemory\) [Upsert](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/inmemory.go#L408>)
 
 ```go
 func (inMemory *InMemory) Upsert(ctx context.Context, record Record) (int64, error)
 ```
 
-### func \(\*InMemory\) [UpsertInTable](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/inmemory.go#L391>)
+### func \(\*InMemory\) [UpsertInTable](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/inmemory.go#L412>)
 
 ```go
 func (inMemory *InMemory) UpsertInTable(ctx context.Context, cacheName string, record Record) (int64, error)
@@ -1044,7 +1078,7 @@ type Record interface {
 func GetRecordInstanceFromSlice(x interface{}) Record
 ```
 
-## type [RelationalDb](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L125-L128>)
+## type [RelationalDb](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L129-L132>)
 
 Postgres\-backed implementation of DataStore interface. By default, uses MetadataBasedAuthorizer for authentication & authorization.
 
@@ -1054,7 +1088,7 @@ type RelationalDb struct {
 }
 ```
 
-### func \(\*RelationalDb\) [Configure](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L1063>)
+### func \(\*RelationalDb\) [Configure](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L1114>)
 
 ```go
 func (database *RelationalDb) Configure(_ context.Context, isDataStoreInMemory bool, authorizer Authorizer)
@@ -1062,7 +1096,7 @@ func (database *RelationalDb) Configure(_ context.Context, isDataStoreInMemory b
 
 Configures data store to use Postgres or an in\-memory cache. Should be called when microservice starts up.
 
-### func \(\*RelationalDb\) [Delete](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L668>)
+### func \(\*RelationalDb\) [Delete](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L672>)
 
 ```go
 func (database *RelationalDb) Delete(ctx context.Context, record Record) (int64, error)
@@ -1070,7 +1104,7 @@ func (database *RelationalDb) Delete(ctx context.Context, record Record) (int64,
 
 Deletes a record from a DB table.
 
-### func \(\*RelationalDb\) [DeleteInTable](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L749>)
+### func \(\*RelationalDb\) [DeleteInTable](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L782>)
 
 ```go
 func (database *RelationalDb) DeleteInTable(ctx context.Context, tableName string, record Record) (int64, error)
@@ -1078,7 +1112,13 @@ func (database *RelationalDb) DeleteInTable(ctx context.Context, tableName strin
 
 Deletes a record from DB table tableName.
 
-### func \(\*RelationalDb\) [Drop](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L701>)
+### func \(\*RelationalDb\) [DoesTableExist](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L747>)
+
+```go
+func (database *RelationalDb) DoesTableExist(tableName string) error
+```
+
+### func \(\*RelationalDb\) [Drop](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L690>)
 
 ```go
 func (database *RelationalDb) Drop(tableNames ...string) error
@@ -1086,7 +1126,13 @@ func (database *RelationalDb) Drop(tableNames ...string) error
 
 Drops given DB tables.
 
-### func \(\*RelationalDb\) [DropTables](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L675>)
+### func \(\*RelationalDb\) [DropCascade](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L694>)
+
+```go
+func (database *RelationalDb) DropCascade(cascade bool, tableNames ...string) error
+```
+
+### func \(\*RelationalDb\) [DropTables](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L679>)
 
 ```go
 func (database *RelationalDb) DropTables(records ...Record) error
@@ -1094,7 +1140,7 @@ func (database *RelationalDb) DropTables(records ...Record) error
 
 \* Drops the DB tables given by Records.
 
-### func \(\*RelationalDb\) [Find](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L464>)
+### func \(\*RelationalDb\) [Find](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L472>)
 
 ```go
 func (database *RelationalDb) Find(ctx context.Context, record Record) error
@@ -1102,7 +1148,7 @@ func (database *RelationalDb) Find(ctx context.Context, record Record) error
 
 Finds a single record that has the same primary key as record. record argument must be a pointer to a struct and will be modified in\-place. Returns RecordNotFoundError if a record could not be found.
 
-### func \(\*RelationalDb\) [FindAll](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L530>)
+### func \(\*RelationalDb\) [FindAll](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L534>)
 
 ```go
 func (database *RelationalDb) FindAll(ctx context.Context, records interface{}) error
@@ -1110,7 +1156,7 @@ func (database *RelationalDb) FindAll(ctx context.Context, records interface{}) 
 
 Finds all records in a DB table. records must be a pointer to a slice of structs and will be modified in\-place.
 
-### func \(\*RelationalDb\) [FindAllInTable](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L546>)
+### func \(\*RelationalDb\) [FindAllInTable](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L550>)
 
 ```go
 func (database *RelationalDb) FindAllInTable(ctx context.Context, tableName string, records interface{}) error
@@ -1118,7 +1164,7 @@ func (database *RelationalDb) FindAllInTable(ctx context.Context, tableName stri
 
 Finds all records in DB table tableName. records must be a pointer to a slice of structs and will be modified in\-place.
 
-### func \(\*RelationalDb\) [FindInTable](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L473>)
+### func \(\*RelationalDb\) [FindInTable](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L481>)
 
 ```go
 func (database *RelationalDb) FindInTable(ctx context.Context, tableName string, record Record) error
@@ -1126,7 +1172,7 @@ func (database *RelationalDb) FindInTable(ctx context.Context, tableName string,
 
 Finds a single record in table tableName that has the same primary key as record. record argument must be a pointer to a struct and will be modified in\-place. Returns RecordNotFoundError if a record could not be found.
 
-### func \(\*RelationalDb\) [FindWithFilter](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L560>)
+### func \(\*RelationalDb\) [FindWithFilter](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L564>)
 
 ```go
 func (database *RelationalDb) FindWithFilter(ctx context.Context, record Record, records interface{}) error
@@ -1134,7 +1180,7 @@ func (database *RelationalDb) FindWithFilter(ctx context.Context, record Record,
 
 Finds multiple records in a DB table. If record argument is non\-empty, uses the non\-empty fields as criteria in a query. records must be a pointer to a slice of structs and will be modified in\-place.
 
-### func \(\*RelationalDb\) [FindWithFilterInTable](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L569>)
+### func \(\*RelationalDb\) [FindWithFilterInTable](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L573>)
 
 ```go
 func (database *RelationalDb) FindWithFilterInTable(ctx context.Context, tableName string, record Record, records interface{}) error
@@ -1142,13 +1188,13 @@ func (database *RelationalDb) FindWithFilterInTable(ctx context.Context, tableNa
 
 Finds multiple records in DB table tableName. If record argument is non\-empty, uses the non\-empty fields as criteria in a query. records must be a pointer to a slice of structs and will be modified in\-place.
 
-### func \(\*RelationalDb\) [GetAuthorizer](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L1056>)
+### func \(\*RelationalDb\) [GetAuthorizer](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L1107>)
 
 ```go
 func (database *RelationalDb) GetAuthorizer() Authorizer
 ```
 
-### func \(\*RelationalDb\) [Insert](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L625>)
+### func \(\*RelationalDb\) [Insert](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L629>)
 
 ```go
 func (database *RelationalDb) Insert(ctx context.Context, record Record) (int64, error)
@@ -1156,7 +1202,7 @@ func (database *RelationalDb) Insert(ctx context.Context, record Record) (int64,
 
 Inserts a record into a DB table.
 
-### func \(\*RelationalDb\) [InsertInTable](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L632>)
+### func \(\*RelationalDb\) [InsertInTable](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L636>)
 
 ```go
 func (database *RelationalDb) InsertInTable(ctx context.Context, tableName string, record Record) (int64, error)
@@ -1164,7 +1210,7 @@ func (database *RelationalDb) InsertInTable(ctx context.Context, tableName strin
 
 Inserts a record into DB table tableName.
 
-### func \(\*RelationalDb\) [PerformJoinOneToMany](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L395>)
+### func \(\*RelationalDb\) [PerformJoinOneToMany](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L403>)
 
 ```go
 func (database *RelationalDb) PerformJoinOneToMany(ctx context.Context, record1 Record, record1Id string, record2JoinOnColumn string, query2Output interface{}) error
@@ -1172,7 +1218,7 @@ func (database *RelationalDb) PerformJoinOneToMany(ctx context.Context, record1 
 
 Performs an inner join between 2 non\-multitenant DB tables, joining them on the key column of the first table and the "record2JoinOnField" column of the 2nd table. Assumes the following: \- There is a one\-to\-many relationship between the two tables \- Both tables either have primary keys consisting of one column \(ID\) or a composite key that is a combination of record ID and org. ID Requires a unique ID of the record in the first table to be passed, which leads to 1 record from the first table and multiple records from the second table to be returned. record1 must be a pointer to a struct implementing Record interface. query2Output must be a pointer to an array of structs implementing Record interface. record1 and query2Output will be filled with data retrieved from the 2 DB tables.
 
-### func \(\*RelationalDb\) [PerformJoinOneToOne](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L326>)
+### func \(\*RelationalDb\) [PerformJoinOneToOne](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L334>)
 
 ```go
 func (database *RelationalDb) PerformJoinOneToOne(ctx context.Context, record1 Record, record1Id string, record2 Record, record2JoinOnColumn string) error
@@ -1180,7 +1226,7 @@ func (database *RelationalDb) PerformJoinOneToOne(ctx context.Context, record1 R
 
 Performs an inner join between 2 non\-multitenant DB tables, joining them on the key column of the first table and the "record2JoinOnField" column of the 2nd table. Assumes the following: \- There is a one\-to\-one relationship between the two tables \- Both tables either have primary keys consisting of one column \(ID\) or a composite key that is a combination of record ID and org. ID Requires a unique ID of the record in the first table to be passed, which leads to only one record to be returned. record1 and record2 must be pointers to structs implementing Record interface and represent entities persisted to the 2 DB tables. record1 and record2 will be filled with data retrieved from the 2 DB tables. TODO return ErrOperationNotAllowed if the library user is trying to access other tenant's data.
 
-### func \(\*RelationalDb\) [RegisterWithDAL](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L875>)
+### func \(\*RelationalDb\) [RegisterWithDAL](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L908>)
 
 ```go
 func (database *RelationalDb) RegisterWithDAL(ctx context.Context, roleMapping map[string]DbRole, record Record) error
@@ -1188,7 +1234,7 @@ func (database *RelationalDb) RegisterWithDAL(ctx context.Context, roleMapping m
 
 Registers a struct with DAL. See RegisterWithDALHelper\(\) for more info.
 
-### func \(\*RelationalDb\) [RegisterWithDALHelper](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L895>)
+### func \(\*RelationalDb\) [RegisterWithDALHelper](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L928>)
 
 ```go
 func (database *RelationalDb) RegisterWithDALHelper(_ context.Context, roleMapping map[string]DbRole, tableName string, record Record) error
@@ -1198,7 +1244,7 @@ Create a DB table for the given struct. Enables RLS in it if it is multi\-tenant
 
 Panics if the struct doesn't pass the following validations: \- Each field has to have a tag indicating the name of the relevant column in DB table \- Each field has to be exported \- Each field has to be of a supported data type \(signed integral data types, boolean, strings\).
 
-### func \(\*RelationalDb\) [Reset](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L301>)
+### func \(\*RelationalDb\) [Reset](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L309>)
 
 ```go
 func (database *RelationalDb) Reset()
@@ -1206,13 +1252,19 @@ func (database *RelationalDb) Reset()
 
 Resets DB connection pools.
 
-### func \(\*RelationalDb\) [Truncate](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L723>)
+### func \(\*RelationalDb\) [Truncate](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L718>)
 
 ```go
 func (database *RelationalDb) Truncate(tableNames ...string) error
 ```
 
-### func \(\*RelationalDb\) [Update](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L785>)
+### func \(\*RelationalDb\) [TruncateCascade](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L722>)
+
+```go
+func (database *RelationalDb) TruncateCascade(cascade bool, tableNames ...string) error
+```
+
+### func \(\*RelationalDb\) [Update](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L818>)
 
 ```go
 func (database *RelationalDb) Update(ctx context.Context, record Record) (int64, error)
@@ -1220,7 +1272,7 @@ func (database *RelationalDb) Update(ctx context.Context, record Record) (int64,
 
 Updates a record in a DB table.
 
-### func \(\*RelationalDb\) [UpdateInTable](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L792>)
+### func \(\*RelationalDb\) [UpdateInTable](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L825>)
 
 ```go
 func (database *RelationalDb) UpdateInTable(ctx context.Context, tableName string, record Record) (int64, error)
@@ -1228,7 +1280,7 @@ func (database *RelationalDb) UpdateInTable(ctx context.Context, tableName strin
 
 Updates a record in DB table tableName.
 
-### func \(\*RelationalDb\) [Upsert](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L831>)
+### func \(\*RelationalDb\) [Upsert](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L864>)
 
 ```go
 func (database *RelationalDb) Upsert(ctx context.Context, record Record) (int64, error)
@@ -1236,7 +1288,7 @@ func (database *RelationalDb) Upsert(ctx context.Context, record Record) (int64,
 
 Upserts a record in a DB table.
 
-### func \(\*RelationalDb\) [UpsertInTable](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L838>)
+### func \(\*RelationalDb\) [UpsertInTable](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/database.go#L871>)
 
 ```go
 func (database *RelationalDb) UpsertInTable(ctx context.Context, tableName string, record Record) (int64, error)
