@@ -48,6 +48,7 @@ type DataStoreHelper interface {
 	RegisterWithDALHelper(ctx context.Context, roleMapping map[string]DbRole, tableName string, record Record) error
 	FindInTable(ctx context.Context, tableName string, record Record) error
 	FindAllInTable(ctx context.Context, tableName string, records interface{}) error
+	FindWithFilterInTable(ctx context.Context, tableName string, record Record, records interface{}) error
 	InsertInTable(ctx context.Context, tableName string, record Record) (int64, error)
 	UpdateInTable(ctx context.Context, tableName string, record Record) (int64, error)
 	UpsertInTable(ctx context.Context, tableName string, record Record) (int64, error)

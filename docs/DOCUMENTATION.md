@@ -325,7 +325,7 @@ type Authorizer interface {
 }
 ```
 
-## type [DataStoreHelper](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/datastore.go#L45-L55>)
+## type [DataStoreHelper](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/datastore.go#L45-L56>)
 
 ```go
 type DataStoreHelper interface {
@@ -334,6 +334,7 @@ type DataStoreHelper interface {
     RegisterWithDALHelper(ctx context.Context, roleMapping map[string]DbRole, tableName string, record Record) error
     FindInTable(ctx context.Context, tableName string, record Record) error
     FindAllInTable(ctx context.Context, tableName string, records interface{}) error
+    FindWithFilterInTable(ctx context.Context, tableName string, record Record, records interface{}) error
     InsertInTable(ctx context.Context, tableName string, record Record) (int64, error)
     UpdateInTable(ctx context.Context, tableName string, record Record) (int64, error)
     UpsertInTable(ctx context.Context, tableName string, record Record) (int64, error)
@@ -341,19 +342,19 @@ type DataStoreHelper interface {
 }
 ```
 
-### func [DatastoreHelperInDatabase](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/datastore.go#L97>)
+### func [DatastoreHelperInDatabase](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/datastore.go#L98>)
 
 ```go
 func DatastoreHelperInDatabase() DataStoreHelper
 ```
 
-### func [DatastoreHelperInMemory](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/datastore.go#L91>)
+### func [DatastoreHelperInMemory](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/datastore.go#L92>)
 
 ```go
 func DatastoreHelperInMemory() DataStoreHelper
 ```
 
-## type [DataStoreTestHelper](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/datastore.go#L57-L64>)
+## type [DataStoreTestHelper](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/data-access-layer/datastore/datastore.go#L58-L65>)
 
 ```go
 type DataStoreTestHelper interface {
