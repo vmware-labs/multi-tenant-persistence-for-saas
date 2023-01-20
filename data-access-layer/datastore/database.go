@@ -55,7 +55,7 @@ func (a DbRoleSlice) Len() int {
 	return len(a)
 }
 
-func (dbRole DbRole) IsTenantDbRole() bool {
+func (dbRole DbRole) isDbRoleTenantScoped() bool {
 	return dbRole == TENANT_READER || dbRole == TENANT_WRITER
 }
 
@@ -252,7 +252,7 @@ func openDb(dbHost string, dbPort int, dbUsername DbRole, dbPassword string, dbN
 /*
 Starts a transaction. Sets a runtime config. parameter for org. ID within the scope of the transaction.
 */
-func getTx(db *sql.DB, orgId string, isMultitenant bool) (*sql.Tx, error) {
+func getTx(db *sql.DB, orgId string, isDbRoleTenantScoped bool) (*sql.Tx, error) {
 	// Ensure that DB has been previously opened during registration with DAL
 	if db == nil {
 		logger.Error(ErrorStructNotRegisteredWithDAL.Error())
@@ -264,7 +264,7 @@ func getTx(db *sql.DB, orgId string, isMultitenant bool) (*sql.Tx, error) {
 		return nil, err
 	}
 
-	if isMultitenant {
+	if isDbRoleTenantScoped {
 		// Set org. ID
 		stmt := getSetConfigStmt(DB_CONFIG_ORG_ID, orgId, true)
 		if _, err = tx.Exec(stmt); err != nil {
@@ -281,17 +281,26 @@ func getTx(db *sql.DB, orgId string, isMultitenant bool) (*sql.Tx, error) {
 Validates tenancy information and returns a transaction with right dbRole.
 */
 func (database *RelationalDb) validateAndGetTx(ctx context.Context, tableName string, record Record, _ string) (*sql.Tx, error) {
-	err, orgId, dbRole, isMultitenant := database.getTenantInfoFromCtx(ctx, tableName)
+	err, orgId, dbRole, isDbRoleTenantScoped := database.getTenantInfoFromCtx(ctx, tableName)
 	if err != nil {
 		return nil, err
 	}
 
-	if err = database.authorizer.IsOperationAllowed(ctx, tableName, record); err != nil {
-		logger.Errorf("Operation not allowed for the following reason: %s", err.Error())
-		return nil, err
+	/*
+		If the DB role is tenant-specific (TENANT_READER or TENANT_WRITER) and the table is multi-tenant,
+		make sure that the record being inserted/modified/updated/deleted/queried belongs to the user's org.
+		If operation is SELECT but no specific tenant's data is being queried (e.g., FindAll() was called), allow the operation to proceed.
+	*/
+	if dbRole.isDbRoleTenantScoped() && IsMultitenant(record, tableName) {
+		orgIdCol := getField(ORG_ID_COLUMN_NAME, record)
+		if orgIdCol != "" && orgIdCol != orgId {
+			err = ErrOperationNotAllowed.WithValue("tenant", orgId).WithValue("orgIdCol", orgIdCol)
+			logger.Error(err)
+			return nil, err
+		}
 	}
 
-	tx, err := getTx(database.dbMap[dbRole], orgId, isMultitenant)
+	tx, err := getTx(database.dbMap[dbRole], orgId, isDbRoleTenantScoped)
 	if err != nil {
 		err = ErrorStartingTx.Wrap(err).WithMap(map[ErrorContextKey]string{
 			"db_role":    string(dbRole),
@@ -344,13 +353,13 @@ func (database *RelationalDb) PerformJoinOneToOne(ctx context.Context, record1 R
 	table1Name := GetTableName(record1)
 	table2Name := GetTableName(record2)
 
-	err, orgId, dbRole, isMultitenant := database.getTenantInfoFromCtx(ctx, table1Name, table2Name)
+	err, orgId, dbRole, isDbRoleTenantScoped := database.getTenantInfoFromCtx(ctx, table1Name, table2Name)
 	if err != nil {
 		return err
 	}
 
 	query := getSelectJoinStmt(table1Name, table2Name, record1, record2, record2JoinOnColumn, 1)
-	tx, err := getTx(database.dbMap[dbRole], orgId, isMultitenant)
+	tx, err := getTx(database.dbMap[dbRole], orgId, isDbRoleTenantScoped)
 	if err != nil {
 		err = ErrorStartingTx.Wrap(err)
 		logger.Error(err)
@@ -419,14 +428,14 @@ func (database *RelationalDb) PerformJoinOneToMany(ctx context.Context, record1 
 	table1Name := GetTableName(record1)
 	table2Name := GetTableName(record2)
 
-	err, orgId, dbRole, isMultitenant := database.getTenantInfoFromCtx(ctx, table1Name, table2Name)
+	err, orgId, dbRole, isDbRoleTenantScoped := database.getTenantInfoFromCtx(ctx, table1Name, table2Name)
 	if err != nil {
 		return err
 	}
 
 	// Execute query
 	query := getSelectJoinStmt(table1Name, table2Name, record1, record2, record2JoinOnColumn, 0)
-	tx, err := getTx(database.dbMap[dbRole], orgId, isMultitenant)
+	tx, err := getTx(database.dbMap[dbRole], orgId, isDbRoleTenantScoped)
 	if err != nil {
 		err = ErrorStartingTx.Wrap(err)
 		logger.Error(err)
@@ -1163,24 +1172,24 @@ Gets user's org ID and a DB role that matches one of its CSP roles.
 Returns an error if there are no role mappings for the given table, if user's org. ID cannot be retrieved from CSP,
 or if there is no matching DB role for any one of the user's CSP roles.
 */
-func (database *RelationalDb) getTenantInfoFromCtx(ctx context.Context, tableNames ...string) (err error, orgId string, dbRole DbRole, isMultitenant bool) {
+func (database *RelationalDb) getTenantInfoFromCtx(ctx context.Context, tableNames ...string) (err error, orgId string, dbRole DbRole, isDbRoleTenantScoped bool) {
 	// Get the matching DB role
 	dbRole, err = database.authorizer.GetMatchingDbRole(ctx, tableNames...)
 	if err != nil {
 		return err, "", "", false
 	}
 
-	isMultitenant = dbRole.IsTenantDbRole()
+	isDbRoleTenantScoped = dbRole.isDbRoleTenantScoped()
 	orgId, err = database.authorizer.GetOrgFromContext(ctx)
-	if !isMultitenant && errors.Is(err, ErrorMissingOrgId) {
+	if !isDbRoleTenantScoped && errors.Is(err, ErrorMissingOrgId) {
 		err = nil
 	}
 	if err != nil {
 		return err, "", "", false
 	}
 
-	logger.Infof("TenantContext for DB transaction orgId=%s, dbRole=%s, isMultitenant=%v", orgId, dbRole, isMultitenant)
-	return err, orgId, dbRole, isMultitenant
+	logger.Infof("TenantContext for DB transaction orgId=%s, dbRole=%s, isDbRoleTenantScoped=%v", orgId, dbRole, isDbRoleTenantScoped)
+	return err, orgId, dbRole, isDbRoleTenantScoped
 }
 
 func getAdminUsername() DbRole {
