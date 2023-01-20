@@ -68,36 +68,6 @@ func TestGettingMatchingDbRoleWithMetadataBasedAuthorizer(t *testing.T) {
 }
 
 /*
-Positive test case.
-Checks that MetadataBasedAuthorizer permits access to other tenants' data for READER & WRITER roles
-and does not permit access to other tenants' data for TENANT_READER & TENANT_WRITER roles.
-*/
-func TestAllowingOperationsWithMetadataBasedAuthorizer(t *testing.T) {
-	assert := assert.New(t)
-
-	authorizer := MetadataBasedAuthorizer{}
-	serviceAdminCtx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(METADATA_KEY_ORGID, PEPSI, METADATA_KEY_ROLE, METADATA_ROLE_ADMIN))
-	tenantAuditorCtx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(METADATA_KEY_ORGID, PEPSI, METADATA_KEY_ROLE, METADATA_ROLE_AUDITOR))
-
-	someApp := app{
-		Id:    "001",
-		OrgId: COKE, // Another tenant's record
-	}
-
-	// You should not be able to access other tenants' data with TENANT_READER role
-	err := authorizer.IsOperationAllowed(tenantAuditorCtx, "app", someApp)
-	assert.ErrorIs(err, ErrOperationNotAllowed)
-
-	// You should be able to access other tenants' data with TENANT_WRITER role
-	err = authorizer.IsOperationAllowed(serviceAdminCtx, "app", someApp)
-	assert.ErrorIs(err, ErrOperationNotAllowed)
-
-	// You should always be able to perform a SELECT operation if you're not adding a filter with another tenant's org. ID
-	err = authorizer.IsOperationAllowed(serviceAdminCtx, "app", app{})
-	assert.Nil(err)
-}
-
-/*
 Checks if updating role mapping in MetadataBasedAuthorizer works.
 */
 func TestConfiguringMetadataBasedAuthorizer(t *testing.T) {

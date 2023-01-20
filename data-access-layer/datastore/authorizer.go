@@ -25,6 +25,7 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
+// TODO consider moving authorizer.go to a separate package.
 const GLOBAL_DEFAULT_ORG_ID = "_GlobalDefaultOrg"
 
 /*
@@ -35,7 +36,6 @@ type Authorizer interface {
 	GetAuthContext(orgId string, roles ...string) context.Context
 	GetOrgFromContext(ctx context.Context) (string, error)
 	GetMatchingDbRole(ctx context.Context, tableNames ...string) (DbRole, error)
-	IsOperationAllowed(ctx context.Context, tableName string, record Record) error
 
 	/*
 		Method used to configure the authorizer. The method's arguments and implementation will be different for every authorizer.
@@ -92,33 +92,6 @@ func (s MetadataBasedAuthorizer) GetMatchingDbRole(ctx context.Context, tableNam
 		}
 	}
 	return TENANT_READER, nil
-}
-
-func (s MetadataBasedAuthorizer) IsOperationAllowed(ctx context.Context, tableName string, record Record) error {
-	// Get matching DB role
-	dbRole, err := s.GetMatchingDbRole(ctx, tableName)
-	if err != nil {
-		return err
-	}
-
-	// If the DB role is tenant-specific (TENANT_READER or TENANT_WRITER) and the table is multi-tenant,
-	// make sure that the record being inserted/modified/updated/deleted/queried belongs to the user's org.
-	// If operation is SELECT but no specific tenant's data is being queried (e.g., FindAll() was called),
-	// allow the operation to proceed
-	if dbRole.IsTenantDbRole() && IsMultitenant(record, tableName) {
-		orgId, err := s.GetOrgFromContext(ctx)
-		// OrgId check required for Tenant DB roles only
-		if err != nil {
-			return err
-		}
-
-		orgIdCol := getField(ORG_ID_COLUMN_NAME, record)
-		if orgIdCol != "" && orgIdCol != orgId {
-			err = ErrOperationNotAllowed.WithValue("tenant", orgId).WithValue("orgIdCol", orgIdCol)
-			return err
-		}
-	}
-	return nil
 }
 
 func (s MetadataBasedAuthorizer) Configure(_ ...interface{}) {
