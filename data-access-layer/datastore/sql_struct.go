@@ -21,7 +21,6 @@ package datastore
 import (
 	"fmt"
 	"reflect"
-	"sort"
 	"strconv"
 	"strings"
 	"unicode"
@@ -93,7 +92,7 @@ func IsMultitenant(x Record, tableNames ...string) bool {
 }
 
 /*
-Returns columns comprising a primary key of a table.
+Returns columns comprising a primary key of a table in the same order as they are declared in the equivalent Golang struct.
 */
 func getPrimaryKey(tableName string, x Record) []string {
 	if _, ok := primaryKeyMap[tableName]; !ok {
@@ -111,6 +110,18 @@ func getPrimaryKey(tableName string, x Record) []string {
 	}
 
 	return primaryKeyMap[tableName]
+}
+
+/*
+Returns columns comprising a primary key of a table as a map, where key is column name and value is a dummy boolean.
+*/
+func getPrimaryKeyAsMap(tableName string, x Record) map[string]bool {
+	primaryKeySlice := getPrimaryKey(tableName, x)
+	primaryKeyMap := make(map[string]bool, len(primaryKeySlice))
+	for _, primaryKeyColumn := range primaryKeySlice {
+		primaryKeyMap[primaryKeyColumn] = true
+	}
+	return primaryKeyMap
 }
 
 func getBool(str string) bool {
@@ -312,7 +323,7 @@ func validateStruct(x Record) {
 		}
 
 		if firstLetter := rune(structType.Field(i).Name[0]); !unicode.IsUpper(firstLetter) {
-			panic(x)
+			logger.Panicf("Non-exported field %q in struct %q", structType.Field(i).Name, structType.Name())
 		}
 	}
 	if numPrimaryKeyTags < 1 {
@@ -361,16 +372,15 @@ func getDatabaseColumns(tableName string, x Record) *[]DatabaseColumn {
 
 // Extracts struct's name, which will serve as DB table name, using reflection.
 func GetTableName(x interface{}) string {
-	var tableName string
+	var tableName strings.Builder
+	tableName.WriteRune('"')
 	if reflect.TypeOf(x).Kind() == reflect.Ptr {
-		tableName = reflect.ValueOf(x).Elem().Type().Name()
+		tableName.WriteString(reflect.ValueOf(x).Elem().Type().Name())
 	} else {
-		tableName = reflect.TypeOf(x).Name()
+		tableName.WriteString(reflect.TypeOf(x).Name())
 	}
-
-	tableName = "\"" + tableName + "\""
-
-	return tableName
+	tableName.WriteRune('"')
+	return tableName.String()
 }
 
 /*
@@ -430,14 +440,20 @@ func getCreateTableStmt(tableName string, x Record) string {
 	return stmt.String()
 }
 
-func getRevisionTriggerName(tableName string) string {
-	return strings.ReplaceAll(tableName, "\"", "") + "_revision_trigger"
+/*
+Constructs a trigger name that will include the name of table where trigger is going to be applied on and
+the name of a function that will be executed by trigger.
+*/
+func getTriggerName(tableName, functionName string) string {
+	functionName = strings.TrimSuffix(functionName, "()")
+	tableName = strings.ReplaceAll(tableName, "\"", "")
+	return strings.Join([]string{"\"", tableName, "_", functionName, "_trigger\""}, "")
 }
 
-func getDropIfExistsRevisionTriggerStmt(tableName string) string {
+func getDropTriggerStmt(tableName, functionName string) string {
 	var stmt strings.Builder
 	stmt.WriteString("DROP TRIGGER IF EXISTS ")
-	stmt.WriteString(getRevisionTriggerName(tableName))
+	stmt.WriteString(getTriggerName(tableName, functionName))
 	stmt.WriteString(" ON ")
 	stmt.WriteString(tableName)
 	stmt.WriteString(" RESTRICT;")
@@ -445,23 +461,46 @@ func getDropIfExistsRevisionTriggerStmt(tableName string) string {
 	return stmt.String()
 }
 
-func getCreateRevisionTriggerStmt(tableName string) string {
+/*
+Returns a PL/pgSQL statement that creates a trigger invoking the given function.
+*/
+func getCreateTriggerStmt(tableName, functionName string) string {
+	if !strings.HasSuffix(functionName, "()") {
+		functionName += "()"
+	}
+
 	var stmt strings.Builder
 	stmt.WriteString("CREATE TRIGGER ")
-	stmt.WriteString(getRevisionTriggerName(tableName))
+	stmt.WriteString(getTriggerName(tableName, functionName))
 	stmt.WriteString(" BEFORE UPDATE\n")
 	stmt.WriteString("\t ON ")
 	stmt.WriteString(tableName)
 	stmt.WriteString("\n\tFOR EACH ROW\n")
-	stmt.WriteString("\tEXECUTE FUNCTION check_and_update_revision();")
+	stmt.WriteString("\tEXECUTE FUNCTION ")
+	stmt.WriteString(functionName)
+
 	logger.Infof("Executing Statement %s", stmt.String())
 	return stmt.String()
 }
 
-func getCreateRevisionFunctionStmt() string {
+/*
+Returns a PL/pgSQL function that does the following:
+- Rejects updates where a new revision does not equal the current one
+- If an update is not rejected, increments revision by 1
+
+IF NEW._revision = OLD._revision THEN
+
+	NEW._revision := OLD._revision + 1;
+	RETURN NEW;
+
+ELSE
+
+	RAISE EXCEPTION 'Invalid update - outdated _revision: %', NEW._revision;
+
+END IF;.
+*/
+func getCheckAndUpdateRevisionFunc() (functionName, functionBody string) {
 	var stmt strings.Builder
-	stmt.WriteString("CREATE OR REPLACE FUNCTION check_and_update_revision() RETURNS TRIGGER AS $$\n")
-	stmt.WriteString("\tBEGIN\n")
 	stmt.WriteString("\t\tIF NEW.")
 	stmt.WriteString(REVISION_COLUMN_NAME)
 	stmt.WriteString(" = OLD.")
@@ -480,31 +519,59 @@ func getCreateRevisionFunctionStmt() string {
 	stmt.WriteString(": %', NEW.")
 	stmt.WriteString(REVISION_COLUMN_NAME)
 	stmt.WriteString(";\n")
-	stmt.WriteString("\t\tEND IF;\n")
-	stmt.WriteString("\tEND;\n")
+	stmt.WriteString("\t\tEND IF;")
+	return "check_and_update_revision", stmt.String()
+}
+
+func getCreateTriggerFunctionStmt(functionName, functionBody string) string {
+	if !strings.HasSuffix(functionName, "()") {
+		functionName += "()"
+	}
+	var stmt strings.Builder
+	stmt.WriteString("CREATE OR REPLACE FUNCTION ")
+	stmt.WriteString(functionName)
+	stmt.WriteString(" RETURNS TRIGGER AS $$\n")
+	stmt.WriteString("\tBEGIN\n")
+	stmt.WriteString(functionBody)
+	stmt.WriteString("\n\tEND;\n")
 	stmt.WriteString("$$ LANGUAGE PLPGSQL;")
 	logger.Infof("Executing Statement %s", stmt.String())
 	return stmt.String()
 }
 
-func getTruncateTableStmt(tableName string) string {
-	var findTableQuery, truncateTableStmt strings.Builder
+func getFindTableStmt(tableName string) string {
+	var findTableQuery strings.Builder
 
 	findTableQuery.WriteString("SELECT * FROM pg_tables WHERE schemaname = 'public' AND tablename = '")
 	findTableQuery.WriteString(strings.ReplaceAll(tableName, "\"", ""))
 	findTableQuery.WriteString("'")
 
+	return findTableQuery.String()
+}
+
+func getTruncateTableStmt(tableName string, cascade bool) string {
+	findTableStmt := getFindTableStmt(tableName)
+
+	var truncateTableStmt strings.Builder
 	truncateTableStmt.WriteString("TRUNCATE TABLE ")
 	truncateTableStmt.WriteString(tableName)
+	if cascade {
+		truncateTableStmt.WriteString(" CASCADE")
+	}
 
-	return addIfExists(truncateTableStmt.String(), findTableQuery.String())
+	return addIfExists(truncateTableStmt.String(), findTableStmt)
 }
 
 // Returns a DROP TABLE statement.
-func getDropTableStmt(tableName string) string {
-	stmt := fmt.Sprintf("DROP TABLE IF EXISTS %s ;", tableName)
-	logger.Infof("Executing Statement %s", stmt)
-	return stmt
+func getDropTableStmt(tableName string, cascade bool) string {
+	var stmt strings.Builder
+	stmt.WriteString("DROP TABLE IF EXISTS ")
+	stmt.WriteString(tableName)
+	if cascade {
+		stmt.WriteString(" CASCADE;")
+	}
+	logger.Infof("Executing Statement %s", stmt.String())
+	return stmt.String()
 }
 
 // Returns a SELECT statement with no WHERE condition(s) and arguments to be used in place of placeholders.
@@ -656,8 +723,8 @@ func getUpdateStmt(tableName string, x Record) (string, []interface{}) {
 	for i := 0; i < structType.NumField(); i++ {
 		// Check if current column is part of a primary key. If yes, do not modify it
 		columnName := structType.Field(i).Tag.Get(TAG_DB_COLUMN)
-		primaryKey := getPrimaryKey(tableName, x)
-		if index := sort.SearchStrings(primaryKey, columnName); index < len(primaryKey) && primaryKey[index] == columnName {
+		primaryKey := getPrimaryKeyAsMap(tableName, x)
+		if _, present := primaryKey[columnName]; present {
 			continue
 		}
 
@@ -712,15 +779,7 @@ func getUpsertStmt(tableName string, x Record) (string, []interface{}) {
 	}
 	stmt.WriteString(")\n")
 	stmt.WriteString("ON CONFLICT (")
-	primaryKeyColumns := make([]string, 0, 10 /* init. capacity */)
-	for i := 0; i < structType.NumField(); i++ {
-		columnName := structType.Field(i).Tag.Get(TAG_DB_COLUMN)
-		primaryKey := getPrimaryKey(tableName, x)
-		if index := sort.SearchStrings(primaryKey, columnName); index < len(primaryKey) && primaryKey[index] == columnName {
-			primaryKeyColumns = append(primaryKeyColumns, columnName)
-		}
-	}
-	stmt.WriteString(strings.Join(primaryKeyColumns, ", "))
+	stmt.WriteString(strings.Join(getPrimaryKey(tableName, x), ", "))
 	stmt.WriteString(")\n")
 	stmt.WriteString("DO UPDATE SET ")
 
@@ -728,8 +787,8 @@ func getUpsertStmt(tableName string, x Record) (string, []interface{}) {
 	for i := 0; i < structType.NumField(); i++ {
 		// Check if current column is part of a primary key. If yes, do not modify it
 		columnName := structType.Field(i).Tag.Get(TAG_DB_COLUMN)
-		primaryKey := getPrimaryKey(tableName, x)
-		if index := sort.SearchStrings(primaryKey, columnName); index < len(primaryKey) && primaryKey[index] == columnName {
+		primaryKey := getPrimaryKeyAsMap(tableName, x)
+		if _, present := primaryKey[columnName]; present {
 			continue
 		}
 

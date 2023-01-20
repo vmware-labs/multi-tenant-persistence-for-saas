@@ -59,18 +59,6 @@ var (
 	pepsiAuditorCtx = DataStore.GetAuthorizer().GetAuthContext(PEPSI, TENANT_AUDITOR)
 )
 
-var allResources = []Record{
-	app{},
-	appUser{},
-	appUserInvalid6{},
-	appUserInvalid5{},
-	appUserInvalid4{},
-	appUserInvalid3{},
-	appUserInvalid2{},
-	appUserInvalid{},
-	group{},
-}
-
 var datastoreDbTableNames = []string{
 	GetTableName(app{}),
 	GetTableName(appUser{}),
@@ -255,6 +243,17 @@ func TestTruncateNonExistent(t *testing.T) {
 	assert.NoError(err, "Expected no error when trying to truncate a non-existent table")
 }
 
+func TestDoesTableExist(t *testing.T) {
+	assert := assert.New(t)
+
+	err := TestHelper.DoesTableExist("non_existent_table")
+	assert.ErrorIs(err, ErrorTableDoesNotExist, "Expected non-existent table not to be found")
+
+	setupEmptyDbTables(t)
+	err = TestHelper.DoesTableExist(GetTableName(app{}))
+	assert.NoError(err, "Expected an existing table to be found")
+}
+
 func testFindInEmptyDataStore(t *testing.T) {
 	assert := assert.New(t)
 
@@ -351,6 +350,7 @@ func testCrud(t *testing.T, ctx context.Context) {
 Drops existing tables and creates new ones. Generates a context object with a specific org. and CSP role.
 */
 func setupEmptyDbTables(t *testing.T) {
+	t.Helper()
 	assert := assert.New(t)
 	DataStore.Configure(serviceAdminCtx, false, DataStore.GetAuthorizer())
 	allTableNames := make([]string, 0, len(datastoreDbTableNames))
@@ -368,6 +368,7 @@ Drops existing tables and creates new ones. Generates a context object with a sp
 Adds the records returned by prepareInput() to the DB tables.
 */
 func setupDbTables(t *testing.T) {
+	t.Helper()
 	setupEmptyDbTables(t)
 	myCokeApp, user1, user2 := prepareInput()
 	for _, record := range []Record{myCokeApp, user1, user2} {
@@ -378,6 +379,7 @@ func setupDbTables(t *testing.T) {
 }
 
 func setupEmptyInMemoryCache(t *testing.T) {
+	t.Helper()
 	DataStore.Configure(cokeAdminCtx, true, DataStore.GetAuthorizer())
 	DataStore.Reset()
 }
@@ -394,9 +396,17 @@ func setupInMemoryCache(t *testing.T) {
 }
 
 func TestMain(m *testing.M) {
-	ClearAllTables()
+	allTableNames := make([]string, 0)
+	allTableNames = append(allTableNames, datastoreDbTableNames...)
+	if err := TestHelper.Drop(allTableNames...); err != nil {
+		logger.Fatalln("Failed to drop DB tables", err)
+	}
+
 	code := m.Run()
-	ClearAllTables()
+	if err := TestHelper.Drop(allTableNames...); err != nil {
+		logger.Fatalln("Failed to drop DB tables", err)
+	}
+
 	os.Exit(code)
 }
 
@@ -404,7 +414,7 @@ func BenchmarkCrudDatabase(b *testing.B) {
 	rawLogger := logrus.New()
 	rawLogger.SetLevel(logrus.FatalLevel)
 	rawLogger.SetOutput(io.Discard)
-	logger = rawLogger.WithField("comp", "saas-persistence")
+	logger = rawLogger.WithField(COMP, SAAS_PERSISTENCE)
 
 	var t testing.T
 	setupDbTables(&t)
@@ -417,7 +427,7 @@ func BenchmarkCrudInMemory(b *testing.B) {
 	rawLogger := logrus.New()
 	rawLogger.SetLevel(logrus.FatalLevel)
 	rawLogger.SetOutput(io.Discard)
-	logger = rawLogger.WithField("comp", "saas-persistence")
+	logger = rawLogger.WithField(COMP, SAAS_PERSISTENCE)
 
 	var t testing.T
 	setupInMemoryCache(&t)
@@ -973,10 +983,6 @@ func testCrudWithMismatchingOrgId(t *testing.T, cokeCtx context.Context) {
 func TestCrudWithMismatchingOrgIdDatabase(t *testing.T) {
 	setupDbTables(t)
 	testCrudWithMismatchingOrgId(t, cokeAdminCtx)
-}
-
-func ClearAllTables() {
-	_ = TestHelper.DropTables(allResources...)
 }
 
 func TestWithMissingEnvVar(t *testing.T) {
