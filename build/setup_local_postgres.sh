@@ -9,6 +9,7 @@ if [[ $(uname -s) == "Linux" ]]; then
   fi
   # install and setup postgres on Linux
   if [[ $(dpkg -l | grep 'ii  postgresql ') ]]; then
+    $SUDO /etc/init.d/postgresql start || echo ""
     echo "postgresql: Installed already"
   else
     echo "postgresql: Installing ..."
@@ -19,8 +20,8 @@ if [[ $(uname -s) == "Linux" ]]; then
   fi
   su - postgres -c "psql << end_of_sql
 alter user postgres with password 'postgres';
-drop database tmp_db_;
-create database tmp_db_;
+drop database test_tmp_db_;
+create database test_tmp_db_;
 end_of_sql"
 
 elif [[ $(uname -s) == "Darwin" ]]; then
@@ -29,16 +30,17 @@ elif [[ $(uname -s) == "Darwin" ]]; then
     echo "postgresql: Installed already"
   else
     echo "postgresql: Installing ..."
-    brew install postgresql
-    brew services restart postgresql
-    brew services info postgresql --json | jq '.[0].running' | grep true
+    brew install postgresql@14
+    brew services restart postgresql@14
+    sleep 5
+    brew services info postgresql@14 --json | jq '.[0].running' | grep true
     echo "postgresql: Installation successful"
   fi
-  dropdb tmp_db_ --if-exists
-  createdb tmp_db_
-  echo "create user postgres superuser" | psql tmp_db_ || echo "User postgres exists"
-  echo "alter user postgres with password 'postgres'" | psql tmp_db_
-  echo "alter user postgres with superuser;" | psql tmp_db_
+  dropdb test_tmp_db_ --if-exists
+  createdb test_tmp_db_
+  echo "create user postgres superuser" | psql test_tmp_db_ || echo "User postgres exists"
+  echo "alter user postgres with password 'postgres'" | psql test_tmp_db_
+  echo "alter user postgres with superuser;" | psql test_tmp_db_
 fi
 
-export DB_NAME=tmp_db_ DB_PORT=5432 DB_ADMIN_USERNAME=postgres DB_ADMIN_PASSWORD=postgres DB_HOST=localhost SSL_MODE=disable
+export DB_NAME=test_tmp_db_ DB_PORT=5432 DB_ADMIN_USERNAME=postgres DB_ADMIN_PASSWORD=postgres DB_HOST=localhost SSL_MODE=disable

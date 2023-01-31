@@ -21,7 +21,7 @@ linters:
     - durationcheck
     - errcheck
     - errchkjson
-    # errname TODO
+    - errname
     - execinquery
     # exhaustive
     # exhaustivestruct
@@ -32,7 +32,7 @@ linters:
     - funlen
     - gci
     # gochecknoglobals
-    # gochecknoinits
+    - gochecknoinits
     - gocognit
     - goconst
     - gocritic
@@ -43,8 +43,8 @@ linters:
     - goheader
     # goimports
     # golint Replaced by revive.
-    # gomnd
-    # gomoddirectives replacement are not allowed: antreacloud-utils
+    - gomnd
+    # gomoddirectives replacement are not allowed:
     - gomodguard
     - goprintffuncname
     - gosec
@@ -64,7 +64,7 @@ linters:
     - nilnil
     - noctx
     - nolintlint
-    # nonamedreturns TODO
+    # nonamedreturns
     - nosprintfhostport
     # paralleltest
     - prealloc
@@ -78,8 +78,8 @@ linters:
     - tagliatelle
     - tenv
     - testableexamples
-    # testpackage
-    # thelper
+    - testpackage
+    - thelper
     - tparallel
     - typecheck
     - unconvert
@@ -165,6 +165,8 @@ issues:
       linters:
         - cyclop
         - funlen
+        - gochecknoglobals
         - gocritic
         - gosec
+        - typecheck
         - unparam

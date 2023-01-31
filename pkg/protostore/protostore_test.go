@@ -16,7 +16,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package datastore
+package protostore_test
 
 import (
 	"context"
@@ -27,6 +27,10 @@ import (
 	faker "github.com/bxcodec/faker/v3"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
+	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/errors"
+	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/pkgtest"
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/protostore"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/test/pb"
 	"google.golang.org/protobuf/proto"
 )
@@ -35,6 +39,8 @@ var protoMsgs = []proto.Message{
 	&pb.CPU{},
 	&pb.Memory{},
 }
+
+var p = TestProtoStore
 
 type MemorySlice []pb.Memory
 
@@ -110,9 +116,9 @@ func TestProtoConversionWithFaker(t *testing.T) {
 	assert := assert.New(t)
 	msg1 := pb.CPU{}
 	_ = faker.FakeData(&msg1)
-	data, _ := ToBytes(&msg1)
+	data, _ := protostore.ToBytes(&msg1)
 	msg2 := pb.CPU{}
-	_ = FromBytes(data, &msg2)
+	_ = protostore.FromBytes(data, &msg2)
 
 	assert.Equal(msg1.String(), msg2.String())
 }
@@ -126,9 +132,9 @@ func TestProtoConversion(t *testing.T) {
 		NumberThreads: 8,
 		MinGhz:        1.6,
 	}
-	data, _ := ToBytes(&msg1)
+	data, _ := protostore.ToBytes(&msg1)
 	msg2 := pb.CPU{}
-	_ = FromBytes(data, &msg2)
+	_ = protostore.FromBytes(data, &msg2)
 
 	assert.Equal(msg1.String(), msg2.String())
 
@@ -138,9 +144,9 @@ func TestProtoConversion(t *testing.T) {
 		Speed: 2933,
 		Type:  "DDR4",
 	}
-	data, _ = ToBytes(&msg3)
+	data, _ = protostore.ToBytes(&msg3)
 	msg4 := pb.Memory{}
-	_ = FromBytes(data, &msg4)
+	_ = protostore.FromBytes(data, &msg4)
 
 	assert.Equal(msg3.String(), msg4.String())
 }
@@ -148,54 +154,24 @@ func TestProtoConversion(t *testing.T) {
 func setupDbContext(t *testing.T) {
 	t.Helper()
 	assert := assert.New(t)
-	p := GetProtoStore()
 
-	p.Configure(serviceAdminCtx, false, DataStore.GetAuthorizer())
 	if err := p.DropTables(protoMsgs...); err != nil {
 		assert.FailNow("Dropping tables failed with error: " + err.Error())
 	}
 
-	roleMapping := map[string]DbRole{
-		TENANT_AUDITOR:  TENANT_READER,
-		TENANT_ADMIN:    TENANT_WRITER,
-		SERVICE_AUDITOR: READER,
-		SERVICE_ADMIN:   WRITER,
+	roleMapping := map[string]dbrole.DbRole{
+		TENANT_AUDITOR:  dbrole.TENANT_READER,
+		TENANT_ADMIN:    dbrole.TENANT_WRITER,
+		SERVICE_AUDITOR: dbrole.READER,
+		SERVICE_ADMIN:   dbrole.WRITER,
 	}
-	err := p.Register(serviceAdminCtx, roleMapping, protoMsgs...)
+	err := p.Register(ServiceAdminCtx, roleMapping, protoMsgs...)
 	assert.NoError(err)
-}
-
-func setupInMemoryContext(t *testing.T) {
-	t.Helper()
-	assert := assert.New(t)
-	p := GetProtoStore()
-
-	p.Configure(serviceAdminCtx, false, DataStore.GetAuthorizer())
-	if err := p.DropTables(protoMsgs...); err != nil {
-		assert.FailNow("Dropping tables failed with error: " + err.Error())
-	}
-
-	roleMapping := map[string]DbRole{
-		TENANT_AUDITOR:  TENANT_READER,
-		TENANT_ADMIN:    TENANT_WRITER,
-		SERVICE_AUDITOR: READER,
-		SERVICE_ADMIN:   WRITER,
-	}
-
-	for _, msg := range protoMsgs {
-		err := p.Register(serviceAdminCtx, roleMapping, msg)
-		assert.NoError(err)
-	}
 }
 
 func TestProtoStoreInDbFindWithInvalidParams(t *testing.T) {
 	setupDbContext(t)
-	testProtoStoreFindWithInvalidParams(t, pepsiAdminCtx)
-}
-
-func TestProtoStoreInMemoryFindWithInvalidParams(t *testing.T) {
-	setupInMemoryContext(t)
-	testProtoStoreFindWithInvalidParams(t, cokeAdminCtx)
+	testProtoStoreFindWithInvalidParams(t, PepsiAdminCtx)
 }
 
 /*
@@ -203,8 +179,8 @@ Checks that ProtobufDataStore.FindAll and ProtobufDataStore.FindAllAsMap reject 
 where query results are supposed to be stored and do not reject those that contain valid arguments.
 */
 func testProtoStoreFindWithInvalidParams(t *testing.T, ctx context.Context) {
+	t.Helper()
 	assert := assert.New(t)
-	var p ProtoStore = GetProtoStore()
 
 	// FIND ALL
 	{
@@ -219,7 +195,7 @@ func testProtoStoreFindWithInvalidParams(t *testing.T, ctx context.Context) {
 		for i := range invalidParams {
 			invalidParam := invalidParams[i]
 			_, err := p.FindAll(ctx, invalidParam)
-			assert.ErrorIs(err, IllegalArgumentError)
+			assert.ErrorIs(err, ErrNotPtrToStructSlice)
 		}
 
 		validParams := []interface{}{
@@ -247,7 +223,7 @@ func testProtoStoreFindWithInvalidParams(t *testing.T, ctx context.Context) {
 		for i := range invalidParams {
 			invalidParam := invalidParams[i]
 			_, err := p.FindAllAsMap(ctx, invalidParam)
-			assert.ErrorIs(err, IllegalArgumentError)
+			assert.ErrorIs(err, ErrNotPtrToStructSlice)
 		}
 
 		validParams := []interface{}{
@@ -265,12 +241,7 @@ func testProtoStoreFindWithInvalidParams(t *testing.T, ctx context.Context) {
 
 func TestProtoStoreInDbFindAll(t *testing.T) {
 	setupDbContext(t)
-	testProtoStoreFindAll(t, pepsiAdminCtx)
-}
-
-func TestProtoStoreInMemoryFindAll(t *testing.T) {
-	setupInMemoryContext(t)
-	testProtoStoreFindAll(t, cokeAdminCtx)
+	testProtoStoreFindAll(t, PepsiAdminCtx)
 }
 
 /*
@@ -279,8 +250,8 @@ Checks if FindAll() works (both when query results are stored in a ptr to a slic
 when query results are stored in a ptr to a slice of ptrs to structs ).
 */
 func testProtoStoreFindAll(t *testing.T, ctx context.Context) {
+	t.Helper()
 	assert := assert.New(t)
-	var p ProtoStore = GetProtoStore()
 
 	// Prepare data for test cases
 	memmsg1, memmsg2, cpumsg1, cpumsg2 := pb.Memory{}, pb.Memory{}, pb.CPU{}, pb.CPU{}
@@ -492,13 +463,13 @@ func testProtoStoreFindAll(t *testing.T, ctx context.Context) {
 	{
 		assert.NotNil(p.GetAuthorizer())
 		_, err := p.FindAll(ctx, pb.CPU{})
-		assert.ErrorIs(err, IllegalArgumentError)
+		assert.ErrorIs(err, ErrNotPtrToStructSlice)
 		_, err = p.FindAll(ctx, &pb.CPU{})
-		assert.ErrorIs(err, IllegalArgumentError)
+		assert.ErrorIs(err, ErrNotPtrToStructSlice)
 		_, err = p.FindAllAsMap(ctx, pb.CPU{})
-		assert.ErrorIs(err, IllegalArgumentError)
+		assert.ErrorIs(err, ErrNotPtrToStructSlice)
 		_, err = p.FindAllAsMap(ctx, &pb.CPU{})
-		assert.ErrorIs(err, IllegalArgumentError)
+		assert.ErrorIs(err, ErrNotPtrToStructSlice)
 	}
 	{
 		err := p.DropTables(protoMsgs...)
@@ -506,34 +477,23 @@ func testProtoStoreFindAll(t *testing.T, ctx context.Context) {
 
 		cpuQueryResults := make(map[string]*pb.CPU)
 		_, err = p.FindAllAsMap(ctx, cpuQueryResults)
-		assert.ErrorIs(err, ErrorExecutingSqlStmt)
+		assert.ErrorIs(err, ErrExecutingSqlStmt)
 
 		memoryQueryResults := make([]*pb.Memory, 0)
 		_, err = p.FindAll(ctx, &memoryQueryResults)
-		assert.ErrorIs(err, ErrorExecutingSqlStmt)
+		assert.ErrorIs(err, ErrExecutingSqlStmt)
 	}
 }
 
 func TestProtoStoreInDbCrud(t *testing.T) {
 	setupDbContext(t)
-	testProtoStoreCrud(t, pepsiAdminCtx, false)
+	testProtoStoreCrud(t, PepsiAdminCtx, false)
 }
 
 // Same as TestProtoStoreInDbCrud, but uses Upsert instead of Insert or Update.
 func TestProtoStoreInDbCrudUpsert(t *testing.T) {
 	setupDbContext(t)
-	testProtoStoreCrud(t, pepsiAdminCtx, true)
-}
-
-func TestProtoStoreInMemoryCrud(t *testing.T) {
-	setupInMemoryContext(t)
-	testProtoStoreCrud(t, cokeAdminCtx, false)
-}
-
-// Same as TestProtoStoreInMemoryCrudm but uses Upsert instead of Insert or Update.
-func TestProtoStoreInMemoryCrudUpsert(t *testing.T) {
-	setupInMemoryContext(t)
-	testProtoStoreCrud(t, cokeAdminCtx, true)
+	testProtoStoreCrud(t, PepsiAdminCtx, true)
 }
 
 /*
@@ -542,17 +502,17 @@ If useUpsert is true, will use Upsert instead of Insert and Update.
 Otherwise, Insert and Update will be used.
 */
 func testProtoStoreCrud(t *testing.T, ctx context.Context, useUpsert bool) {
+	t.Helper()
 	assert := assert.New(t)
-	var p ProtoStore = GetProtoStore()
 	var err error
 	var rowsAffected int64
-	var metadata1, metadata2, metadata3 Metadata
+	var metadata1, metadata2, metadata3 protostore.Metadata
 
 	// Insert Protobuf record
 	cpumsg1 := pb.CPU{}
 	_ = faker.FakeData(&cpumsg1)
 	if useUpsert {
-		rowsAffected, _, err = p.UpsertWithMetadata(ctx, P4, &cpumsg1, Metadata{Revision: 1})
+		rowsAffected, _, err = p.UpsertWithMetadata(ctx, P4, &cpumsg1, protostore.Metadata{Revision: 1})
 	} else {
 		rowsAffected, _, err = p.Insert(ctx, P4, &cpumsg1)
 	}
@@ -564,11 +524,9 @@ func testProtoStoreCrud(t *testing.T, ctx context.Context, useUpsert bool) {
 	err = p.FindById(ctx, P4, &cpumsg2, &metadata1)
 	assert.NoError(err, "Failed to find a Protobuf message in ProtoStore")
 	assert.Equal(cpumsg1.String(), cpumsg2.String())
-	if DataStore == &relationalDb { // Only check this for Postgres-backed ProtoStore
-		revision, err := p.GetRevision(ctx, P4, &pb.CPU{})
-		assert.NoError(err)
-		assert.Equal(int64(1), revision)
-	}
+	revision, err := p.GetRevision(ctx, P4, &pb.CPU{})
+	assert.NoError(err)
+	assert.Equal(int64(1), revision)
 
 	// Update Protobuf record (with metadata provided explicitly)
 	cpumsg3 := pb.CPU{}
@@ -580,24 +538,20 @@ func testProtoStoreCrud(t *testing.T, ctx context.Context, useUpsert bool) {
 	}
 	assert.NoError(err, "Failed to update a Protobuf message in ProtoStore")
 	assert.EqualValues(1, rowsAffected)
-	if DataStore == &relationalDb { // Only check this for Postgres-backed ProtoStore
-		assert.EqualValues(metadata1.Revision+1, metadata2.Revision, "Revision did not increment by 1 after an update")
-		revision, err := p.GetRevision(ctx, P4, &pb.CPU{})
-		assert.NoError(err)
-		assert.Equal(metadata1.Revision+1, revision)
-	}
+	assert.EqualValues(metadata1.Revision+1, metadata2.Revision, "Revision did not increment by 1 after an update")
+	revision, err = p.GetRevision(ctx, P4, &pb.CPU{})
+	assert.NoError(err)
+	assert.Equal(metadata1.Revision+1, revision)
 
 	// Query updated Protobuf record
 	cpumsg4 := pb.CPU{}
 	err = p.FindById(ctx, P4, &cpumsg4, &metadata2)
 	assert.NoError(err, "Failed to find the updated Protobuf message in ProtoStore")
 	assert.Equal(cpumsg3.String(), cpumsg4.String())
-	if DataStore == &relationalDb { // Only check this for Postgres-backed ProtoStore
-		assert.EqualValues(metadata1.Revision+1, metadata2.Revision, "Revision did not increment by 1 after an update")
-		revision, err := p.GetRevision(ctx, P4, &pb.CPU{})
-		assert.NoError(err)
-		assert.Equal(metadata1.Revision+1, revision)
-	}
+	assert.EqualValues(metadata1.Revision+1, metadata2.Revision, "Revision did not increment by 1 after an update")
+	revision, err = p.GetRevision(ctx, P4, &pb.CPU{})
+	assert.NoError(err)
+	assert.Equal(metadata1.Revision+1, revision)
 
 	// Update Protobuf record (without metadata)
 	cpumsg5 := pb.CPU{}
@@ -612,26 +566,22 @@ func testProtoStoreCrud(t *testing.T, ctx context.Context, useUpsert bool) {
 	assert.EqualValues(1, rowsAffected)
 	assert.NotEqual(cpumsg4.String(), cpumsg5.String())
 	assert.Equal(cpumsg5String, cpumsg5.String())
-	if DataStore == &relationalDb { // Only check this for Postgres-backed ProtoStore
-		assert.EqualValues(metadata2.Revision+1, metadata3.Revision, "Revision did not increment by 1 after an update")
-		revision, err := p.GetRevision(ctx, P4, &pb.CPU{})
-		assert.NoError(err)
-		assert.Equal(metadata2.Revision+1, revision)
-	}
+	assert.EqualValues(metadata2.Revision+1, metadata3.Revision, "Revision did not increment by 1 after an update")
+	revision, err = p.GetRevision(ctx, P4, &pb.CPU{})
+	assert.NoError(err)
+	assert.Equal(metadata2.Revision+1, revision)
 
 	// Query all Protobuf records
 	allCpus := make([]pb.CPU, 0)
 	metadataMap, err := p.FindAll(ctx, &allCpus)
 	assert.NoError(err)
 	assert.Len(allCpus, 1)
-	if DataStore == &relationalDb { // Only check this for Postgres-backed ProtoStore
-		assert.Len(metadataMap, 1)
-		assert.Contains(metadataMap, P4)
-		assert.EqualValues(metadata2.Revision+1, metadataMap[P4].Revision, "Revision did not increment by 1 after an update")
-		revision, err := p.GetRevision(ctx, P4, &cpumsg2)
-		assert.NoError(err)
-		assert.EqualValues(metadata2.Revision+1, revision, "Revision did not increment by 1 after an update")
-	}
+	assert.Len(metadataMap, 1)
+	assert.Contains(metadataMap, P4)
+	assert.EqualValues(metadata2.Revision+1, metadataMap[P4].Revision, "Revision did not increment by 1 after an update")
+	revision, err = p.GetRevision(ctx, P4, &cpumsg2)
+	assert.NoError(err)
+	assert.EqualValues(metadata2.Revision+1, revision, "Revision did not increment by 1 after an update")
 
 	memmsg1 := pb.Memory{}
 	_ = faker.FakeData(&memmsg1)
@@ -648,13 +598,11 @@ func testProtoStoreCrud(t *testing.T, ctx context.Context, useUpsert bool) {
 	err = p.FindById(ctx, P4, &memmsg2, &metadata1)
 	assert.NoError(err, "Failed to find a Protobuf message in ProtoStore")
 	assert.Equal(memmsg1.String(), memmsg2.String())
-	if DataStore == &relationalDb { // Only check this for Postgres-backed ProtoStore
-		assert.Equal(P4, metadata1.Id)
-		assert.Equal(int64(1), metadata1.Revision)
-		revision, err := p.GetRevision(ctx, P4, &pb.Memory{})
-		assert.NoError(err)
-		assert.Equal(int64(1), revision)
-	}
+	assert.Equal(P4, metadata1.Id)
+	assert.Equal(int64(1), metadata1.Revision)
+	revision, err = p.GetRevision(ctx, P4, &pb.Memory{})
+	assert.NoError(err)
+	assert.Equal(int64(1), revision)
 
 	memmsg3 := pb.Memory{}
 	_ = faker.FakeData(&memmsg3)
@@ -682,7 +630,7 @@ func testProtoStoreCrud(t *testing.T, ctx context.Context, useUpsert bool) {
 	// Delete CPU message with an ID of P4. Memory message with an ID of P4 must remain intact
 	cpumsg6 := pb.CPU{}
 	err = p.FindById(ctx, P4, &cpumsg6, nil)
-	assert.ErrorIs(err, RecordNotFoundError)
+	assert.ErrorIs(err, ErrRecordNotFound)
 	assert.Equal("", cpumsg6.String(), "Found a Protobuf message that was supposed to be deleted")
 
 	err = p.FindById(ctx, P4, &memmsg4, nil)
@@ -699,7 +647,7 @@ func testProtoStoreCrud(t *testing.T, ctx context.Context, useUpsert bool) {
 
 	memmsg5 := pb.Memory{}
 	err = p.FindById(ctx, P4, &memmsg5, nil)
-	assert.ErrorIs(err, RecordNotFoundError)
+	assert.ErrorIs(err, ErrRecordNotFound)
 	assert.Equal("", memmsg5.String(), "Found a Protobuf message that was supposed to be deleted")
 }
 
@@ -709,18 +657,17 @@ Checks if a Protobuf message inserted by a user from Pepsi is visible to the use
 func TestProtoStoreInDbMultitenancy(t *testing.T) {
 	assert := assert.New(t)
 
-	var p ProtoStore = GetProtoStore()
 	cpumsg1 := pb.CPU{}
 	_ = faker.FakeData(&cpumsg1)
-	rowsAffected, md, err := p.Insert(pepsiAdminCtx, cpumsg1.Name, &cpumsg1) // Pepsi inserts a record into Protostore
+	rowsAffected, md, err := p.Insert(PepsiAdminCtx, cpumsg1.Name, &cpumsg1) // Pepsi inserts a record into Protostore
 	assert.NoError(err)
 	assert.Equal(int64(1), rowsAffected)
 	assert.Equal(cpumsg1.Name, md.Id)
 	assert.Equal(int64(1), md.Revision)
 
 	queryResult := pb.CPU{}
-	err = p.FindById(cokeAdminCtx, cpumsg1.Name, &queryResult, nil) // Coke tries to read Pepsi's Protobuf message
-	assert.ErrorIs(err, RecordNotFoundError)                        // Coke won't be able to see that record due to RLS
+	err = p.FindById(CokeAdminCtx, cpumsg1.Name, &queryResult, nil) // Coke tries to read Pepsi's Protobuf message
+	assert.ErrorIs(err, ErrRecordNotFound)                          // Coke won't be able to see that record due to RLS
 	assert.Empty(queryResult.GetName(), "Coke user found a record belonging to Pepsi tenant")
 }
 
@@ -730,16 +677,7 @@ func BenchmarkCrudProtoStoreInDb(b *testing.B) {
 	var t testing.T
 	setupDbContext(&t)
 	for n := 0; n < b.N; n++ {
-		testCrud(&t, cokeAdminCtx)
-	}
-}
-
-func BenchmarkCrudProtoStoreInMemory(b *testing.B) {
-	log.SetLevel(log.FatalLevel)
-	log.SetOutput(io.Discard)
-	var t testing.T
-	setupInMemoryContext(&t)
-	for n := 0; n < b.N; n++ {
-		testCrud(&t, pepsiAdminCtx)
+		testProtoStoreCrud(&t, CokeAdminCtx, false)
+		testProtoStoreCrud(&t, CokeAdminCtx, true)
 	}
 }

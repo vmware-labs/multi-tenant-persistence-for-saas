@@ -16,7 +16,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package datastore
+package errors
 
 import (
 	"context"
@@ -39,6 +39,7 @@ const (
 	SSL_MODE          = ErrorContextKey("sslMode")
 	TABLE_NAME        = ErrorContextKey("TableName")
 	PRIMARY_KEY       = ErrorContextKey("PrimaryKey")
+	TYPE              = ErrorContextKey("Type")
 )
 
 func contextToString(ctx interface{}) string {
@@ -156,30 +157,28 @@ func (e *DbError) WithMap(kvMap map[ErrorContextKey]string) *DbError {
 }
 
 var (
-	BaseDbError                      = &DbError{}
-	ErrorMissingRoleMapping          = BaseDbError.With("Missing role mapping for DB table")
-	ErrorStructNotRegisteredWithDAL  = BaseDbError.With("Struct(s) have not been registered with DAL")
-	IllegalArgumentError             = BaseDbError.With("Argument is invalid")
-	InvalidPortNumberError           = BaseDbError.With("Port # is invalid")
-	ErrorMissingEnvVar               = BaseDbError.With("An environment variable is missing or empty")
-	ErrorMissingOrgId                = BaseDbError.With("Org. ID is missing in context")
-	ErrorConnectingToDb              = BaseDbError.With("Failed to establish a connection with database")
-	ErrorParsingSqlRow               = BaseDbError.With("Failed to parse a row from DB table")
-	ErrorExecutingSqlStmt            = BaseDbError.With("SQL statement could not be executed")
-	ErrorRegisteringWithDAL          = BaseDbError.With("Registration of a struct with DAL failed")
-	ErrorStartingTx                  = BaseDbError.With("Failed to start a transaction")
-	ErrorCommittingTx                = BaseDbError.With("Failed to commit a transaction")
-	RevisionConflictError            = BaseDbError.With("Blocking update due to outdated revision")
-	ErrorMarshalling                 = BaseDbError.With("Cannot marshal proto message to binary")
-	ErrorUnmarshalling               = BaseDbError.With("Cannot unmarshal binary to proto message")
-	ErrOperationNotAllowed           = BaseDbError.With("Not authorized to perform the operation on other tenant's data")
-	ErrorFetchingMetadataFromContext = BaseDbError.With("Error fetching metadata from GRPC context")
-	ErrorTableDoesNotExist           = BaseDbError.With("Table does not exist")
-	RecordNotFoundError              = BaseDbError.With("Record not found")
+	ErrBaseDb              = &DbError{}
+	ErrMissingRoleMapping  = ErrBaseDb.With("Missing role mapping for DB table")
+	ErrNotPtrToStructSlice = ErrBaseDb.With("Argument is invalid")
+	ErrInvalidPortNumber   = ErrBaseDb.With("Port # is invalid")
+	ErrMissingEnvVar       = ErrBaseDb.With("An environment variable is missing or empty")
+	ErrMissingOrgId        = ErrBaseDb.With("OrgId is missing in context")
+	ErrConnectingToDb      = ErrBaseDb.With("Failed to establish a connection with database")
+	ErrExecutingSqlStmt    = ErrBaseDb.With("SQL statement could not be executed")
+	ErrRegisteringStruct   = ErrBaseDb.With("Registration of a struct with DAL failed")
+	ErrStartingTx          = ErrBaseDb.With("Failed to start a transaction")
+	ErrCommittingTx        = ErrBaseDb.With("Failed to commit a transaction")
+	ErrRevisionConflict    = ErrBaseDb.With("Blocking update due to outdated revision")
+	ErrMarshalling         = ErrBaseDb.With("Cannot marshal proto message to binary")
+	ErrUnmarshalling       = ErrBaseDb.With("Cannot unmarshal binary to proto message")
+	ErrOperationNotAllowed = ErrBaseDb.With("Not authorized to perform the operation on other tenant's data")
+	ErrFetchingMetadata    = ErrBaseDb.With("Error fetching metadata from GRPC context")
+	ErrTableDoesNotExist   = ErrBaseDb.With("Table does not exist")
+	ErrRecordNotFound      = ErrBaseDb.With("Record not found")
+	ErrNotPtrToStruct      = ErrBaseDb.With("PointerToStruct expected, invalid type provided")
 
-	ErrAuthContext       = BaseDbError.With("Error extracting authContext from context")
-	ErrNoAuthContext     = BaseDbError.With("Permission denied because authContext is missing")
-	ErrNoUserContext     = BaseDbError.With("Permission denied because userInformation is missing")
-	ErrUserNotAuthorized = BaseDbError.With("User is not authorized to access this API")
-	ErrMissingOrgId      = BaseDbError.With("Org. ID is missing in context")
+	ErrAuthContext       = ErrBaseDb.With("Error extracting authContext from context")
+	ErrNoAuthContext     = ErrBaseDb.With("Permission denied because authContext is missing")
+	ErrNoUserContext     = ErrBaseDb.With("Permission denied because userInformation is missing")
+	ErrUserNotAuthorized = ErrBaseDb.With("User is not authorized to access this API")
 )

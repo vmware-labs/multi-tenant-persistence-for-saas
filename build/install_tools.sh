@@ -19,4 +19,5 @@ elif [[ "${OSTYPE}" == "darwin"* ]]; then
   /tmp/typos --version | grep ${TYPOS_VERSION} || wget -qO- https://github.com/crate-ci/typos/releases/download/v${TYPOS_VERSION}/typos-v${TYPOS_VERSION}-x86_64-apple-darwin.tar.gz | tar -zxf - -C /tmp/ ./typos
 fi
 
-pip3 install addlicense mdv
+pip3 install addlicense mdv yamllint
+sudo snap install mdl

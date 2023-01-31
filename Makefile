@@ -1,5 +1,6 @@
-.PHONY: build
-ci: lint unit_tests build ## Run only ci targets that lint/build/test the code
+.PHONY: all build ci clean test
+
+ci: lint test build ## Run only ci targets that lint/build/test the code
 
 all: clean update lint_fix doc ci benchmarks ## Run all the targets including the ones that generate files/docs etc ...
 
@@ -15,7 +16,7 @@ lint: install_tools ## Run golang linters in checking mode
 lint_fix: ## Run golang linters in fix mode
 	build/lint_fix.sh
 
-unit_tests:  install_tools ## Run unit-tests
+test:  install_tools ## Run unit-tests
 	build/unit_tests.sh
 
 benchmarks:
@@ -27,11 +28,12 @@ build:
 clean:  ## Clean up the temporary files
 	rm -rf vendor test-results
 
-update: $(TARGETS) ## updates all the go module versions
+update: ## updates all the go module versions
 	build/go_update.sh
 
 install_tools:
 	build/install_tools.sh
 
-mdlint:
-	mdl -s .mdl_style.rb *.md docs/*.md
+mlint: ## Run miscellaneous md/yaml linters in view-only mode
+	yamllint *.yaml .github/workflows/*.yml || true
+	mdl -s .mdl_style.rb *.md docs/*.md || true

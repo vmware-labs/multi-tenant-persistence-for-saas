@@ -32,7 +32,7 @@ Clone the repo and checkout the branch for creating PR, then:
 
 * For building the code, run `make build`
 * For linting the code, run `make lint`
-* For running unit tests, run `make unit_tests`
+* For running unit tests, run `make test`
 
 ## Contribution Flow
 

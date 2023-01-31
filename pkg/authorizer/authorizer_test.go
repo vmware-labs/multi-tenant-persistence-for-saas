@@ -16,13 +16,17 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package datastore
+package authorizer_test
 
 import (
 	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
+	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/errors"
+	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/pkgtest"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -33,12 +37,12 @@ func testGettingOrgFromContext(t *testing.T, authorizer Authorizer) {
 
 	// Negative test case - no auth. context in ctx
 	_, err := authorizer.GetOrgFromContext(context.Background())
-	assert.ErrorIs(err, ErrorFetchingMetadataFromContext)
+	assert.ErrorIs(err, ErrFetchingMetadata)
 
 	// Negative test cases - missing org. ID
 	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(METADATA_KEY_ROLE, "admin"))
 	_, err = authorizer.GetOrgFromContext(ctx)
-	assert.ErrorIs(err, ErrorMissingOrgId)
+	assert.ErrorIs(err, ErrMissingOrgId)
 
 	ctx = metadata.NewIncomingContext(context.Background(), metadata.Pairs(METADATA_KEY_ORGID, PEPSI))
 	orgId, err := authorizer.GetOrgFromContext(ctx)
@@ -56,15 +60,30 @@ func TestGettingMatchingDbRoleWithMetadataBasedAuthorizer(t *testing.T) {
 
 	authorizer := MetadataBasedAuthorizer{}
 
-	wCtx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(METADATA_KEY_ORGID, PEPSI, METADATA_KEY_ROLE, METADATA_ROLE_ADMIN))
-	dbRole, err := authorizer.GetMatchingDbRole(wCtx, "appUser", "app")
+	gCtx := authorizer.GetDefaultOrgAdminContext()
+	dbRole, err := authorizer.GetMatchingDbRole(gCtx, "appUser", "app")
 	assert.Nil(err)
-	assert.Equal(TENANT_WRITER, dbRole)
+	assert.Equal(dbrole.TENANT_WRITER, dbRole)
+
+	aCtx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(METADATA_KEY_ORGID, PEPSI, METADATA_KEY_ROLE, METADATA_ROLE_SERVICE_ADMIN))
+	dbRole, err = authorizer.GetMatchingDbRole(aCtx, "appUser", "app")
+	assert.Nil(err)
+	assert.Equal(dbrole.WRITER, dbRole)
+
+	uCtx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(METADATA_KEY_ORGID, PEPSI, METADATA_KEY_ROLE, METADATA_ROLE_SERVICE_AUDITOR))
+	dbRole, err = authorizer.GetMatchingDbRole(uCtx, "appUser", "app")
+	assert.Nil(err)
+	assert.Equal(dbrole.READER, dbRole)
+
+	wCtx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(METADATA_KEY_ORGID, PEPSI, METADATA_KEY_ROLE, METADATA_ROLE_ADMIN))
+	dbRole, err = authorizer.GetMatchingDbRole(wCtx, "appUser", "app")
+	assert.Nil(err)
+	assert.Equal(dbrole.TENANT_WRITER, dbRole)
 
 	rCtx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(METADATA_KEY_ORGID, PEPSI, METADATA_KEY_ROLE, METADATA_ROLE_AUDITOR))
 	dbRole, err = authorizer.GetMatchingDbRole(rCtx, "appUser", "app")
 	assert.Nil(err)
-	assert.Equal(TENANT_READER, dbRole)
+	assert.Equal(dbrole.TENANT_READER, dbRole)
 }
 
 /*
@@ -73,9 +92,9 @@ Checks if updating role mapping in MetadataBasedAuthorizer works.
 func TestConfiguringMetadataBasedAuthorizer(t *testing.T) {
 	authorizer := MetadataBasedAuthorizer{}
 
-	newRoleMapping := map[string]map[string]DbRole{
+	newRoleMapping := map[string]map[string]dbrole.DbRole{
 		"app": {
-			"SERVICE_ADMIN": WRITER,
+			"SERVICE_ADMIN": dbrole.WRITER,
 		},
 	}
 

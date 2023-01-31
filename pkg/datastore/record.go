@@ -21,11 +21,8 @@ package datastore
 import "reflect"
 
 type Record interface {
-	/*
-		Returns all the fields that can together uniquely identify the record (primary key). The fields returned in the slice
-		must be in the same order as they were declared in the struct.
-	*/
-	GetId() []interface{}
+	// Currently are Records are expected to be pointers to struct, this is
+	// just place holder for future support
 }
 
 func GetRecordInstanceFromSlice(x interface{}) Record {
@@ -34,10 +31,7 @@ func GetRecordInstanceFromSlice(x interface{}) Record {
 		sliceType = sliceType.Elem()
 	}
 
-	/*
-		True if x consists of pointers to structs
-		False if x consists of structs
-	*/
+	// True if x consists of pointers to structs
 	var areSliceElemPtrs bool = sliceType.Elem().Kind() == reflect.Ptr
 
 	sliceElemType := sliceType.Elem()
