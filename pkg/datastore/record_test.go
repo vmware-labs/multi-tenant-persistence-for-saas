@@ -16,25 +16,27 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package datastore
+package datastore_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/datastore"
+	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/pkgtest"
 )
 
 func TestInstantiatingRecordFromSlice(t *testing.T) {
 	assert := assert.New(t)
-	record := GetRecordInstanceFromSlice([]appUser{})
-	assert.Equal(appUser{}, record)
+	record := datastore.GetRecordInstanceFromSlice([]AppUser{})
+	assert.Equal(AppUser{}, record)
 
-	record = GetRecordInstanceFromSlice(&[]appUser{})
-	assert.Equal(appUser{}, record)
+	record = datastore.GetRecordInstanceFromSlice(&[]AppUser{})
+	assert.Equal(AppUser{}, record)
 
-	record = GetRecordInstanceFromSlice([]*appUser{})
-	assert.Equal(&appUser{}, record)
+	record = datastore.GetRecordInstanceFromSlice([]*AppUser{})
+	assert.Equal(&AppUser{}, record)
 
-	record = GetRecordInstanceFromSlice(&[]*appUser{})
-	assert.Equal(&appUser{}, record)
+	record = datastore.GetRecordInstanceFromSlice(&[]*AppUser{})
+	assert.Equal(&AppUser{}, record)
 }

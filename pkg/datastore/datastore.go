@@ -21,16 +21,29 @@ package datastore
 import (
 	"context"
 	"os"
+	"strings"
+
+	"github.com/sirupsen/logrus"
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
+	"gorm.io/gorm"
+)
+
+const (
+	// Logging configuration variables.
+	LOG_LEVEL_ENV_VAR = "LOG_LEVEL"
+
+	// Constants for LOG field names & values.
+	COMP             = "comp"
+	SAAS_PERSISTENCE = "saas-persistence"
 )
 
 /*
 Datastore: Interface to be implemented by the persistence library.
 */
-type dataStore interface {
-	GetAuthorizer() Authorizer
-	Configure(ctx context.Context, isDataStoreInMemory bool, authorizer Authorizer)
-	PerformJoinOneToMany(ctx context.Context, record1 Record, record1Id string, record2JoinOnColumn string, query2Output interface{}) error
-	PerformJoinOneToOne(ctx context.Context, record1 Record, record1Id string, record2 Record, record2JoinOnColumn string) error
+type DataStore interface {
+	GetAuthorizer() authorizer.Authorizer
+	GetDBTransaction(ctx context.Context, tableName string, record Record) (tx *gorm.DB, err error)
 	Find(ctx context.Context, record Record) error
 	FindAll(ctx context.Context, records interface{}) error
 	FindWithFilter(ctx context.Context, record Record, records interface{}) error
@@ -38,14 +51,15 @@ type dataStore interface {
 	Delete(ctx context.Context, record Record) (int64, error)
 	Update(ctx context.Context, record Record) (int64, error)
 	Upsert(ctx context.Context, record Record) (int64, error)
-	RegisterWithDAL(ctx context.Context, roleMapping map[string]DbRole, record Record) error
+	RegisterWithDAL(ctx context.Context, roleMapping map[string]dbrole.DbRole, record Record) error
 	Reset()
+	Helper() DataStoreHelper
+	TestHelper() DataStoreTestHelper
 }
 
 type DataStoreHelper interface {
-	GetAuthorizer() Authorizer
-	Configure(ctx context.Context, isDataStoreInMemory bool, authorizer Authorizer)
-	RegisterWithDALHelper(ctx context.Context, roleMapping map[string]DbRole, tableName string, record Record) error
+	GetAuthorizer() authorizer.Authorizer
+	RegisterWithDALHelper(ctx context.Context, roleMapping map[string]dbrole.DbRole, tableName string, record Record) error
 	FindInTable(ctx context.Context, tableName string, record Record) error
 	FindAllInTable(ctx context.Context, tableName string, records interface{}) error
 	FindWithFilterInTable(ctx context.Context, tableName string, record Record, records interface{}) error
@@ -56,47 +70,25 @@ type DataStoreHelper interface {
 }
 
 type DataStoreTestHelper interface {
+	Initialize() error
 	DropTables(records ...Record) error                       // Drop DB tables by records
 	Drop(tableNames ...string) error                          // Drops DB tables
 	DropCascade(cascade bool, tableNames ...string) error     // Drops DB tables, with an option to drop them in a cascading fashion
 	Truncate(tableNames ...string) error                      // Truncates DB tables
 	TruncateCascade(cascade bool, tableNames ...string) error // Truncates DB tables, with an option to truncate them in a cascading fashion
-	DoesTableExist(tableName string) error                    // Checks if table exists
 }
 
-var (
-	DataStore  dataStore           = &relationalDb
-	Helper     DataStoreHelper     = &relationalDb
-	TestHelper DataStoreTestHelper = &relationalDb
-)
-
-func configureDataStore(isDataStoreInMemory bool, authorizer Authorizer) {
-	if authorizer == nil {
-		os.Exit(1)
-	}
-	if isDataStoreInMemory {
-		if authorizer != nil {
-			inMemoryDataStore.authorizer = authorizer
-		}
-		DataStore = &inMemoryDataStore
-		DatastoreHelperInMemory()
+func GetLogger() *logrus.Entry {
+	log := logrus.New()
+	log.SetFormatter(&logrus.TextFormatter{
+		FullTimestamp:   true,
+		TimestampFormat: "2006-01-02T15:04:05.000",
+	})
+	loglevel := strings.ToLower(os.Getenv(LOG_LEVEL_ENV_VAR))
+	if level, err := logrus.ParseLevel(loglevel); err != nil {
+		log.SetLevel(logrus.InfoLevel) // Default logging level
 	} else {
-		if authorizer != nil {
-			relationalDb.authorizer = authorizer
-		}
-		DataStore = &relationalDb
-		DatastoreHelperInDatabase()
+		log.SetLevel(level)
 	}
-}
-
-func DatastoreHelperInMemory() DataStoreHelper {
-	Helper = &inMemoryDataStore
-	TestHelper = &inMemoryDataStore
-	return Helper
-}
-
-func DatastoreHelperInDatabase() DataStoreHelper {
-	Helper = &relationalDb
-	TestHelper = &relationalDb
-	return Helper
+	return log.WithField(COMP, SAAS_PERSISTENCE)
 }

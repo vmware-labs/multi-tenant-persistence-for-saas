@@ -16,34 +16,20 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package datastore
+package authorizer
 
 import (
 	"context"
 	"strings"
 
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
+	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/errors"
 	"google.golang.org/grpc/metadata"
 )
 
-// TODO consider moving authorizer.go to a separate package.
-const GLOBAL_DEFAULT_ORG_ID = "_GlobalDefaultOrg"
-
-/*
-Interface for everything auth.-related in DAL. Can be implemented by the users of DAL and passed to DAL using SetAuthorizer().
-*/
-type Authorizer interface {
-	GetDefaultOrgAdminContext() context.Context
-	GetAuthContext(orgId string, roles ...string) context.Context
-	GetOrgFromContext(ctx context.Context) (string, error)
-	GetMatchingDbRole(ctx context.Context, tableNames ...string) (DbRole, error)
-
-	/*
-		Method used to configure the authorizer. The method's arguments and implementation will be different for every authorizer.
-	*/
-	Configure(args ...interface{})
-}
-
 const (
+	GLOBAL_DEFAULT_ORG_ID = "_GlobalDefaultOrg"
+
 	METADATA_KEY_ORGID            = "orgid"
 	METADATA_KEY_ROLE             = "role"
 	METADATA_ROLE_SERVICE_ADMIN   = "service_admin"
@@ -57,44 +43,40 @@ type MetadataBasedAuthorizer struct{}
 func (s MetadataBasedAuthorizer) GetOrgFromContext(ctx context.Context) (string, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		return "", ErrorFetchingMetadataFromContext
+		return "", ErrFetchingMetadata
 	}
-
-	logger.Debugf("Received metadata %+v from context", md)
 
 	org := md[METADATA_KEY_ORGID]
 	if len(org) == 0 {
-		return "", ErrorMissingOrgId
+		return "", ErrMissingOrgId
 	}
 
 	return org[len(org)-1], nil
 }
 
-func (s MetadataBasedAuthorizer) GetMatchingDbRole(ctx context.Context, tableNames ...string) (DbRole, error) {
+func (s MetadataBasedAuthorizer) GetMatchingDbRole(ctx context.Context, tableNames ...string) (dbrole.DbRole, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		return "", ErrorFetchingMetadataFromContext
+		return "", ErrFetchingMetadata
 	}
-
-	logger.Debugf("Received metadata %+v from context", md)
 
 	role := md[METADATA_KEY_ROLE]
 	if len(role) > 0 {
 		switch role[len(role)-1] {
 		case METADATA_ROLE_SERVICE_ADMIN:
-			return WRITER, nil
+			return dbrole.WRITER, nil
 		case METADATA_ROLE_SERVICE_AUDITOR:
-			return READER, nil
+			return dbrole.READER, nil
 		default:
 			if strings.HasSuffix(role[len(role)-1], METADATA_ROLE_ADMIN) {
-				return TENANT_WRITER, nil
+				return dbrole.TENANT_WRITER, nil
 			}
 		}
 	}
-	return TENANT_READER, nil
+	return dbrole.TENANT_READER, nil
 }
 
-func (s MetadataBasedAuthorizer) Configure(_ ...interface{}) {
+func (s MetadataBasedAuthorizer) Configure(_ string, _ map[string]dbrole.DbRole) {
 	// TODO - Set "service role" to DB role mapping here
 }
 

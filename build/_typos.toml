@@ -6,4 +6,4 @@ importas = "importas"
 # Accepted words to be ignored by typos
 
 [files]
-extend-exclude = [".golangci.yml"]
+extend-exclude = [".golangci.yml", "go.mod", "go.sum"]

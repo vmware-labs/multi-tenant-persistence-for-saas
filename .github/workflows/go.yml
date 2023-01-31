@@ -1,16 +1,16 @@
-
+---
 name: Go
 on:
   pull_request:
     branches:
-    - main
-    - release-*
-    - feature/*
+      - main
+      - release-*
+      - feature/*
   push:
     branches:
-    - main
-    - release-*
-    - feature/*
+      - main
+      - release-*
+      - feature/*
   workflow_run:
     workflows: ["Build"]
     types:
@@ -31,7 +31,7 @@ jobs:
         run: |
           mkdir -p $(go env GOPATH)
           mkdir -p $(go env GOCACHE)
-          sudo make unit_tests
+          sudo make test
       - name: Codecov
         uses: codecov/codecov-action@v3
         with:
@@ -44,13 +44,13 @@ jobs:
     name: Check lint
     runs-on: [ubuntu-latest]
     steps:
-    - uses: actions/checkout@v3
-    - name: Set up Go using version from go.mod
-      uses: actions/setup-go@v3
-      with:
-        go-version-file: 'go.mod'
-    - name: Run lint
-      run: |
-        mkdir -p $(go env GOPATH)
-        mkdir -p $(go env GOCACHE)
-        make lint
+      - uses: actions/checkout@v3
+      - name: Set up Go using version from go.mod
+        uses: actions/setup-go@v3
+        with:
+          go-version-file: 'go.mod'
+      - name: Run lint
+        run: |
+          mkdir -p $(go env GOPATH)
+          mkdir -p $(go env GOCACHE)
+          make lint
