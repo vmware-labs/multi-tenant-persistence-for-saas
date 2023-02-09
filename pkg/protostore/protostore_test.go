@@ -24,7 +24,7 @@ import (
 	"sort"
 	"testing"
 
-	faker "github.com/bxcodec/faker/v3"
+	"github.com/bxcodec/faker/v3"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
@@ -254,36 +254,36 @@ func testProtoStoreFindAll(t *testing.T, ctx context.Context) {
 	assert := assert.New(t)
 
 	// Prepare data for test cases
-	memmsg1, memmsg2, cpumsg1, cpumsg2 := pb.Memory{}, pb.Memory{}, pb.CPU{}, pb.CPU{}
-	for _, protoMsg := range []proto.Message{&memmsg1, &memmsg2, &cpumsg1, &cpumsg2} {
+	memMsg1, memMsg2, cpuMsg1, cpuMsg2 := pb.Memory{}, pb.Memory{}, pb.CPU{}, pb.CPU{}
+	for _, protoMsg := range []proto.Message{&memMsg1, &memMsg2, &cpuMsg1, &cpuMsg2} {
 		_ = faker.FakeData(protoMsg)
 	}
-	rowsAffected, md, err := p.Insert(ctx, P1, &memmsg1)
+	rowsAffected, md, err := p.Insert(ctx, P1, &memMsg1)
 	assert.NoError(err)
 	assert.Equal(int64(1), rowsAffected)
 	assert.Equal(P1, md.Id)
 	assert.Equal(int64(1), md.Revision)
 
-	rowsAffected, md, err = p.Insert(ctx, P2, &memmsg2)
+	rowsAffected, md, err = p.Insert(ctx, P2, &memMsg2)
 	assert.NoError(err)
 	assert.Equal(int64(1), rowsAffected)
 	assert.Equal(P2, md.Id)
 	assert.Equal(int64(1), md.Revision)
 
-	rowsAffected, md, err = p.Insert(ctx, P1, &cpumsg1)
+	rowsAffected, md, err = p.Insert(ctx, P1, &cpuMsg1)
 	assert.NoError(err)
 	assert.Equal(int64(1), rowsAffected)
 	assert.Equal(P1, md.Id)
 	assert.Equal(int64(1), md.Revision)
 
-	rowsAffected, md, err = p.Insert(ctx, P2, &cpumsg2)
+	rowsAffected, md, err = p.Insert(ctx, P2, &cpuMsg2)
 	assert.NoError(err)
 	assert.Equal(int64(1), rowsAffected)
 	assert.Equal(P2, md.Id)
 	assert.Equal(int64(1), md.Revision)
 
-	var expectedMemoryQueryResults MemoryPtrSlice = []*pb.Memory{&memmsg1, &memmsg2}
-	var expectedCPUQueryResults CPUPtrSlice = []*pb.CPU{&cpumsg1, &cpumsg2}
+	var expectedMemoryQueryResults MemoryPtrSlice = []*pb.Memory{&memMsg1, &memMsg2}
+	var expectedCPUQueryResults CPUPtrSlice = []*pb.CPU{&cpuMsg1, &cpuMsg2}
 	sort.Sort(expectedMemoryQueryResults)
 	sort.Sort(expectedCPUQueryResults)
 
@@ -323,16 +323,16 @@ func testProtoStoreFindAll(t *testing.T, ctx context.Context) {
 
 		expectedQueryResults := make(map[string]pb.Memory)
 		expectedQueryResults[P1] = pb.Memory{
-			Brand: memmsg1.Brand,
-			Size:  memmsg1.Size,
-			Speed: memmsg1.Speed,
-			Type:  memmsg1.Type,
+			Brand: memMsg1.Brand,
+			Size:  memMsg1.Size,
+			Speed: memMsg1.Speed,
+			Type:  memMsg1.Type,
 		}
 		expectedQueryResults[P2] = pb.Memory{
-			Brand: memmsg2.Brand,
-			Size:  memmsg2.Size,
-			Speed: memmsg2.Speed,
-			Type:  memmsg2.Type,
+			Brand: memMsg2.Brand,
+			Size:  memMsg2.Size,
+			Speed: memMsg2.Speed,
+			Type:  memMsg2.Type,
 		}
 
 		for _, id := range []string{P1, P2} {
@@ -361,8 +361,8 @@ func testProtoStoreFindAll(t *testing.T, ctx context.Context) {
 		assert.Len(metadataMap, 2)
 
 		expectedQueryResults := make(map[string]*pb.Memory)
-		expectedQueryResults[P1] = &memmsg1
-		expectedQueryResults[P2] = &memmsg2
+		expectedQueryResults[P1] = &memMsg1
+		expectedQueryResults[P2] = &memMsg2
 
 		for _, id := range []string{P1, P2} {
 			expectedQueryResult, actualQueryResult := expectedQueryResults[id], actualQueryResults[id]
@@ -406,20 +406,20 @@ func testProtoStoreFindAll(t *testing.T, ctx context.Context) {
 
 		expectedQueryResults := make(map[string]pb.CPU)
 		expectedQueryResults[P1] = pb.CPU{
-			Brand:         cpumsg1.Brand,
-			Name:          cpumsg1.Name,
-			NumberCores:   cpumsg1.NumberCores,
-			NumberThreads: cpumsg1.NumberThreads,
-			MinGhz:        cpumsg1.MinGhz,
-			MaxGhz:        cpumsg1.MaxGhz,
+			Brand:         cpuMsg1.Brand,
+			Name:          cpuMsg1.Name,
+			NumberCores:   cpuMsg1.NumberCores,
+			NumberThreads: cpuMsg1.NumberThreads,
+			MinGhz:        cpuMsg1.MinGhz,
+			MaxGhz:        cpuMsg1.MaxGhz,
 		}
 		expectedQueryResults[P2] = pb.CPU{
-			Brand:         cpumsg2.Brand,
-			Name:          cpumsg2.Name,
-			NumberCores:   cpumsg2.NumberCores,
-			NumberThreads: cpumsg2.NumberThreads,
-			MinGhz:        cpumsg2.MinGhz,
-			MaxGhz:        cpumsg2.MaxGhz,
+			Brand:         cpuMsg2.Brand,
+			Name:          cpuMsg2.Name,
+			NumberCores:   cpuMsg2.NumberCores,
+			NumberThreads: cpuMsg2.NumberThreads,
+			MinGhz:        cpuMsg2.MinGhz,
+			MaxGhz:        cpuMsg2.MaxGhz,
 		}
 
 		for _, id := range []string{P1, P2} {
@@ -452,8 +452,8 @@ func testProtoStoreFindAll(t *testing.T, ctx context.Context) {
 		assert.Len(metadataMap, 2)
 
 		expectedQueryResults := make(map[string]*pb.CPU)
-		expectedQueryResults[P1] = &cpumsg1
-		expectedQueryResults[P2] = &cpumsg2
+		expectedQueryResults[P1] = &cpuMsg1
+		expectedQueryResults[P2] = &cpuMsg2
 
 		for _, id := range []string{P1, P2} {
 			expectedQueryResult, actualQueryResult := expectedQueryResults[id], actualQueryResults[id]
@@ -509,32 +509,32 @@ func testProtoStoreCrud(t *testing.T, ctx context.Context, useUpsert bool) {
 	var metadata1, metadata2, metadata3 protostore.Metadata
 
 	// Insert Protobuf record
-	cpumsg1 := pb.CPU{}
-	_ = faker.FakeData(&cpumsg1)
+	cpuMsg1 := pb.CPU{}
+	_ = faker.FakeData(&cpuMsg1)
 	if useUpsert {
-		rowsAffected, _, err = p.UpsertWithMetadata(ctx, P4, &cpumsg1, protostore.Metadata{Revision: 1})
+		rowsAffected, _, err = p.UpsertWithMetadata(ctx, P4, &cpuMsg1, protostore.Metadata{Revision: 1})
 	} else {
-		rowsAffected, _, err = p.Insert(ctx, P4, &cpumsg1)
+		rowsAffected, _, err = p.Insert(ctx, P4, &cpuMsg1)
 	}
 	assert.NoError(err, "Failed to insert a Protobuf message into ProtoStore")
 	assert.Equal(int64(1), rowsAffected)
 
 	// Query Protobuf record
-	cpumsg2 := pb.CPU{}
-	err = p.FindById(ctx, P4, &cpumsg2, &metadata1)
+	cpuMsg2 := pb.CPU{}
+	err = p.FindById(ctx, P4, &cpuMsg2, &metadata1)
 	assert.NoError(err, "Failed to find a Protobuf message in ProtoStore")
-	assert.Equal(cpumsg1.String(), cpumsg2.String())
+	assert.Equal(cpuMsg1.String(), cpuMsg2.String())
 	revision, err := p.GetRevision(ctx, P4, &pb.CPU{})
 	assert.NoError(err)
 	assert.Equal(int64(1), revision)
 
 	// Update Protobuf record (with metadata provided explicitly)
-	cpumsg3 := pb.CPU{}
-	_ = faker.FakeData(&cpumsg3)
+	cpuMsg3 := pb.CPU{}
+	_ = faker.FakeData(&cpuMsg3)
 	if useUpsert {
-		rowsAffected, metadata2, err = p.UpsertWithMetadata(ctx, P4, &cpumsg3, metadata1)
+		rowsAffected, metadata2, err = p.UpsertWithMetadata(ctx, P4, &cpuMsg3, metadata1)
 	} else {
-		rowsAffected, metadata2, err = p.UpdateWithMetadata(ctx, P4, &cpumsg3, metadata1)
+		rowsAffected, metadata2, err = p.UpdateWithMetadata(ctx, P4, &cpuMsg3, metadata1)
 	}
 	assert.NoError(err, "Failed to update a Protobuf message in ProtoStore")
 	assert.EqualValues(1, rowsAffected)
@@ -544,28 +544,28 @@ func testProtoStoreCrud(t *testing.T, ctx context.Context, useUpsert bool) {
 	assert.Equal(metadata1.Revision+1, revision)
 
 	// Query updated Protobuf record
-	cpumsg4 := pb.CPU{}
-	err = p.FindById(ctx, P4, &cpumsg4, &metadata2)
+	cpuMsg4 := pb.CPU{}
+	err = p.FindById(ctx, P4, &cpuMsg4, &metadata2)
 	assert.NoError(err, "Failed to find the updated Protobuf message in ProtoStore")
-	assert.Equal(cpumsg3.String(), cpumsg4.String())
+	assert.Equal(cpuMsg3.String(), cpuMsg4.String())
 	assert.EqualValues(metadata1.Revision+1, metadata2.Revision, "Revision did not increment by 1 after an update")
 	revision, err = p.GetRevision(ctx, P4, &pb.CPU{})
 	assert.NoError(err)
 	assert.Equal(metadata1.Revision+1, revision)
 
 	// Update Protobuf record (without metadata)
-	cpumsg5 := pb.CPU{}
-	_ = faker.FakeData(&cpumsg5)
-	cpumsg5String := cpumsg5.String()
+	cpuMsg5 := pb.CPU{}
+	_ = faker.FakeData(&cpuMsg5)
+	cpuMsg5String := cpuMsg5.String()
 	if useUpsert {
-		rowsAffected, metadata3, err = p.Upsert(ctx, P4, &cpumsg5)
+		rowsAffected, metadata3, err = p.Upsert(ctx, P4, &cpuMsg5)
 	} else {
-		rowsAffected, metadata3, err = p.Update(ctx, P4, &cpumsg5)
+		rowsAffected, metadata3, err = p.Update(ctx, P4, &cpuMsg5)
 	}
 	assert.NoError(err, "Failed to update a Protobuf message in ProtoStore")
 	assert.EqualValues(1, rowsAffected)
-	assert.NotEqual(cpumsg4.String(), cpumsg5.String())
-	assert.Equal(cpumsg5String, cpumsg5.String())
+	assert.NotEqual(cpuMsg4.String(), cpuMsg5.String())
+	assert.Equal(cpuMsg5String, cpuMsg5.String())
 	assert.EqualValues(metadata2.Revision+1, metadata3.Revision, "Revision did not increment by 1 after an update")
 	revision, err = p.GetRevision(ctx, P4, &pb.CPU{})
 	assert.NoError(err)
@@ -579,45 +579,45 @@ func testProtoStoreCrud(t *testing.T, ctx context.Context, useUpsert bool) {
 	assert.Len(metadataMap, 1)
 	assert.Contains(metadataMap, P4)
 	assert.EqualValues(metadata2.Revision+1, metadataMap[P4].Revision, "Revision did not increment by 1 after an update")
-	revision, err = p.GetRevision(ctx, P4, &cpumsg2)
+	revision, err = p.GetRevision(ctx, P4, &cpuMsg2)
 	assert.NoError(err)
 	assert.EqualValues(metadata2.Revision+1, revision, "Revision did not increment by 1 after an update")
 
-	memmsg1 := pb.Memory{}
-	_ = faker.FakeData(&memmsg1)
+	memMsg1 := pb.Memory{}
+	_ = faker.FakeData(&memMsg1)
 	if useUpsert {
-		// rowsAffected, _, err = p.UpsertWithMetadata(ctx, P4, &memmsg1, Metadata{Revision: 1})
-		rowsAffected, _, err = p.Upsert(ctx, P4, &memmsg1)
+		// rowsAffected, _, err = p.UpsertWithMetadata(ctx, P4, &memMsg1, Metadata{Revision: 1})
+		rowsAffected, _, err = p.Upsert(ctx, P4, &memMsg1)
 	} else {
-		rowsAffected, _, err = p.Insert(ctx, P4, &memmsg1)
+		rowsAffected, _, err = p.Insert(ctx, P4, &memMsg1)
 	}
 	assert.NoError(err, "Failed to insert a Protobuf message into ProtoStore")
 	assert.Equal(int64(1), rowsAffected)
 
-	memmsg2 := pb.Memory{}
-	err = p.FindById(ctx, P4, &memmsg2, &metadata1)
+	memMsg2 := pb.Memory{}
+	err = p.FindById(ctx, P4, &memMsg2, &metadata1)
 	assert.NoError(err, "Failed to find a Protobuf message in ProtoStore")
-	assert.Equal(memmsg1.String(), memmsg2.String())
+	assert.Equal(memMsg1.String(), memMsg2.String())
 	assert.Equal(P4, metadata1.Id)
 	assert.Equal(int64(1), metadata1.Revision)
 	revision, err = p.GetRevision(ctx, P4, &pb.Memory{})
 	assert.NoError(err)
 	assert.Equal(int64(1), revision)
 
-	memmsg3 := pb.Memory{}
-	_ = faker.FakeData(&memmsg3)
+	memMsg3 := pb.Memory{}
+	_ = faker.FakeData(&memMsg3)
 	if useUpsert {
-		rowsAffected, _, err = p.UpsertWithMetadata(ctx, P4, &memmsg3, metadata1)
+		rowsAffected, _, err = p.UpsertWithMetadata(ctx, P4, &memMsg3, metadata1)
 	} else {
-		rowsAffected, _, err = p.UpdateWithMetadata(ctx, P4, &memmsg3, metadata1)
+		rowsAffected, _, err = p.UpdateWithMetadata(ctx, P4, &memMsg3, metadata1)
 	}
 	assert.NoError(err, "Failed to update a Protobuf message in ProtoStore")
 	assert.EqualValues(1, rowsAffected)
 
-	memmsg4 := pb.Memory{}
-	err = p.FindById(ctx, P4, &memmsg4, nil)
+	memMsg4 := pb.Memory{}
+	err = p.FindById(ctx, P4, &memMsg4, nil)
 	assert.NoError(err, "Failed to find an updated Protobuf message in ProtoStore")
-	assert.Equal(memmsg3.String(), memmsg4.String())
+	assert.Equal(memMsg3.String(), memMsg4.String())
 
 	rowsAffected, err = p.DeleteById(ctx, P4, &pb.CPU{})
 	assert.NoError(err, "Failed to delete Protobuf message from ProtoStore")
@@ -628,14 +628,14 @@ func testProtoStoreCrud(t *testing.T, ctx context.Context, useUpsert bool) {
 	assert.EqualValues(0, rowsAffected)
 
 	// Delete CPU message with an ID of P4. Memory message with an ID of P4 must remain intact
-	cpumsg6 := pb.CPU{}
-	err = p.FindById(ctx, P4, &cpumsg6, nil)
+	cpuMsg6 := pb.CPU{}
+	err = p.FindById(ctx, P4, &cpuMsg6, nil)
 	assert.ErrorIs(err, ErrRecordNotFound)
-	assert.Equal("", cpumsg6.String(), "Found a Protobuf message that was supposed to be deleted")
+	assert.Equal("", cpuMsg6.String(), "Found a Protobuf message that was supposed to be deleted")
 
-	err = p.FindById(ctx, P4, &memmsg4, nil)
+	err = p.FindById(ctx, P4, &memMsg4, nil)
 	assert.NoError(err)
-	assert.Equal(memmsg3.String(), memmsg4.String(), "Protobuf message that was not supposed to be modified was still modified")
+	assert.Equal(memMsg3.String(), memMsg4.String(), "Protobuf message that was not supposed to be modified was still modified")
 
 	rowsAffected, err = p.DeleteById(ctx, P4, &pb.Memory{})
 	assert.NoError(err, "Failed to delete Protobuf message from ProtoStore")
@@ -645,10 +645,10 @@ func testProtoStoreCrud(t *testing.T, ctx context.Context, useUpsert bool) {
 	assert.NoError(err, "Deleting a non-existent Protobuf message produced an error. DeleteById() might be not idempotent.")
 	assert.EqualValues(0, rowsAffected)
 
-	memmsg5 := pb.Memory{}
-	err = p.FindById(ctx, P4, &memmsg5, nil)
+	memMsg5 := pb.Memory{}
+	err = p.FindById(ctx, P4, &memMsg5, nil)
 	assert.ErrorIs(err, ErrRecordNotFound)
-	assert.Equal("", memmsg5.String(), "Found a Protobuf message that was supposed to be deleted")
+	assert.Equal("", memMsg5.String(), "Found a Protobuf message that was supposed to be deleted")
 }
 
 /*
@@ -657,16 +657,16 @@ Checks if a Protobuf message inserted by a user from Pepsi is visible to the use
 func TestProtoStoreInDbMultitenancy(t *testing.T) {
 	assert := assert.New(t)
 
-	cpumsg1 := pb.CPU{}
-	_ = faker.FakeData(&cpumsg1)
-	rowsAffected, md, err := p.Insert(PepsiAdminCtx, cpumsg1.Name, &cpumsg1) // Pepsi inserts a record into Protostore
+	cpuMsg1 := pb.CPU{}
+	_ = faker.FakeData(&cpuMsg1)
+	rowsAffected, md, err := p.Insert(PepsiAdminCtx, cpuMsg1.Name, &cpuMsg1) // Pepsi inserts a record into Protostore
 	assert.NoError(err)
 	assert.Equal(int64(1), rowsAffected)
-	assert.Equal(cpumsg1.Name, md.Id)
+	assert.Equal(cpuMsg1.Name, md.Id)
 	assert.Equal(int64(1), md.Revision)
 
 	queryResult := pb.CPU{}
-	err = p.FindById(CokeAdminCtx, cpumsg1.Name, &queryResult, nil) // Coke tries to read Pepsi's Protobuf message
+	err = p.FindById(CokeAdminCtx, cpuMsg1.Name, &queryResult, nil) // Coke tries to read Pepsi's Protobuf message
 	assert.ErrorIs(err, ErrRecordNotFound)                          // Coke won't be able to see that record due to RLS
 	assert.Empty(queryResult.GetName(), "Coke user found a record belonging to Pepsi tenant")
 }

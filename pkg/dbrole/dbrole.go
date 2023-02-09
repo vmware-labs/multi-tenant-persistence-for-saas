@@ -16,20 +16,47 @@
 // specific language governing permissions and limitations
 // under the License.
 
+/*
+DAL uses 4 database roles/users to perform all operations:
+
+- `TENANT_READER` - has read access to its tenant's data
+- `READER` - has read access to all tenants' data
+- `TENANT_WRITER` - has read & write access to its tenant's data
+- `WRITER` - has read & write access to all tenants' data
+
+DAL allows to map a user's service role to the DB role that will be used for
+that user. If a user has multiple service roles which map to several DB roles,
+the DB role with the most extensive privileges will be used (see `DbRoles()`
+for reference to ordered list of DbRoles.
+*/
 package dbrole
 
-import "strings"
-
-// Database roles/users.
+// DbRole Database roles/users.
 type DbRole string
 
 const (
-	// DB Roles.
+	// NO_ROLE DB Roles.
+	NO_ROLE       DbRole = ""
 	TENANT_READER DbRole = "tenant_reader"
-	TENANT_WRITER DbRole = "tenant_writer"
 	READER        DbRole = "reader"
+	TENANT_WRITER DbRole = "tenant_writer"
 	WRITER        DbRole = "writer"
 )
+
+// Returns *Ordered* slice of DbRoles.
+// A reader role is always considered to have fewer permissions than a writer role.
+// and a tenant-specific reader/writer role is always considered to have fewer permissions,
+// than a non-tenant specific reader/writer role, respectively.
+// NO_ROLE < TENANT_READER < READER < TENANT_WRITER < WRITER.
+func DbRoles() DbRoleSlice {
+	return DbRoleSlice{
+		NO_ROLE,
+		TENANT_READER,
+		READER,
+		TENANT_WRITER,
+		WRITER,
+	}
+}
 
 type DbRoleSlice []DbRole // Needed for sorting records
 func (a DbRoleSlice) Len() int {
@@ -40,30 +67,21 @@ func (dbRole DbRole) IsDbRoleTenantScoped() bool {
 	return dbRole == TENANT_READER || dbRole == TENANT_WRITER
 }
 
-/*
-Returns true if the first role has fewer permissions than the second role, and true if the two roles are the same or
-the second role has more permissions.
-A reader role is always considered to have fewer permissions than a writer role.
-and a tenant-specific reader/writer role is always considered to have fewer permissions than a non-tenant specific reader/writer role, respectively.
-
-TENANT_READER < READER < TENANT_WRITER < WRITER.
-*/
-func (a DbRoleSlice) Less(i, j int) bool {
-	var roleI, roleJ string = string(a[i]), string(a[j])
-	switch {
-	case roleI == roleJ:
-		return true
-	case strings.Contains(roleI, "reader") && strings.Contains(roleJ, "writer"):
-		return true
-	case strings.Contains(roleI, "writer") && strings.Contains(roleJ, "reader"):
-		return false
-	case strings.Contains(roleI, "reader") && strings.Contains(roleJ, "reader"):
-		return DbRole(roleI) == TENANT_READER
-	case strings.Contains(roleI, "writer") && strings.Contains(roleJ, "writer"):
-		return DbRole(roleI) == TENANT_WRITER
-	default:
-		panic("Unable to compare " + roleI + " and " + roleJ)
+func indexOf(dbRole DbRole) int {
+	orderedDbRoles := DbRoles()
+	for idx, role := range orderedDbRoles {
+		if dbRole == role {
+			return idx
+		}
 	}
+	return -1
+}
+
+// Returns true if the first role has fewer permissions than the second
+// role, and true if the two roles are the same or the second role has
+// more permissions.
+func (a DbRoleSlice) Less(i, j int) bool {
+	return indexOf(a[i]) <= indexOf(a[j])
 }
 
 func (a DbRoleSlice) Swap(i, j int) {

@@ -8,9 +8,9 @@ require (
 	github.com/lib/pq v1.10.7
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.1
-	google.golang.org/grpc v1.52.3
+	google.golang.org/grpc v1.53.0-dev
 	google.golang.org/protobuf v1.28.1
-	gorm.io/driver/postgres v1.4.6
+	gorm.io/driver/postgres v1.4.7
 	gorm.io/gorm v1.24.5
 )
 

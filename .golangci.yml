@@ -1,3 +1,4 @@
+---
 # golangci.com configuration
 # https://golangci-lint.run/usage/configuration/
 run:
@@ -16,6 +17,7 @@ linters:
     # contextcheck
     - cyclop
     # deadcode Replaced by unused.
+    - decorder
     - depguard
     - dupword
     - durationcheck
@@ -31,7 +33,7 @@ linters:
     # forcetypeassert
     - funlen
     - gci
-    # gochecknoglobals
+    - gochecknoglobals
     - gochecknoinits
     - gocognit
     - goconst
@@ -121,7 +123,6 @@ linters-settings:
     # List of aliases
     # Default: []
     alias:
-      # Using `servingv1` alias for `knative.dev/serving/pkg/apis/serving/v1` package.
       - pkg: knative.dev/serving/pkg/apis/serving/v1
         alias: servingv1
   lll:
@@ -140,7 +141,7 @@ linters-settings:
       - name: atomic
       - name: line-length-limit
         severity: error
-        arguments: [330]
+        arguments: [ 330 ]
   tagliatelle:
     # Check the struct tag name case.
     case:
@@ -151,7 +152,8 @@ linters-settings:
       # Default: {}
       rules:
         # Any struct tag type can be used.
-        # Support string case: `camel`, `pascal`, `kebab`, `snake`, `goCamel`, `goPascal`, `goKebab`, `goSnake`, `upper`, `lower`
+        # Support string case: `camel`, `pascal`, `kebab`, `snake`,
+        # `goCamel`, `goPascal`, `goKebab`, `goSnake`, `upper`, `lower`
         json: snake
         yaml: camel
         xml: camel
@@ -170,3 +172,9 @@ issues:
         - gosec
         - typecheck
         - unparam
+    - path: pkg/datastore/sql_struct.go
+      linters:
+        - gochecknoglobals
+    - path: pkg/pkgtest/data.go
+      linters:
+        - gochecknoglobals

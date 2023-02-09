@@ -54,10 +54,10 @@ func (s MetadataBasedAuthorizer) GetOrgFromContext(ctx context.Context) (string,
 	return org[len(org)-1], nil
 }
 
-func (s MetadataBasedAuthorizer) GetMatchingDbRole(ctx context.Context, tableNames ...string) (dbrole.DbRole, error) {
+func (s MetadataBasedAuthorizer) GetMatchingDbRole(ctx context.Context, _ ...string) (dbrole.DbRole, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		return "", ErrFetchingMetadata
+		return dbrole.NO_ROLE, ErrFetchingMetadata
 	}
 
 	role := md[METADATA_KEY_ROLE]
@@ -77,7 +77,8 @@ func (s MetadataBasedAuthorizer) GetMatchingDbRole(ctx context.Context, tableNam
 }
 
 func (s MetadataBasedAuthorizer) Configure(_ string, _ map[string]dbrole.DbRole) {
-	// TODO - Set "service role" to DB role mapping here
+	// TODO - Set "service role" to DB role mapping here"
+	// Currently MetadataBasedAuthorizer, doesn't support service to DB role mapping
 }
 
 func (s MetadataBasedAuthorizer) GetAuthContext(orgId string, roles ...string) context.Context {

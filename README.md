@@ -60,17 +60,6 @@ Currently, following features are supported:
   tenant-specific roles (`TENANT_WRITER`, `TENANT_READER`) will be able to
   access only their own tenant's data.
 
-DAL uses 4 database roles/users to perform all operations:
-
-- `TENANT_READER` - has read access to its tenant's data
-- `READER` - has read access to all tenants' data
-- `TENANT_WRITER` - has read & write access to its tenant's data
-- `WRITER` - has read & write access to all tenants' data
-
-DAL allows to map a user's service role to the DB role that will be used for
-that user. If a user has multiple service roles which map to several DB roles,
-the DB role with the most extensive privileges will be used (see `Less()` method
-for `DbRoleSlice` for details).
 
 ## Documentation
 
@@ -84,7 +73,6 @@ Following interfaces are exposed by the Golang library to be consumed by the use
 
 ### [ProtoStore](docs/DOCUMENTATION.md#type-protostore)
 
-
 ## Getting Started
 
 Import the package and use `DataStore` object to interact with the data access
@@ -97,8 +85,8 @@ environment variables set to relevant values: *DB_ADMIN_USERNAME*, *DB_PORT*,
 ## Future Support
 
 - Some of the topics that require further discussion are the following:
-  - Do we want to provide functionality for microservices to subscribe for updates in certain tables?
-  - Will microservices need more advanced queries that are not supported by DAL? Do we want to return DB connection object to microservices so that they run their own queries?
+    - Do we want to provide functionality for microservices to subscribe for updates in certain tables?
+    - Do we need to provide pagination or streaming support using channels?
 
 ## Contributing
 

@@ -26,9 +26,7 @@ import (
 	"gorm.io/gorm/schema"
 )
 
-/*
-Library processing all the golang tags in the struct into SQL domain
-*/
+// Library processing all the golang tags in the struct into SQL domain
 
 const (
 	// Struct Field Names.
@@ -42,21 +40,19 @@ const (
 	REVISION_OUTDATED_MSG = "Invalid update - outdated "
 )
 
-var LOG = GetLogger()
+var LOG = GetCompLogger()
 
 // Maps a DB table name to booleans showing if the table is multitenant.
-var multitenancyMap map[string]bool = make(map[string]bool)
+var multitenancyMap = make(map[string]bool)
 
 // Maps DB table name to boolean showing if the table is concurrent with revision column.
-var revisionSupportMap map[string]bool = make(map[string]bool)
+var revisionSupportMap = make(map[string]bool)
 
-/*
-Checks if revisioning is supported in the given table (if
-the struct contains a field with column name equal to "revision").
-*/
+// Checks if revisioning is supported in the given table (if
+// the struct contains a field with column name equal to "revision").
 func IsRevisioningSupported(tableName string, x Record) bool {
 	if _, ok := revisionSupportMap[tableName]; !ok {
-		s, _ := Parse(x)
+		s, _ := schemaParse(x)
 		if _, ok := s.FieldsByDBName[COLUMN_REVISION]; ok {
 			revisionSupportMap[tableName] = true
 		}
@@ -64,27 +60,23 @@ func IsRevisioningSupported(tableName string, x Record) bool {
 	return revisionSupportMap[tableName]
 }
 
-/*
-Checks if any of the tables in tableNames are multi-tenant.
-*/
+// Checks if any of the tables in tableNames are multi-tenant.
 func IsMultitenant(x Record, tableNames ...string) bool {
 	for _, tableName := range tableNames {
-		s, _ := Parse(x)
+		s, _ := schemaParse(x)
 		if _, ok := s.FieldsByDBName[COLUMN_ORGID]; ok {
 			multitenancyMap[tableName] = true
 		}
 	}
 
-	var isMultitenant bool = false
+	isMultitenant := false
 	for i := 0; i < len(tableNames) && !isMultitenant; i++ {
 		isMultitenant = multitenancyMap[tableNames[i]]
 	}
 	return isMultitenant
 }
 
-/*
-Wraps IF NOT EXISTS around the given statement.
-*/
+// Wraps IF NOT EXISTS around the given statement.
 func addIfNotExists(stmt, cond string) string {
 	var wrapper strings.Builder
 	wrapper.WriteString("DO\n")
@@ -108,11 +100,9 @@ func addIfExists(stmt, cond string) string {
 	return wrapper
 }
 
-/*
-Returns a SQL statement that sets a Postgres config. parameter
-settingName - parameter name
-settingValue - parameter value.
-*/
+// Returns a SQL statement that sets a Postgres config. parameter
+// settingName - parameter name
+// settingValue - parameter value.
 func getSetConfigStmt(settingName, settingValue string) string {
 	var stmt strings.Builder
 	stmt.WriteString("SET ")
@@ -124,9 +114,7 @@ func getSetConfigStmt(settingName, settingValue string) string {
 	return stmt.String()
 }
 
-/*
-Returns a SQL statement that enables row-level security in a DB table.
-*/
+// Returns a SQL statement that enables row-level security in a DB table.
 func getEnableRLSStmt(tableName string, _ Record) string {
 	var stmt strings.Builder
 	stmt.WriteString("ALTER TABLE ")
@@ -136,9 +124,7 @@ func getEnableRLSStmt(tableName string, _ Record) string {
 	return stmt.String()
 }
 
-/*
-Returns a SQL statement that creates a DB user with the given specs, if it does not exist yet.
-*/
+// Returns a SQL statement that creates a DB user with the given specs, if it does not exist yet.
 func getCreateUserStmt(username string, password string) string {
 	var findRoleQuery, createUserStmt strings.Builder
 	findRoleQuery.WriteString("SELECT * FROM pg_roles WHERE rolname = '")
@@ -170,9 +156,7 @@ func getGrantPrivilegesStmt(tableName string, username string, commands []string
 	return stmt.String()
 }
 
-/*
-Returns a SQL statement that creates an RLS-policy with the given specs, if it does not exist yet.
-*/
+// Returns a SQL statement that creates an RLS-policy with the given specs, if it does not exist yet.
 func getCreatePolicyStmt(tableName string, _ Record, userSpecs dbUserSpecs) string {
 	if userSpecs.existingRowsCond == "" || userSpecs.newRowsCond == "" {
 		panic(userSpecs)
@@ -202,10 +186,27 @@ func getCreatePolicyStmt(tableName string, _ Record, userSpecs dbUserSpecs) stri
 	return stmt
 }
 
-func Parse(x interface{}) (*schema.Schema, error) {
+func TypeName(x interface{}) (typeName string) {
+	t := reflect.TypeOf(x)
+	for t.Kind() == reflect.Ptr {
+		t = t.Elem()
+		typeName += "*"
+	}
+	typeName += t.Name()
+	return
+}
+
+func IsPointerToStruct(x interface{}) (isPtrType bool) {
+	t := reflect.TypeOf(x)
+	isPtrType = t.Kind() == reflect.Ptr && t.Elem().Kind() == reflect.Struct
+	return
+}
+
+// Validates tenancy information and returns a transaction with right dbRole.
+func schemaParse(x interface{}) (*schema.Schema, error) {
 	s, err := schema.Parse(x, &sync.Map{}, schema.NamingStrategy{})
 	if err != nil {
-		LOG.Errorf("Unable to parse schema: %+v, %e", x, err)
+		LOG.Errorf("Unable to parse schema: %+v, %e", TypeName(x), err)
 	}
 	return s, err
 }
@@ -215,13 +216,11 @@ func GetTableName(x interface{}) string {
 	if t, ok := x.(schema.Tabler); ok {
 		return t.TableName()
 	}
-	s, _ := Parse(x)
+	s, _ := schemaParse(x)
 	return s.Table
 }
 
-/*
-Extracts name of a struct comprising the input slice.
-*/
+// Extracts name of a struct comprising the input slice.
 func GetTableNameFromSlice(x interface{}) string {
 	sliceType := reflect.TypeOf(x)
 	if sliceType.Kind() == reflect.Ptr {
@@ -236,19 +235,16 @@ func GetTableNameFromSlice(x interface{}) string {
 	return tableName
 }
 
-/*
-Generates RLS-policy name based on database role/user and table name.
-*/
-func GetRlsPolicyName(username string, tableName string) string {
+// Generates RLS-policy name based on database role/user and table name.
+func getRlsPolicyName(username string, tableName string) string {
 	policyName := strings.ToLower(username + "_" + tableName + "_policy")
 	policyName = strings.ReplaceAll(policyName, "\"", "")
 	return policyName
 }
 
-/*
-Constructs a trigger name that will include the name of table where trigger is going to be applied on and
-the name of a function that will be executed by trigger.
-*/
+// Constructs a trigger name that will include the name of table where trigger
+// is going to be applied on and the name of a function that will be executed
+// by trigger.
 func getTriggerName(tableName, functionName string) string {
 	functionName = strings.TrimSuffix(functionName, "()")
 	tableName = strings.ReplaceAll(tableName, "\"", "")
@@ -266,9 +262,7 @@ func getDropTriggerStmt(tableName, functionName string) string {
 	return stmt.String()
 }
 
-/*
-Returns a PL/pgSQL statement that creates a trigger invoking the given function.
-*/
+// Returns PL/pgSQL statement that creates a trigger invoking the given function.
 func getCreateTriggerStmt(tableName, functionName string) string {
 	if !strings.HasSuffix(functionName, "()") {
 		functionName += "()"
@@ -288,23 +282,18 @@ func getCreateTriggerStmt(tableName, functionName string) string {
 	return stmt.String()
 }
 
-/*
-Returns a PL/pgSQL function that does the following:
-
-	Rejects updates where a new revision does not equal the current one
-	If an update is not rejected, increments revision by 1
-
-IF NEW.revision = OLD.revision THEN
-
-	NEW.revision := OLD.revision + 1;
-	RETURN NEW;
-
-ELSE
-
-	RAISE EXCEPTION 'Invalid update - outdated revision: %', NEW.revision;
-
-END IF;.
-*/
+// Returns a PL/pgSQL function that does the following:
+//
+//	Rejects updates where a new revision does not equal the current one
+//	If an update is not rejected, increments revision by 1
+//
+//	IF NEW.revision = OLD.revision THEN
+//		NEW.revision := OLD.revision + 1;
+//		RETURN NEW;
+//	ELSE
+//		RAISE EXCEPTION 'Invalid update - outdated revision: %', NEW.revision;
+//
+//	END IF;.
 func getCheckAndUpdateRevisionFunc() (functionName, functionBody string) {
 	var stmt strings.Builder
 	stmt.WriteString("\t\tIF NEW.")
@@ -368,14 +357,13 @@ func getTruncateTableStmt(tableName string, cascade bool) string {
 	return addIfExists(truncateTableStmt.String(), findTableStmt)
 }
 
-/*
-Returns the requested OrgId field's value from record, which is a struct or a pointer to a struct implementing Record interface.
-Uses a tag rather than field name to find the desired field.
-Returns an empty string and false if such a field is not present.
-*/
+// Returns the requested OrgId field's value from record, which is a pointer
+// to a struct implementing Record interface.  Uses a tag rather than field
+// name to find the desired field. Returns an empty string and false if such
+// a field is not present.
 func GetOrgId(record Record) (string, bool) {
 	fieldName := FIELD_ORGID
-	if s, err := Parse(record); err == nil {
+	if s, err := schemaParse(record); err == nil {
 		if f, ok := s.FieldsByDBName[COLUMN_ORGID]; ok {
 			fieldName = f.Name
 		}

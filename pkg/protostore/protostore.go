@@ -16,6 +16,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
+/*
+This package exposes `ProtoStore` interface to the consumer, which is a wrapper
+around `DataStore` interface and is used specifically to persist Protobuf messages.
+Just as with `DataStore`, Protobuf messages can be persisted with revisioning and
+multi-tenancy support along with `CreatedAt` and `UpdatedAt` timestamps.
+*/
 package protostore
 
 import (
@@ -43,25 +49,8 @@ type ProtoStore interface {
 	FindAllAsMap(ctx context.Context, msgsMap interface{}) (metadataMap map[string]Metadata, err error)
 	DeleteById(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, err error)
 
-	// Inserts a new Protobuf record in the DB.
-	// Returns,
-	// rowsAffected - 0 if insertion fails; 1 otherwise
-	// md - metadata of the new Protobuf record
-	// err - error that occurred during insertion, if any
 	InsertWithMetadata(ctx context.Context, id string, msg proto.Message, metadata Metadata) (rowsAffected int64, md Metadata, err error)
-
-	// Updates an existing Protobuf record in the DB.
-	// Returns,
-	// rowsAffected - 0 if update fails; 1 otherwise
-	// md - metadata of the updated Protobuf record
-	// err - error that occurred during update, if any
 	UpdateWithMetadata(ctx context.Context, id string, msg proto.Message, metadata Metadata) (rowsAffected int64, md Metadata, err error)
-
-	// Upserts a Protobuf record in the DB (if the record exists, it is updated; if it does not, it is inserted).
-	// Returns,
-	// rowsAffected - 0 if upsert fails; 1 otherwise
-	// md - metadata of the upserted Protobuf record
-	// err - error that occurred during upsert, if any
 	UpsertWithMetadata(ctx context.Context, id string, msg proto.Message, metadata Metadata) (rowsAffected int64, md Metadata, err error)
 
 	GetMetadata(ctx context.Context, id string, msg proto.Message) (md Metadata, err error)
@@ -78,6 +67,7 @@ type Metadata struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
+
 type ProtoStoreMsg struct {
 	Id        string `gorm:"primaryKey"`
 	Msg       []byte
@@ -142,10 +132,16 @@ func (p ProtobufDataStore) Register(ctx context.Context, roleMapping map[string]
 	return nil
 }
 
+// @DEPRECATD See [InsertWithMetadata].
 func (p ProtobufDataStore) Insert(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, md Metadata, err error) {
 	return p.InsertWithMetadata(ctx, id, msg, Metadata{})
 }
 
+// Inserts a new Protobuf record in the DB.
+// Returns,
+// rowsAffected - 0 if insertion fails; 1 otherwise
+// md - metadata of the new Protobuf record
+// err - error that occurred during insertion, if any.
 func (p ProtobufDataStore) InsertWithMetadata(ctx context.Context, id string, msg proto.Message, metadata Metadata) (rowsAffected int64, md Metadata, err error) {
 	bytes, err := ToBytes(msg)
 	if err != nil {
@@ -166,8 +162,8 @@ func (p ProtobufDataStore) InsertWithMetadata(ctx context.Context, id string, ms
 	}
 	// We cannot use 0 as the starting revision as we cannot
 	// differentiate between 0 vs unset values.
-	// Hence we are using 1 as the first revision for the
-	// inserted records unless they a revision != 0.
+	// Hence, we are using 1 as the first revision for the
+	// inserted records unless they are already at revision != 0.
 	if protoStoreMsg.Revision == 0 {
 		protoStoreMsg.Revision = 1
 	}
@@ -180,7 +176,7 @@ func (p ProtobufDataStore) InsertWithMetadata(ctx context.Context, id string, ms
 	return rowsAffected, metadata, nil
 }
 
-// Fetches metadata for the record and updates the Protobuf message.
+// Update Fetches metadata for the record and updates the Protobuf message.
 // NOTE: Avoid using this method in user-workflows and only in service-to-service workflows
 // when the updates are already ordered by some other service/app.
 func (p ProtobufDataStore) Update(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, md Metadata, err error) {
@@ -191,6 +187,11 @@ func (p ProtobufDataStore) Update(ctx context.Context, id string, msg proto.Mess
 	return p.UpdateWithMetadata(ctx, id, msg, md)
 }
 
+// Updates an existing Protobuf record in the DB.
+// Returns,
+// rowsAffected - 0 if update fails; 1 otherwise
+// md - metadata of the updated Protobuf record
+// err - error that occurred during update, if any.
 func (p ProtobufDataStore) UpdateWithMetadata(ctx context.Context, id string, msg proto.Message, metadata Metadata) (rowsAffected int64, md Metadata, err error) {
 	bytes, err := ToBytes(msg)
 	if err != nil {
@@ -220,7 +221,7 @@ func (p ProtobufDataStore) UpdateWithMetadata(ctx context.Context, id string, ms
 	return rowsAffected, metadata, nil
 }
 
-// Fetches metadata for the record and upserts the Protobuf message.
+// Upsert Fetches metadata for the record and upserts the Protobuf message.
 // NOTE: Avoid using this method in user-workflows and only in service-to-service workflows
 // when the updates are already ordered by some other service/app.
 func (p ProtobufDataStore) Upsert(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, md Metadata, err error) {
@@ -236,6 +237,11 @@ func (p ProtobufDataStore) Upsert(ctx context.Context, id string, msg proto.Mess
 	return p.UpsertWithMetadata(ctx, id, msg, md)
 }
 
+// Upserts a Protobuf record in the DB (if the record exists, it is updated; if it does not, it is inserted).
+// Returns,
+// rowsAffected - 0 if upsert fails; 1 otherwise
+// md - metadata of the upserted Protobuf record
+// err - error that occurred during upsert, if any.
 func (p ProtobufDataStore) UpsertWithMetadata(ctx context.Context, id string, msg proto.Message, metadata Metadata) (
 	rowsAffected int64, md Metadata, err error,
 ) {
@@ -350,11 +356,11 @@ func (p ProtobufDataStore) FindAllAsMap(ctx context.Context, msgsMap interface{}
 
 	metadataMap = make(map[string]Metadata, len(protoStoreMsgs))
 	msgsMapValue := reflect.ValueOf(msgsMap)
-	var isMsgsElemPtrToStructs bool = reflect.TypeOf(msgsMap).Elem().Kind() == reflect.Ptr
+	isMsgsElemPtrToStructs := reflect.TypeOf(msgsMap).Elem().Kind() == reflect.Ptr
 
 	for _, protoStoreMsg := range protoStoreMsgs {
 		// Empty instance of a Protobuf message
-		var msgCopy proto.Message = reflect.New(elemType).Interface().(proto.Message)
+		msgCopy := reflect.New(elemType).Interface().(proto.Message)
 		if err = FromBytes(protoStoreMsg.Msg, msgCopy); err != nil {
 			return nil, err
 		}
@@ -370,7 +376,7 @@ func (p ProtobufDataStore) FindAllAsMap(ctx context.Context, msgsMap interface{}
 	return metadataMap, nil
 }
 
-// Finds all messages (of the same type as the element of msgs) in Protostore and stores the result in msgs.
+// FindAll Finds all messages (of the same type as the element of msgs) in Protostore and stores the result in msgs.
 // msgs must be a pointer to a slice of Protobuf structs or a pointer to a slice of pointers to Protobuf structs.
 // It will be modified in-place.
 // Returns a map of Protobuf messages' IDs to their metadata (parent ID & revision).
@@ -387,7 +393,7 @@ func (p ProtobufDataStore) FindAll(ctx context.Context, msgs interface{}) (metad
 
 	// True if msgs is a pointer to a slice of pointers to structs
 	// False if msgs is a pointer to a slice of structs
-	var isSlicePtrToStructs bool = reflect.TypeOf(msgs).Elem().Elem().Kind() == reflect.Ptr
+	isSlicePtrToStructs := reflect.TypeOf(msgs).Elem().Elem().Kind() == reflect.Ptr
 	tableName := datastore.GetTableNameFromSlice(msgs)
 
 	protoStoreMsgs := make([]ProtoStoreMsg, 0)

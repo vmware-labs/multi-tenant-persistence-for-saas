@@ -96,7 +96,7 @@ func prepareInput() (*App, *AppUser, *AppUser) {
 	return &myCokeApp, &user1, &user2
 }
 
-var ds datastore.DataStore = TestDataStore
+var ds = TestDataStore
 
 func createDbTables(ctx context.Context) error {
 	roleMapping := map[string]dbrole.DbRole{
@@ -179,7 +179,7 @@ func testCrud(t *testing.T, ctx context.Context) {
 
 	// Querying of previously inserted records should succeed
 	for _, record := range []AppUser{user1, user2} {
-		var queryResult AppUser = AppUser{Id: record.Id}
+		queryResult := AppUser{Id: record.Id}
 		err = ds.Find(ctx, &queryResult)
 		assert.NoError(err)
 		assert.Equal(record, queryResult)
@@ -198,7 +198,7 @@ func testCrud(t *testing.T, ctx context.Context) {
 		rowsAffected, err := ds.Update(ctx, &record)
 		assert.NoError(err)
 		assert.EqualValues(1, rowsAffected)
-		var queryResult AppUser = AppUser{Id: record.Id}
+		queryResult := AppUser{Id: record.Id}
 		err = ds.Find(ctx, &queryResult)
 		assert.NoError(err)
 		assert.Equal(record, queryResult)
@@ -211,7 +211,7 @@ func testCrud(t *testing.T, ctx context.Context) {
 		rowsAffected, err := ds.Update(ctx, &record)
 		assert.NoError(err)
 		assert.EqualValues(1, rowsAffected)
-		var queryResult AppUser = AppUser{Id: record.Id}
+		queryResult := AppUser{Id: record.Id}
 		err = ds.Find(ctx, &queryResult)
 		assert.NoError(err)
 		assert.Equal(record, queryResult)
@@ -262,6 +262,7 @@ func setupDbTables(t *testing.T) {
 }
 
 func TestMain(m *testing.M) {
+	LOG = datastore.GetCompLogger()
 	allTableNames := make([]string, 0)
 	allTableNames = append(allTableNames, datastoreDbTableNames...)
 	if err := ds.TestHelper().Drop(allTableNames...); err != nil {
@@ -277,10 +278,10 @@ func TestMain(m *testing.M) {
 }
 
 func BenchmarkCrudDatabase(b *testing.B) {
-	rawLOG := logrus.New()
-	rawLOG.SetLevel(logrus.FatalLevel)
-	rawLOG.SetOutput(io.Discard)
-	LOG = rawLOG.WithField(datastore.COMP, datastore.SAAS_PERSISTENCE)
+	logger := datastore.GetLogger()
+	logger.SetLevel(logrus.FatalLevel)
+	logger.SetOutput(io.Discard)
+	LOG = logger.WithField(datastore.COMP, datastore.SAAS_PERSISTENCE)
 
 	var t testing.T
 	setupDbTables(&t)
@@ -593,9 +594,9 @@ func TestWithMissingEnvVar(t *testing.T) {
 	} {
 		defer os.Setenv(envVar, os.Getenv(envVar))
 		os.Unsetenv(envVar)
+		_, err := datastore.GetDefaultDatastore(LOG, TestMetadataAuthorizer)
+		assert.ErrorIs(err, ErrMissingEnvVar)
 	}
-
-	assert.ErrorIs(ds.TestHelper().Initialize(), ErrMissingEnvVar)
 }
 
 func TestWithEmptyEnvVar(t *testing.T) {
@@ -607,9 +608,9 @@ func TestWithEmptyEnvVar(t *testing.T) {
 	} {
 		defer os.Setenv(envVar, os.Getenv(envVar))
 		os.Setenv(envVar, "")
+		_, err := datastore.GetDefaultDatastore(LOG, TestMetadataAuthorizer)
+		assert.ErrorIs(err, ErrMissingEnvVar)
 	}
-
-	assert.ErrorIs(ds.TestHelper().Initialize(), ErrMissingEnvVar)
 }
 
 func TestWithBlankEnvVar(t *testing.T) {
@@ -621,9 +622,9 @@ func TestWithBlankEnvVar(t *testing.T) {
 	} {
 		defer os.Setenv(envVar, os.Getenv(envVar))
 		os.Setenv(envVar, "    ")
+		_, err := datastore.GetDefaultDatastore(LOG, TestMetadataAuthorizer)
+		assert.ErrorIs(err, ErrMissingEnvVar)
 	}
-
-	assert.ErrorIs(ds.TestHelper().Initialize(), ErrMissingEnvVar)
 }
 
 /*
