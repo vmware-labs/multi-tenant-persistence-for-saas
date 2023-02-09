@@ -18,32 +18,37 @@
 
 package datastore
 
-import "reflect"
+import (
+	"os"
+	"strings"
 
-type Record interface {
-	// Currently are Records are expected to be pointers to struct, this is
-	// just placeholder for future support
+	"github.com/sirupsen/logrus"
+)
+
+const (
+	// Logging configuration variables.
+	LOG_LEVEL_ENV_VAR = "LOG_LEVEL"
+
+	// Constants for LOG field names & values.
+	COMP             = "comp"
+	SAAS_PERSISTENCE = "persistence"
+)
+
+func GetLogger() *logrus.Logger {
+	log := logrus.New()
+	log.SetFormatter(&logrus.TextFormatter{
+		FullTimestamp:   true,
+		TimestampFormat: "2006-01-02T15:04:05.000",
+	})
+	loglevel := strings.ToLower(os.Getenv(LOG_LEVEL_ENV_VAR))
+	if level, err := logrus.ParseLevel(loglevel); err != nil {
+		log.SetLevel(logrus.InfoLevel) // Default logging level
+	} else {
+		log.SetLevel(level)
+	}
+	return log
 }
 
-func GetRecordInstanceFromSlice(x interface{}) Record {
-	sliceType := reflect.TypeOf(x)
-	if sliceType.Kind() == reflect.Ptr {
-		sliceType = sliceType.Elem()
-	}
-
-	// True if x consists of pointers to structs
-	areSliceElemPtrs := sliceType.Elem().Kind() == reflect.Ptr
-
-	sliceElemType := sliceType.Elem()
-	if sliceElemType.Kind() == reflect.Ptr {
-		sliceElemType = sliceElemType.Elem()
-	}
-
-	var record Record
-	if areSliceElemPtrs {
-		record = reflect.New(sliceElemType).Interface().(Record)
-	} else {
-		record = reflect.New(sliceElemType).Elem().Interface().(Record)
-	}
-	return record
+func GetCompLogger() *logrus.Entry {
+	return GetLogger().WithField(COMP, SAAS_PERSISTENCE)
 }

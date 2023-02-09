@@ -36,10 +36,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"hash/fnv"
-	"os"
 	"reflect"
-	"strconv"
 	"strings"
 
 	_ "github.com/lib/pq"
@@ -47,191 +44,37 @@ import (
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
 	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/errors"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
-	"gorm.io/gorm/logger"
 )
 
 const (
-	// DB Runtime Parameters.
-	DB_CONFIG_ORG_ID = "multitenant.orgId" // Name of Postgres run-time config. parameter that will store current user's org. ID
-
-	// Env. variable names.
-	DB_NAME_ENV_VAR           = "DB_NAME"
-	DB_PORT_ENV_VAR           = "DB_PORT"
-	DB_HOST_ENV_VAR           = "DB_HOST"
-	SSL_MODE_ENV_VAR          = "SSL_MODE"
-	DB_ADMIN_USERNAME_ENV_VAR = "DB_ADMIN_USERNAME"
-	DB_ADMIN_PASSWORD_ENV_VAR = "DB_ADMIN_PASSWORD"
+	DbConfigOrgId               = "multitenant.orgId" // Name of Postgres run-time config. parameter that will store current user's org. ID
+	MAIN          dbrole.DbRole = "main"
 )
-
-// Specifications for database user.
-type dbUserSpecs struct {
-	username         dbrole.DbRole // Username/role name (in Postgres, users and roles are equivalent)
-	password         string
-	policyName       string
-	commands         []string // Commands to be permitted in the policy. Could be SELECT, INSERT, UPDATE, DELETE
-	existingRowsCond string   // SQL conditional expression to be checked for existing rows. Only those rows for which the condition is true will be visible.
-	newRowsCond      string   // SQL conditional expression to be checked for rows being inserted or updated. Only those rows for which the condition is true will be inserted/updated
-}
 
 /*
 Postgres-backed implementation of DataStore interface. By default, uses MetadataBasedAuthorizer for authentication & authorization.
 */
 type relationalDb struct {
-	authorizer authorizer.Authorizer // Allows or cancels operations on the DB depending on user's org. and service roles
-	gormDBMap  map[dbrole.DbRole]*gorm.DB
-	logger     *logrus.Entry
+	authorizer  authorizer.Authorizer // Allows or cancels operations on the DB depending on user's org. and service roles
+	gormDBMap   map[dbrole.DbRole]*gorm.DB
+	logger      *logrus.Entry
+	initializer func(db *relationalDb, dbRole dbrole.DbRole) error
 }
 
-func GetDefaultDataStore(logger *logrus.Entry, authorizer authorizer.Authorizer) (d DataStore, err error) {
-	db := &relationalDb{
-		authorizer: authorizer,
-		gormDBMap:  make(map[dbrole.DbRole]*gorm.DB),
-		logger:     logger,
-	}
-	err = db.Initialize()
-	if err != nil {
-		logger.Errorf("Failed to initialize db: %e", err)
-	}
-	d = db
-	return
-}
-
-func (db *relationalDb) TestHelper() DataStoreTestHelper {
+func (db *relationalDb) TestHelper() TestHelper {
 	return db
 }
 
-func (db *relationalDb) Helper() DataStoreHelper {
+func (db *relationalDb) Helper() Helper {
 	return db
 }
 
-func (db *relationalDb) Initialize() error {
-	// Ensure all the needed environment variables are present and non-empty
-	for _, envVar := range []string{DB_ADMIN_USERNAME_ENV_VAR, DB_ADMIN_PASSWORD_ENV_VAR, DB_NAME_ENV_VAR, DB_PORT_ENV_VAR, DB_HOST_ENV_VAR, SSL_MODE_ENV_VAR} {
-		if _, isPresent := os.LookupEnv(envVar); !isPresent {
-			db.logger.Errorf("Please, provide environment variable %q", envVar)
-			return ErrMissingEnvVar.WithValue(ENV_VAR, envVar)
-		}
-
-		if envVarValue := strings.TrimSpace(os.Getenv(envVar)); len(envVarValue) == 0 {
-			db.logger.Errorf("Please, provide a non-empty value for environment variable %q", envVar)
-			return ErrMissingEnvVar.WithValue(ENV_VAR, envVar)
-		}
-	}
-
-	var err error
-	var dbPort int
-	dbAdminUsername := getAdminUsername()
-	dbAdminPassword := strings.TrimSpace(os.Getenv(DB_ADMIN_PASSWORD_ENV_VAR))
-	dbName := strings.TrimSpace(os.Getenv(DB_NAME_ENV_VAR))
-	dbHost := strings.TrimSpace(os.Getenv(DB_HOST_ENV_VAR))
-	sslMode := strings.TrimSpace(os.Getenv(SSL_MODE_ENV_VAR))
-
-	// Ensure port number is valid
-	if dbPort, err = strconv.Atoi(strings.TrimSpace(os.Getenv(DB_PORT_ENV_VAR))); err != nil {
-		err = ErrInvalidPortNumber.Wrap(err).WithValue(PORT_NUMBER, os.Getenv(DB_PORT_ENV_VAR))
-		db.logger.Errorf("Please, provide a valid port number in environment variable %q", DB_PORT_ENV_VAR)
-		return err
-	}
-
-	if _, ok := db.gormDBMap[dbAdminUsername]; ok {
-		return nil
-	}
-
-	// Create DB connections
-	db.gormDBMap[dbAdminUsername], err = openDb(dbHost, dbPort, dbAdminUsername, dbAdminPassword, dbName, sslMode)
-	if err != nil {
-		args := map[ErrorContextKey]string{
-			DB_HOST:           dbHost,
-			DB_PORT:           strconv.Itoa(dbPort),
-			DB_ADMIN_USERNAME: string(dbAdminUsername),
-			DB_NAME:           dbName,
-			SSL_MODE:          sslMode,
-		}
-		err = ErrConnectingToDb.WithMap(args).Wrap(err)
-		db.logger.Error(err)
-		return err
-	}
-
-	users := getDbUsers("ANY")
-	for _, dbUserSpecs := range users {
-		stmt := getCreateUserStmt(string(dbUserSpecs.username), dbUserSpecs.password)
-		if tx := db.gormDBMap[dbAdminUsername].Exec(stmt); tx.Error != nil {
-			err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
-			db.logger.Errorln(err)
-			return err
-		}
-
-		db.logger.Infof("Connecting to database %s@%s:%d[%s] ...", dbUserSpecs.username, dbHost, dbPort, dbName)
-		db.gormDBMap[dbUserSpecs.username], err = openDb(dbHost, dbPort, dbUserSpecs.username, dbUserSpecs.password, dbName, sslMode)
-		if err != nil {
-			args := map[ErrorContextKey]string{
-				DB_HOST:     dbHost,
-				DB_PORT:     strconv.Itoa(dbPort),
-				DB_USERNAME: string(dbUserSpecs.username),
-				DB_NAME:     dbName,
-				SSL_MODE:    sslMode,
-			}
-			err = ErrConnectingToDb.WithMap(args).Wrap(err)
-			db.logger.Error(err)
-			return err
-		}
-		db.logger.Infof("Connecting to database %s@%s:%d[%s] successfully", dbUserSpecs.username, dbHost, dbPort, dbName)
-	}
-
-	return nil
-}
-
-// Opens a Postgres DB using the provided config. parameters.
-func openDb(dbHost string, dbPort int, dbUsername dbrole.DbRole, dbPassword string, dbName string, sslMode string) (tx *gorm.DB, err error) {
-	// Create DB connection
-	dataSourceName := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s", dbHost, dbPort, dbUsername, dbPassword, dbName, sslMode)
-	db, err := gorm.Open(postgres.Open(dataSourceName),
-		&gorm.Config{
-			Logger: logger.Default.LogMode(logger.Info),
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	sqlDB, err := db.DB()
-	if err != nil {
-		return nil, err
-	}
-
-	// Ensure DB connection works
-	if err = sqlDB.Ping(); err != nil {
-		return nil, err
-	}
-
-	return db, nil
-}
-
-func TypeName(x interface{}) (typeName string) {
-	t := reflect.TypeOf(x)
-	for t.Kind() == reflect.Ptr {
-		t = t.Elem()
-		typeName += "*"
-	}
-	typeName += t.Name()
-	return
-}
-
-func IsPointerToStruct(x interface{}) (isPtrType bool) {
-	t := reflect.TypeOf(x)
-	isPtrType = (t.Kind() == reflect.Ptr && t.Elem().Kind() == reflect.Struct)
-	return
-}
-
-// Validates tenancy information and returns a transaction with right dbRole.
 func (db *relationalDb) GetDBTransaction(ctx context.Context, tableName string, record Record) (tx *gorm.DB, err error) {
 	if !IsPointerToStruct(record) {
 		return nil, ErrNotPtrToStruct.WithValue(TYPE, TypeName(record))
 	}
-
 	return db.getDBTransaction(ctx, tableName, record)
 }
 
@@ -243,7 +86,8 @@ func (db *relationalDb) getDBTransaction(ctx context.Context, tableName string, 
 
 	// If the DB role is tenant-specific (TENANT_READER or TENANT_WRITER) and the table is multi-tenant,
 	// make sure that the record being inserted/modified/updated/deleted/queried belongs to the user's org.
-	// If operation is SELECT but no specific tenant's data is being queried (e.g., FindAll() was called), allow the operation to proceed.
+	// If operation is SELECT but no specific tenant's data is being queried (e.g., FindAll() was called),
+	// allow the operation to proceed.
 	if dbRole.IsDbRoleTenantScoped() && IsMultitenant(record, tableName) {
 		orgIdCol, _ := GetOrgId(record)
 		err = ErrOperationNotAllowed.WithValue("tenant", orgId).WithValue("orgIdCol", orgIdCol)
@@ -255,10 +99,14 @@ func (db *relationalDb) getDBTransaction(ctx context.Context, tableName string, 
 		}
 	}
 
-	tx = db.gormDBMap[dbRole].Begin()
+	tx, err = db.GetDBConn(dbRole)
+	if err != nil {
+		return nil, err
+	}
+	tx = tx.Begin()
 	if isDbRoleTenantScoped {
 		// Set org. ID
-		stmt := getSetConfigStmt(DB_CONFIG_ORG_ID, orgId)
+		stmt := getSetConfigStmt(DbConfigOrgId, orgId)
 		if tx = tx.Exec(stmt); tx.Error != nil {
 			err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
 			db.logger.Errorln(err)
@@ -280,16 +128,13 @@ func (db *relationalDb) getDBTransaction(ctx context.Context, tableName string, 
 	return tx, nil
 }
 
-// Resets DB connection pools.
+// Reset Resets DB connection pools.
 func (db *relationalDb) Reset() {
 	db.gormDBMap = make(map[dbrole.DbRole]*gorm.DB)
 	db.authorizer = authorizer.MetadataBasedAuthorizer{}
-	if err := db.Initialize(); err != nil {
-		panic(err)
-	}
 }
 
-// Finds a single record that has the same values as non-zero fields in the record.
+// Find Finds a single record that has the same values as non-zero fields in the record.
 // record argument must be a pointer to a struct and will be modified in-place.
 // Returns ErrRecordNotFound if a record could not be found.
 func (db *relationalDb) Find(ctx context.Context, record Record) error {
@@ -335,14 +180,14 @@ func (db *relationalDb) FindAll(ctx context.Context, records interface{}) error 
 	return db.FindAllInTable(ctx, tableName, records)
 }
 
-// Finds all records in DB table tableName.
+// FindAllInTable Finds all records in DB table tableName.
 // records must be a pointer to a slice of structs and will be modified in-place.
 func (db *relationalDb) FindAllInTable(ctx context.Context, tableName string, records interface{}) error {
 	record := GetRecordInstanceFromSlice(records)
 	return db.FindWithFilterInTable(ctx, tableName, record, records)
 }
 
-// Finds multiple records in a DB table.
+// FindWithFilter Finds multiple records in a DB table.
 // If record argument is non-empty, uses the non-empty fields as criteria in a query.
 // records must be a pointer to a slice of structs and will be modified in-place.
 func (db *relationalDb) FindWithFilter(ctx context.Context, record Record, records interface{}) error {
@@ -423,21 +268,14 @@ func (db *relationalDb) Drop(tableNames ...string) error {
 	return db.DropCascade(false, tableNames...)
 }
 
-func (db *relationalDb) DropCascade(cascade bool, tableNames ...string) (err error) {
-	// Initialize DB connection
-	if err = db.Initialize(); err != nil {
-		return err
-	}
-
-	if _, ok := os.LookupEnv(DB_ADMIN_USERNAME_ENV_VAR); !ok {
-		return ErrMissingEnvVar.WithValue(ENV_VAR, DB_ADMIN_USERNAME_ENV_VAR)
-	}
-
-	adminUsername := getAdminUsername()
-
+func (db *relationalDb) DropCascade(_ bool, tableNames ...string) (err error) {
 	// Drop DB tables
 	for _, tableName := range tableNames {
-		err = db.gormDBMap[adminUsername].Migrator().DropTable(tableName)
+		tx, err := db.GetDBConn(MAIN)
+		if err != nil {
+			return err
+		}
+		err = tx.Migrator().DropTable(tableName)
 		if err != nil {
 			err = ErrExecutingSqlStmt.Wrap(err)
 			db.logger.Errorln(err)
@@ -452,21 +290,14 @@ func (db *relationalDb) Truncate(tableNames ...string) error {
 }
 
 func (db *relationalDb) TruncateCascade(cascade bool, tableNames ...string) (err error) {
-	// Initialize DB connection
-	if err = db.Initialize(); err != nil {
-		return err
-	}
-
-	if _, ok := os.LookupEnv(DB_ADMIN_USERNAME_ENV_VAR); !ok {
-		return ErrMissingEnvVar.WithValue(ENV_VAR, DB_ADMIN_USERNAME_ENV_VAR)
-	}
-
-	adminUsername := getAdminUsername()
-
 	// Truncate DB tables
 	for _, tableName := range tableNames {
 		stmt := getTruncateTableStmt(tableName, cascade)
-		if tx := db.gormDBMap[adminUsername].Exec(stmt); tx.Error != nil {
+		tx, err := db.GetDBConn(MAIN)
+		if err != nil {
+			return err
+		}
+		if tx := tx.Exec(stmt); tx.Error != nil {
 			err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
 			db.logger.Errorln(err)
 			return err
@@ -577,16 +408,11 @@ func (db *relationalDb) RegisterWithDALHelper(_ context.Context, roleMapping map
 
 	db.logger.Debugf("Registering the struct %q with DAL (backed by Postgres)... Using authorizer %s...", tableName, GetTableName(db.authorizer))
 
-	adminUsername := getAdminUsername()
-
-	// Connect to Postgres if there are no connections
-	if err = db.Initialize(); err != nil {
-		err = ErrRegisteringStruct.Wrap(err).WithValue(TABLE_NAME, tableName)
-		db.logger.Error(err)
+	tx, err := db.GetDBConn(MAIN)
+	if err != nil {
 		return err
 	}
-
-	err = db.gormDBMap[adminUsername].Table(tableName).AutoMigrate(record)
+	err = tx.Table(tableName).AutoMigrate(record)
 	if err != nil {
 		err = ErrRegisteringStruct.Wrap(err).WithValue(TABLE_NAME, tableName)
 		db.logger.Error(err)
@@ -603,7 +429,7 @@ func (db *relationalDb) RegisterWithDALHelper(_ context.Context, roleMapping map
 	// Enable row-level security in a multi-tenant table
 	if IsMultitenant(record, tableName) {
 		stmt := getEnableRLSStmt(tableName, record)
-		if tx := db.gormDBMap[adminUsername].Exec(stmt); tx.Error != nil {
+		if tx := db.gormDBMap[MAIN].Exec(stmt); tx.Error != nil {
 			err = ErrRegisteringStruct.Wrap(tx.Error).WithMap(map[ErrorContextKey]string{
 				TABLE_NAME: tableName,
 				SQL_STMT:   stmt,
@@ -633,25 +459,23 @@ Creates a Postgres trigger that checks if a record being updated contains the mo
 If not, update is rejected.
 */
 func (db *relationalDb) enforceRevisioning(tableName string) (err error) {
-	adminUsername := getAdminUsername()
-
 	functionName, functionBody := getCheckAndUpdateRevisionFunc()
 	stmt := getCreateTriggerFunctionStmt(functionName, functionBody)
-	if tx := db.gormDBMap[adminUsername].Exec(stmt); tx.Error != nil {
+	if tx := db.gormDBMap[MAIN].Exec(stmt); tx.Error != nil {
 		err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
 		db.logger.Error(err)
 		return err
 	}
 
 	stmt = getDropTriggerStmt(tableName, functionName)
-	if tx := db.gormDBMap[adminUsername].Exec(stmt); tx.Error != nil {
+	if tx := db.gormDBMap[MAIN].Exec(stmt); tx.Error != nil {
 		err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
 		db.logger.Error(err)
 		return err
 	}
 
 	stmt = getCreateTriggerStmt(tableName, functionName)
-	if tx := db.gormDBMap[adminUsername].Exec(stmt); tx.Error != nil {
+	if tx := db.gormDBMap[MAIN].Exec(stmt); tx.Error != nil {
 		err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
 		db.logger.Error(err)
 		return err
@@ -663,10 +487,8 @@ func (db *relationalDb) enforceRevisioning(tableName string) (err error) {
 // Creates a Postgres user (which is the same as role in Postgres). Grants certain privileges to perform certain operations
 // to the user (e.g., SELECT only; SELECT, INSERT, UPDATE, DELETE). Creates RLS-policy if the table is multi-tenant.
 func (db *relationalDb) createDbUser(dbUserSpecs dbUserSpecs, tableName string, record Record) (err error) {
-	adminUsername := getAdminUsername()
-
 	stmt := getGrantPrivilegesStmt(tableName, string(dbUserSpecs.username), dbUserSpecs.commands)
-	if tx := db.gormDBMap[adminUsername].Exec(stmt); tx.Error != nil {
+	if tx := db.gormDBMap[MAIN].Exec(stmt); tx.Error != nil {
 		err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
 		db.logger.Error(err)
 		return err
@@ -674,7 +496,7 @@ func (db *relationalDb) createDbUser(dbUserSpecs dbUserSpecs, tableName string, 
 
 	if IsMultitenant(record, tableName) {
 		stmt = getCreatePolicyStmt(tableName, record, dbUserSpecs)
-		if tx := db.gormDBMap[adminUsername].Exec(stmt); tx.Error != nil {
+		if tx := db.gormDBMap[MAIN].Exec(stmt); tx.Error != nil {
 			err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
 			db.logger.Error(err)
 			return err
@@ -682,58 +504,6 @@ func (db *relationalDb) createDbUser(dbUserSpecs dbUserSpecs, tableName string, 
 	}
 
 	return nil
-}
-
-/*
-Generates specifications of 4 DB users:
-- user with read-only access to his org
-- user with read & write access to his org
-- user with read-only access to all orgs
-- user with read & write access to all orgs.
-*/
-func getDbUsers(tableName string) []dbUserSpecs {
-	writer := dbUserSpecs{
-		username:         dbrole.WRITER,
-		commands:         []string{"SELECT", "INSERT", "UPDATE", "DELETE"},
-		existingRowsCond: "true", // Allow access to all existing rows
-		newRowsCond:      "true", // Allow inserting or updating records
-	}
-
-	reader := dbUserSpecs{
-		username:         dbrole.READER,
-		commands:         []string{"SELECT"}, // READER role will only be able to perform SELECT
-		existingRowsCond: "true",             // Allow access to all existing rows
-		newRowsCond:      "false",            // Prevent inserting or updating records
-	}
-
-	tenantWriter := dbUserSpecs{
-		username:         dbrole.TENANT_WRITER,
-		commands:         []string{"SELECT", "INSERT", "UPDATE", "DELETE"},
-		existingRowsCond: COLUMN_ORGID + " = current_setting('" + DB_CONFIG_ORG_ID + "')", // Allow access only to its tenant's records
-		newRowsCond:      COLUMN_ORGID + " = current_setting('" + DB_CONFIG_ORG_ID + "')", // Allow inserting for or updating records of its own tenant
-	}
-
-	tenantReader := dbUserSpecs{
-		username:         dbrole.TENANT_READER,
-		commands:         []string{"SELECT"},                                              // TENANT_READER role will only be able to perform SELECT on its tenant's records
-		existingRowsCond: COLUMN_ORGID + " = current_setting('" + DB_CONFIG_ORG_ID + "')", // Allow access only to its tenant's records
-		newRowsCond:      "false",                                                         // Prevent inserting or updating records
-	}
-
-	dbUsers := []dbUserSpecs{writer, reader, tenantWriter, tenantReader}
-	for i := 0; i < len(dbUsers); i++ {
-		dbUsers[i].password = getPassword(string(dbUsers[i].username))
-		dbUsers[i].policyName = GetRlsPolicyName(string(dbUsers[i].username), tableName)
-	}
-	return dbUsers
-}
-
-// Generates a password for a DB user by getting a hash of DB admin. password concatenated with a DB username and
-// converting the hash to hex.
-func getPassword(username string) string {
-	h := fnv.New32a()
-	h.Write([]byte(os.Getenv(DB_ADMIN_PASSWORD_ENV_VAR) + username))
-	return strconv.FormatInt(int64(h.Sum32()), 16)
 }
 
 func (db *relationalDb) GetAuthorizer() authorizer.Authorizer {
@@ -761,10 +531,20 @@ func (db *relationalDb) getTenantInfoFromCtx(ctx context.Context, tableNames ...
 		return err, "", "", false
 	}
 
-	db.logger.Infof("TenantContext for DB transaction orgId=%s, dbRole=%s, isDbRoleTenantScoped=%v", orgId, dbRole, isDbRoleTenantScoped)
+	db.logger.Infof("Tenant Context: orgId=%s, dbRole=%s, isDbRoleTenantScoped=%v",
+		orgId, dbRole, isDbRoleTenantScoped)
 	return err, orgId, dbRole, isDbRoleTenantScoped
 }
 
-func getAdminUsername() dbrole.DbRole {
-	return dbrole.DbRole(strings.TrimSpace(os.Getenv(DB_ADMIN_USERNAME_ENV_VAR)))
+func (db *relationalDb) GetDBConn(dbRole dbrole.DbRole) (*gorm.DB, error) {
+	if _, ok := db.gormDBMap[dbRole]; !ok {
+		if err := db.initializer(db, dbRole); err != nil {
+			err = ErrConnectingToDb.Wrap(err)
+			return nil, err
+		}
+	}
+	if conn, ok := db.gormDBMap[dbRole]; ok {
+		return conn, nil
+	}
+	return nil, ErrConnectingToDb.WithValue(DB_ROLE, string(dbRole))
 }

@@ -29,6 +29,7 @@ type ErrorContextKey string
 
 const (
 	ENV_VAR           = ErrorContextKey("EnvVar")
+	VALUE             = ErrorContextKey("Value")
 	DB_ADMIN_USERNAME = ErrorContextKey("dbAdminUsername")
 	DB_HOST           = ErrorContextKey("dbHost")
 	DB_NAME           = ErrorContextKey("dbName")
@@ -38,8 +39,8 @@ const (
 	SQL_STMT          = ErrorContextKey("SqlStmt")
 	SSL_MODE          = ErrorContextKey("sslMode")
 	TABLE_NAME        = ErrorContextKey("TableName")
-	PRIMARY_KEY       = ErrorContextKey("PrimaryKey")
 	TYPE              = ErrorContextKey("Type")
+	DB_ROLE           = ErrorContextKey("DbRole")
 )
 
 func contextToString(ctx interface{}) string {
