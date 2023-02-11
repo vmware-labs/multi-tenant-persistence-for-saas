@@ -21,6 +21,53 @@ This package exposes `ProtoStore` interface to the consumer, which is a wrapper
 around `DataStore` interface and is used specifically to persist Protobuf messages.
 Just as with `DataStore`, Protobuf messages can be persisted with revisioning and
 multi-tenancy support along with `CreatedAt` and `UpdatedAt` timestamps.
+
+### ProtoStore Example
+
+```go
+
+	// Import the package in your microservice
+	import "github.com/vmware-labs/multi-tenant-persistence-for-saas/data-access-layer/datastore"
+
+	// Initialize protostore with proper logger and role Mappings
+	protoStore := datastore.GetProtoStore(myLogger, myDatastore)
+	roleMappingForMemory := map[string]DbRole{
+	  APP_ADMIN:     datastore.READER,
+	    SERVICE_ADMIN: datastore.WRITER,
+	}
+	protoStore.Register(context.TODO(), roleMappingForMemory, &pb.Memory{})
+
+	// Store protobuf message using Upsert
+	id := "001"
+	memory := pb.Memory{
+	  Brand: "Samsung",
+	  Size:  32,
+	  Speed: 2933,
+	  Type:  "DDR4",
+	}
+	protoStore.Upsert(ctx, id, &memory)
+
+	// Retrieve protobuf message using ID
+	memory = pb.Memory{}
+	var metadata = Metadata{}
+	protoStore.FindById(ctx, id, &memory, &metadata)
+
+	// Update the protobuf message with metadata (existing revision)
+	memory.Speed++
+	protoStore.UpdateWithMetadata(ctx, id, &memory, metadata)
+
+	// Retrieve all the protobuf messages
+	var queryResults = make([]*pb.Memory, 0)
+	metadataMap, _ := protoStore.FindAll(ctx, queryResults)
+
+	// Update the protobuf without metadata (without revision, NOT RECOMMENDED)
+	memory.Speed++
+	protoStore.Update(ctx, id, memory) //Update()
+
+	// Delete the protobuf
+	protoStore.DeleteById(ctx, id, &pb.Memory{})
+
+```
 */
 package protostore
 
@@ -445,7 +492,7 @@ func (p ProtobufDataStore) DeleteById(ctx context.Context, id string, msg proto.
 func (p ProtobufDataStore) DropTables(msgs ...proto.Message) error {
 	for _, msg := range msgs {
 		p.logger.Infof("Dropping Table for %s", msg)
-		err := p.ds.TestHelper().Drop(datastore.GetTableName(msg))
+		err := p.ds.TestHelper().DropTables(datastore.GetTableName(msg))
 		if err != nil {
 			return err
 		}

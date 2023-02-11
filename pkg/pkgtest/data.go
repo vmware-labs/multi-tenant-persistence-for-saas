@@ -20,6 +20,7 @@ package pkgtest
 
 import (
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/uuid"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/datastore"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/protostore"
@@ -37,16 +38,17 @@ const (
 	TENANT_ADMIN    = "tenant_admin"
 	SERVICE_AUDITOR = "service_auditor"
 	SERVICE_ADMIN   = "service_admin"
-	RANDOM_ID       = "SomeRandomId"
 )
 
 var (
-	TestMetadataAuthorizer = authorizer.MetadataBasedAuthorizer{}
-	ServiceAdminCtx        = TestMetadataAuthorizer.GetAuthContext("", SERVICE_ADMIN)
-	CokeAdminCtx           = TestMetadataAuthorizer.GetAuthContext(COKE, TENANT_ADMIN)
-	CokeAuditorCtx         = TestMetadataAuthorizer.GetAuthContext(COKE, TENANT_AUDITOR)
-	PepsiAdminCtx          = TestMetadataAuthorizer.GetAuthContext(PEPSI, TENANT_ADMIN)
-	PepsiAuditorCtx        = TestMetadataAuthorizer.GetAuthContext(PEPSI, TENANT_AUDITOR)
+	RANDOM_ID              string = uuid.New().String()
+	TestMetadataAuthorizer        = authorizer.MetadataBasedAuthorizer{}
+	ServiceAdminCtx               = TestMetadataAuthorizer.GetAuthContext("", SERVICE_ADMIN)
+	ServiceAuditorCtx             = TestMetadataAuthorizer.GetAuthContext("", SERVICE_AUDITOR)
+	CokeAdminCtx                  = TestMetadataAuthorizer.GetAuthContext(COKE, TENANT_ADMIN)
+	CokeAuditorCtx                = TestMetadataAuthorizer.GetAuthContext(COKE, TENANT_AUDITOR)
+	PepsiAdminCtx                 = TestMetadataAuthorizer.GetAuthContext(PEPSI, TENANT_ADMIN)
+	PepsiAuditorCtx               = TestMetadataAuthorizer.GetAuthContext(PEPSI, TENANT_AUDITOR)
 
 	TestDataStore, _ = datastore.GetDefaultDatastore(datastore.GetCompLogger(), TestMetadataAuthorizer)
 	TestProtoStore   = protostore.GetProtoStore(datastore.GetCompLogger(), TestDataStore)

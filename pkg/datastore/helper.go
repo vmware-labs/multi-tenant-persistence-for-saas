@@ -149,7 +149,7 @@ func openDb(dbHost string, dbPort int, dbUsername dbrole.DbRole, dbPassword stri
 		dbHost, dbPort, dbUsername, dbPassword, dbName, sslMode)
 	db, err := gorm.Open(postgres.Open(dataSourceName),
 		&gorm.Config{
-			Logger: logger.Default.LogMode(logger.Error),
+			Logger: logger.Default.LogMode(logger.Info),
 		},
 	)
 	if err != nil {
