@@ -178,3 +178,6 @@ issues:
     - path: pkg/pkgtest/data.go
       linters:
         - gochecknoglobals
+    - path: pkg/pkgtest/helper.go
+      linters:
+        - gomnd

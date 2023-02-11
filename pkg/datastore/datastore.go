@@ -29,7 +29,6 @@ import (
 // DataStore /*.
 type DataStore interface {
 	GetAuthorizer() authorizer.Authorizer
-	GetDBTransaction(ctx context.Context, tableName string, record Record) (tx *gorm.DB, err error)
 	Find(ctx context.Context, record Record) error
 	FindAll(ctx context.Context, records interface{}) error
 	FindWithFilter(ctx context.Context, record Record, records interface{}) error
@@ -41,10 +40,12 @@ type DataStore interface {
 	Reset()
 	Helper() Helper
 	TestHelper() TestHelper
+	GetTransaction(ctx context.Context, record ...Record) (tx *gorm.DB, err error)
 }
 
 type Helper interface {
 	GetAuthorizer() authorizer.Authorizer
+	GetDBTransaction(ctx context.Context, tableName string, record Record) (tx *gorm.DB, err error)
 	RegisterWithDALHelper(ctx context.Context, roleMapping map[string]dbrole.DbRole, tableName string, record Record) error
 	FindInTable(ctx context.Context, tableName string, record Record) error
 	FindAllInTable(ctx context.Context, tableName string, records interface{}) error
@@ -57,8 +58,6 @@ type Helper interface {
 
 type TestHelper interface {
 	DropTables(records ...Record) error                       // Drop DB tables by records
-	Drop(tableNames ...string) error                          // Drops DB tables
-	DropCascade(cascade bool, tableNames ...string) error     // Drops DB tables, with an option to drop them in a cascading fashion
 	Truncate(tableNames ...string) error                      // Truncates DB tables
 	TruncateCascade(cascade bool, tableNames ...string) error // Truncates DB tables, with an option to truncate them in a cascading fashion
 }

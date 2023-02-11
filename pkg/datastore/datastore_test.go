@@ -28,7 +28,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -38,85 +37,17 @@ import (
 	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/pkgtest"
 )
 
-var LOG *logrus.Entry
-
-var datastoreDbTableNames = []string{
-	datastore.GetTableName(App{}),
-	datastore.GetTableName(AppUser{}),
-	datastore.GetTableName(Group{}),
-}
-
-// TODO - add a test that would show that the DB users are not able to create, drop, or truncate tables
-
-// Input for all test cases. Inserted into data store by prepareInput().
 var (
-	myCokeApp App
-	user1     AppUser
-	user2     AppUser
+	LOG *logrus.Entry
+	ds  = TestDataStore
 )
 
-/*
-Prepared input for all test cases. Stores the input in global variables.
-*/
-func prepareInput() (*App, *AppUser, *AppUser) {
-	rand.Seed(time.Now().Unix())
-	myCokeApp = App{
-		Id:       "id-" + strconv.Itoa(rand.Int()),
-		Name:     "Cool_app",
-		TenantId: COKE,
-	}
-
-	user1 = AppUser{
-		Id:             "id-" + strconv.Itoa(rand.Int()),
-		Name:           "Jeyhun",
-		Email:          "jeyhun@mail.com",
-		EmailConfirmed: true,
-		NumFollowing:   2147483647,          // int32 type
-		NumFollowers:   9223372036854775807, // int64 type
-		AppId:          myCokeApp.Id,
-		Msg:            []byte("msg1234"),
-	}
-
-	user2 = AppUser{
-		Id:             "id-" + strconv.Itoa(rand.Int()),
-		Name:           "Jahangir",
-		Email:          "jahangir@mail.com",
-		EmailConfirmed: false,
-		NumFollowing:   2,
-		NumFollowers:   20,
-		AppId:          myCokeApp.Id,
-		Msg:            []byte("msg9876"),
-	}
-
-	// Make sure the 2 users  are sorted in ascending order by ID
-	if user1.Id >= user2.Id {
-		user1, user2 = user2, user1
-	}
-
-	return &myCokeApp, &user1, &user2
-}
-
-var ds = TestDataStore
-
-func createDbTables(ctx context.Context) error {
-	roleMapping := map[string]dbrole.DbRole{
-		TENANT_AUDITOR:  dbrole.TENANT_READER,
-		TENANT_ADMIN:    dbrole.TENANT_WRITER,
-		SERVICE_AUDITOR: dbrole.READER,
-		SERVICE_ADMIN:   dbrole.WRITER,
-	}
-	for _, record := range []datastore.Record{App{}, AppUser{}} {
-		if err := ds.RegisterWithDAL(ctx, roleMapping, record); err != nil {
-			return err
-		}
-	}
-	return nil
-}
+// TODO - add a test that would show that the DB users are not able to create, drop, or truncate tables
 
 func TestTruncate(t *testing.T) {
 	assert := assert.New(t)
 
-	setupDbTables(t)
+	_, _, _ = SetupDbTables(ds)
 
 	queryResults := make([]App, 0)
 	if err := ds.FindAll(CokeAdminCtx, &queryResults); err != nil {
@@ -140,9 +71,10 @@ func TestTruncateNonExistent(t *testing.T) {
 	assert.NoError(err, "Expected no error when trying to truncate a non-existent table")
 }
 
-func testFindInEmptyDataStore(t *testing.T) {
-	t.Helper()
+func TestFindInEmpty(t *testing.T) {
 	assert := assert.New(t)
+
+	RecreateAllTables(ds)
 
 	{
 		queryResult := AppUser{Id: "non-existent user ID"}
@@ -166,23 +98,18 @@ func testFindInEmptyDataStore(t *testing.T) {
 	}
 }
 
-func TestFindInEmptyDatabase(t *testing.T) {
-	setupEmptyDbTables(t)
-	testFindInEmptyDataStore(t)
-}
-
-func testCrud(t *testing.T, ctx context.Context) {
+func testCrud(t *testing.T, ctx context.Context, myCokeApp *App, user1, user2 *AppUser) {
 	t.Helper()
 	assert := assert.New(t)
 
 	var err error
 
 	// Querying of previously inserted records should succeed
-	for _, record := range []AppUser{user1, user2} {
+	for _, record := range []*AppUser{user1, user2} {
 		queryResult := AppUser{Id: record.Id}
 		err = ds.Find(ctx, &queryResult)
 		assert.NoError(err)
-		assert.Equal(record, queryResult)
+		assert.Equal(record, &queryResult)
 	}
 
 	// Updating non-key fields in a record should succeed
@@ -194,12 +121,12 @@ func testCrud(t *testing.T, ctx context.Context) {
 	user2.Email = "jahangir111@mail.com"
 	user2.EmailConfirmed = !user2.EmailConfirmed
 	user2.NumFollowers--
-	for _, record := range []AppUser{user1, user2} {
-		rowsAffected, err := ds.Update(ctx, &record)
+	for _, record := range []*AppUser{user1, user2} {
+		rowsAffected, err := ds.Update(ctx, record)
 		assert.NoError(err)
 		assert.EqualValues(1, rowsAffected)
-		queryResult := AppUser{Id: record.Id}
-		err = ds.Find(ctx, &queryResult)
+		queryResult := &AppUser{Id: record.Id}
+		err = ds.Find(ctx, queryResult)
 		assert.NoError(err)
 		assert.Equal(record, queryResult)
 	}
@@ -207,19 +134,19 @@ func testCrud(t *testing.T, ctx context.Context) {
 	// Upsert operation should be an update for already existing records
 	user1.NumFollowers++
 	user2.NumFollowers--
-	for _, record := range []AppUser{user1, user2} {
-		rowsAffected, err := ds.Update(ctx, &record)
+	for _, record := range []*AppUser{user1, user2} {
+		rowsAffected, err := ds.Update(ctx, record)
 		assert.NoError(err)
 		assert.EqualValues(1, rowsAffected)
-		queryResult := AppUser{Id: record.Id}
-		err = ds.Find(ctx, &queryResult)
+		queryResult := &AppUser{Id: record.Id}
+		err = ds.Find(ctx, queryResult)
 		assert.NoError(err)
 		assert.Equal(record, queryResult)
 	}
 
 	// Deletion of existing records should not fail, and the records should no longer be found in the DB
-	for _, record := range []AppUser{user1, user2} {
-		rowsAffected, err := ds.Delete(ctx, &record)
+	for _, record := range []*AppUser{user1, user2} {
+		rowsAffected, err := ds.Delete(ctx, record)
 		assert.NoError(err)
 		assert.EqualValues(1, rowsAffected)
 		queryResult := AppUser{Id: record.Id}
@@ -229,127 +156,78 @@ func testCrud(t *testing.T, ctx context.Context) {
 	}
 }
 
-/*
-Drops existing tables and creates new ones. Generates a context object with a specific org. and CSP role.
-*/
-func setupEmptyDbTables(t *testing.T) {
-	t.Helper()
-	assert := assert.New(t)
-
-	allTableNames := make([]string, 0, len(datastoreDbTableNames))
-	allTableNames = append(allTableNames, datastoreDbTableNames...)
-	if err := ds.TestHelper().Drop(allTableNames...); err != nil {
-		assert.FailNow("Failed to drop DB tables for the following reason:\n" + err.Error())
-	}
-	if err := createDbTables(ServiceAdminCtx); err != nil {
-		assert.FailNow("Failed to create DB tables for the following reason:\n" + err.Error())
-	}
-}
-
-/*
-Drops existing tables and creates new ones. Generates a context object with a specific org. and role.
-Adds the records returned by prepareInput() to the DB tables.
-*/
-func setupDbTables(t *testing.T) {
-	t.Helper()
-	setupEmptyDbTables(t)
-	myCokeApp, user1, user2 := prepareInput()
-	for _, record := range []datastore.Record{myCokeApp, user1, user2} {
-		if _, err := ds.Insert(CokeAdminCtx, record); err != nil {
-			assert.FailNow(t, "Failed to prepare data for test case:\n"+err.Error())
-		}
-	}
-}
-
 func TestMain(m *testing.M) {
 	LOG = datastore.GetCompLogger()
-	allTableNames := make([]string, 0)
-	allTableNames = append(allTableNames, datastoreDbTableNames...)
-	if err := ds.TestHelper().Drop(allTableNames...); err != nil {
-		LOG.Fatalln("Failed to drop DB tables", err)
-	}
 
 	code := m.Run()
-	if err := ds.TestHelper().Drop(allTableNames...); err != nil {
-		LOG.Fatalln("Failed to drop DB tables", err)
-	}
-
+	DropAllTables(ds)
 	os.Exit(code)
 }
 
-func BenchmarkCrudDatabase(b *testing.B) {
+func BenchmarkCrud(b *testing.B) {
 	logger := datastore.GetLogger()
 	logger.SetLevel(logrus.FatalLevel)
 	logger.SetOutput(io.Discard)
 	LOG = logger.WithField(datastore.COMP, datastore.SAAS_PERSISTENCE)
 
 	var t testing.T
-	setupDbTables(&t)
+	myCokeApp, user1, user2 := SetupDbTables(ds)
 	for n := 0; n < b.N; n++ {
-		testCrud(&t, CokeAdminCtx)
+		testCrud(&t, CokeAdminCtx, myCokeApp, user1, user2)
 	}
 }
 
-func TestCrudDatabase(t *testing.T) {
-	setupDbTables(t)
-	testCrud(t, CokeAdminCtx)
+func TestCrud(t *testing.T) {
+	myCokeApp, user1, user2 := SetupDbTables(ds)
+	testCrud(t, CokeAdminCtx, myCokeApp, user1, user2)
 }
 
-func testFindAll(t *testing.T, ctx context.Context) {
-	t.Helper()
+func TestFindAll(t *testing.T) {
 	assert := assert.New(t)
+	_, user1, user2 := SetupDbTables(ds)
 
 	// FindAll should return all (two) records
 	queryResults := make([]AppUser, 0)
-	err := ds.FindAll(ctx, &queryResults)
+	err := ds.FindAll(CokeAdminCtx, &queryResults)
 	sort.Sort(AppUserSlice(queryResults))
 	assert.NoError(err)
 	assert.Len(queryResults, 2)
 
-	expected := []AppUser{user1, user2}
+	expected := []*AppUser{user1, user2}
 
 	for i := 0; i < len(queryResults); i++ {
-		assert.Equal(expected[i], queryResults[i])
+		assert.Equal(expected[i], &queryResults[i])
 	}
 }
 
-func testFindWithCriteria(t *testing.T, ctx context.Context) {
+func TestFindWithCriteria(t *testing.T) {
 	t.Helper()
 	assert := assert.New(t)
+	_, user1, user2 := SetupDbTables(ds)
 
-	expected := []AppUser{user1, user2}
+	expected := []*AppUser{user1, user2}
 
 	// Pass filtering criteria
 	for _, user := range expected {
 		// Search by all fields
 		queryResults := make([]AppUser, 0)
-		err := ds.FindWithFilter(ctx, &user, &queryResults)
+		err := ds.FindWithFilter(CokeAdminCtx, user, &queryResults)
 		assert.NoError(err)
 		assert.Len(queryResults, 1)
-		assert.Equal(user, queryResults[0])
+		assert.Equal(user, &queryResults[0])
 
 		// Search only by name
 		queryResults = make([]AppUser, 0)
-		err = ds.FindWithFilter(ctx, &AppUser{Name: user.Name}, &queryResults)
+		err = ds.FindWithFilter(CokeAdminCtx, &AppUser{Name: user.Name}, &queryResults)
 		assert.NoError(err)
 		assert.Len(queryResults, 1)
-		assert.Equal(user, queryResults[0])
+		assert.Equal(user, &queryResults[0])
 	}
-}
-
-func TestFindAllDatabase(t *testing.T) {
-	setupDbTables(t)
-	testFindAll(t, CokeAdminCtx)
-}
-
-func TestFindWithCriteriaDatabase(t *testing.T) {
-	setupDbTables(t)
-	testFindWithCriteria(t, CokeAdminCtx)
 }
 
 func TestCrudWithMissingOrgId(t *testing.T) {
 	assert := assert.New(t)
-	setupEmptyDbTables(t)
+	RecreateAllTables(ds)
 	_, apps := make([]AppUser, 0), make([]App, 0)
 
 	// Insert some data, to make sure that DAL methods fail not due to data missing in data store
@@ -411,7 +289,7 @@ func testCrudWithInvalidParams(t *testing.T, ctx context.Context) {
 	assert.ErrorIs(err, ErrNotPtrToStruct)
 }
 
-func TestCrudWithInvalidParamsDatabase(t *testing.T) {
+func TestCrudWithInvalidParams(t *testing.T) {
 	assert := assert.New(t)
 	testCrudWithInvalidParams(t, CokeAdminCtx)
 
@@ -422,30 +300,36 @@ func TestCrudWithInvalidParamsDatabase(t *testing.T) {
 	assert.ErrorIs(err, ErrExecutingSqlStmt)
 }
 
-func testDALRegistration(t *testing.T, ctx context.Context) {
+func TestDALRegistration(t *testing.T) {
 	t.Helper()
 	assert := assert.New(t)
-	roleMapping := map[string]dbrole.DbRole{SERVICE_AUDITOR: dbrole.READER}
 
+	roleMapping := map[string]dbrole.DbRole{SERVICE_AUDITOR: dbrole.READER}
 	// When registering a struct with DAL, you should be able to pass it either by value or by reference
-	err := ds.RegisterWithDAL(ctx, roleMapping, App{})
+	err := ds.RegisterWithDAL(CokeAdminCtx, roleMapping, App{})
 	assert.NoError(err)
 
-	err = ds.RegisterWithDAL(ctx, roleMapping, &AppUser{})
+	err = ds.RegisterWithDAL(CokeAdminCtx, roleMapping, &AppUser{})
 	assert.NoError(err)
 
 	// You should be able to register a struct that happens to have a name that's a reserved keyword in Postgres
-	err = ds.RegisterWithDAL(ctx, roleMapping, &Group{})
+	err = ds.RegisterWithDAL(CokeAdminCtx, roleMapping, &Group{})
 	assert.NoError(err)
-}
-
-func TestDALRegistrationDatabase(t *testing.T) {
-	setupEmptyDbTables(t)
-	testDALRegistration(t, CokeAdminCtx)
 
 	// Reset DB connections. Check if RegisterWithDAL() is still able to reconnect to DB
 	ds.Reset()
-	testDALRegistration(t, CokeAdminCtx)
+
+	roleMapping = map[string]dbrole.DbRole{SERVICE_AUDITOR: dbrole.READER}
+	// When registering a struct with DAL, you should be able to pass it either by value or by reference
+	err = ds.RegisterWithDAL(CokeAdminCtx, roleMapping, App{})
+	assert.NoError(err)
+
+	err = ds.RegisterWithDAL(CokeAdminCtx, roleMapping, &AppUser{})
+	assert.NoError(err)
+
+	// You should be able to register a struct that happens to have a name that's a reserved keyword in Postgres
+	err = ds.RegisterWithDAL(CokeAdminCtx, roleMapping, &Group{})
+	assert.NoError(err)
 }
 
 /*
@@ -458,10 +342,6 @@ func TestDeleteWithMultipleCSPRoles(t *testing.T) {
 	// Create context for custom admin who will have 2 service roles
 	customCtx := ds.GetAuthorizer().GetAuthContext(COKE, APP_ADMIN, SERVICE_ADMIN)
 
-	if err := ds.TestHelper().Drop(datastoreDbTableNames...); err != nil {
-		assert.FailNow("Failed to drop DB tables for the following reason:\n" + err.Error())
-	}
-
 	// The custom admin will have a read access being an app admin and read & write access being a service admin
 	roleMapping := map[string]dbrole.DbRole{APP_ADMIN: dbrole.READER, SERVICE_ADMIN: dbrole.WRITER}
 	err := ds.RegisterWithDAL(customCtx, roleMapping, App{})
@@ -470,13 +350,13 @@ func TestDeleteWithMultipleCSPRoles(t *testing.T) {
 	}
 
 	// Add some data to the app table
-	prepareInput()
-	if _, err = ds.Insert(CokeAdminCtx, &myCokeApp); err != nil {
+	myCokeApp, _, _ := PrepareInput()
+	if _, err = ds.Insert(CokeAdminCtx, myCokeApp); err != nil {
 		assert.FailNow("Failed to prepare data for the test case for the following reason:\n" + err.Error())
 	}
 
 	// Make sure that the custom admin is able to delete the data
-	rowsAffected, err := ds.Delete(customCtx, &myCokeApp)
+	rowsAffected, err := ds.Delete(customCtx, myCokeApp)
 	assert.NoError(err)
 	assert.EqualValues(1, rowsAffected)
 }
@@ -486,8 +366,8 @@ Tries to perform a query with a service role that has not been authorized to acc
 */
 func TestUnauthorizedAccess(t *testing.T) {
 	assert := assert.New(t)
-	setupDbTables(t)
 
+	myCokeApp, _, _ := SetupDbTables(ds)
 	ctx := ds.GetAuthorizer().GetAuthContext(COKE, "unauthorized service role")
 	queryResult := App{Id: myCokeApp.Id, TenantId: PEPSI}
 	err := ds.Find(ctx, &queryResult)
@@ -497,9 +377,10 @@ func TestUnauthorizedAccess(t *testing.T) {
 /*
 Tries CRUD operations with Pepsi's org ID in the context, while the data in DB belongs to Coke.
 */
-func testCrudWithMismatchingOrgId(t *testing.T, cokeCtx context.Context) {
+func TestCrudWithMismatchingOrgId(t *testing.T) {
 	t.Helper()
 	assert := assert.New(t)
+	myCokeApp, _, _ := SetupDbTables(ds)
 	tenantStr := "tenant=Pepsi"
 	orgIdStr := "orgIdCol=Coke"
 
@@ -519,17 +400,17 @@ func testCrudWithMismatchingOrgId(t *testing.T, cokeCtx context.Context) {
 
 		// Try to read a specific record from DB that definitely exists but belongs to another tenant
 		queryResult = make([]App, 0)
-		err = ds.FindWithFilter(PepsiAdminCtx, &myCokeApp, &queryResult)
+		err = ds.FindWithFilter(PepsiAdminCtx, myCokeApp, &queryResult)
 		assert.ErrorIs(err, ErrOperationNotAllowed)
 		assert.True(strings.Contains(err.Error(), tenantStr))
 		assert.True(strings.Contains(err.Error(), orgIdStr))
 	}
 
 	{
-		_, err := ds.Delete(PepsiAdminCtx, &myCokeApp)
+		_, err := ds.Delete(PepsiAdminCtx, myCokeApp)
 		assert.ErrorIs(err, ErrOperationNotAllowed) // Trying to delete another tenant's data should return an error
 		queryResult := App{Id: myCokeApp.Id, TenantId: myCokeApp.TenantId}
-		err = ds.Find(cokeCtx, &queryResult) // Since the previous delete has failed, the data should still be in the DB
+		err = ds.Find(CokeAdminCtx, &queryResult) // Since the previous delete has failed, the data should still be in the DB
 		assert.NoError(err)
 		assert.NotEmpty(queryResult)
 	}
@@ -548,41 +429,39 @@ func testCrudWithMismatchingOrgId(t *testing.T, cokeCtx context.Context) {
 
 		// Another tenant's data should not be found because it should not have been inserted into the data store
 		queryResult := App{Id: newApp.Id, TenantId: newApp.TenantId}
-		err = ds.Find(cokeCtx, &queryResult)
+		err = ds.Find(CokeAdminCtx, &queryResult)
 		assert.ErrorIs(err, ErrRecordNotFound)
 		assert.True(queryResult.AreNonKeyFieldsEmpty())
 	}
 
 	{
 		// App without an org. ID
-		newApp := App{
+		newApp := &App{
 			Id:   "id-" + strconv.Itoa(rand.Int()),
 			Name: "New app",
 		}
 
 		// You should not be able to insert a "multi-tenant" record that lacks the org. ID
-		rowsAffected, err := ds.Insert(PepsiAdminCtx, &newApp)
+		rowsAffected, err := ds.Insert(PepsiAdminCtx, newApp)
 		assert.ErrorIs(err, ErrExecutingSqlStmt)
 		assert.Equal(int64(0), rowsAffected)
 	}
 
 	{
-		updatedApp := myCokeApp
-		updatedApp.Name = "new name"
-		_, err := ds.Update(PepsiAdminCtx, &updatedApp) // You shouldn't be able to update another tenant's data with a tenant-specific role
+		updatedApp := &App{
+			Id:       myCokeApp.Id,
+			Name:     "new name",
+			TenantId: myCokeApp.TenantId,
+		}
+		_, err := ds.Update(PepsiAdminCtx, updatedApp) // You shouldn't be able to update another tenant's data with a tenant-specific role
 		assert.ErrorIs(err, ErrOperationNotAllowed)
 
 		queryResult := App{Id: myCokeApp.Id, TenantId: myCokeApp.TenantId}
-		err = ds.Find(cokeCtx, &queryResult)
+		err = ds.Find(CokeAdminCtx, &queryResult)
 		assert.NoError(err)
 		assert.NotEqual(updatedApp.Name, queryResult.Name) // Record should not have been updated
 		assert.Equal(myCokeApp.Name, queryResult.Name)     // Record should not have been updated
 	}
-}
-
-func TestCrudWithMismatchingOrgIdDatabase(t *testing.T) {
-	setupDbTables(t)
-	testCrudWithMismatchingOrgId(t, CokeAdminCtx)
 }
 
 func TestWithMissingEnvVar(t *testing.T) {
@@ -651,7 +530,7 @@ Tests revision blocking updates that are outdated.
 func TestRevision(t *testing.T) {
 	assert := assert.New(t)
 
-	if err := ds.TestHelper().Drop(datastore.GetTableName(Group{})); err != nil {
+	if err := ds.TestHelper().DropTables(&Group{}); err != nil {
 		assert.FailNow("Failed to drop DB tables for the following reason:\n" + err.Error())
 	}
 	roleMapping := map[string]dbrole.DbRole{
@@ -700,8 +579,9 @@ func TestRevision(t *testing.T) {
 
 	// update should fail when revision is not equal to the value in the db
 	updatedGroup = Group{Id: myGroup.Id, Name: "updatedGroup3", Revision: initialRevision + 100}
-	_, err = ds.Update(CokeAdminCtx, &updatedGroup)
+	rowsAffected, err = ds.Update(CokeAdminCtx, &updatedGroup)
 	assert.ErrorIs(err, ErrRevisionConflict)
+	assert.EqualValues(0, rowsAffected)
 	actualQueryResult = Group{Id: myGroup.Id}
 	err = ds.Find(CokeAdminCtx, &actualQueryResult)
 	assert.NoError(err)
@@ -720,6 +600,20 @@ func TestRevision(t *testing.T) {
 
 	// upsert should fail when revision is less than the value in the db
 	updatedGroup = Group{Id: myGroup.Id, Name: "updatedGroup4", Revision: 1}
-	_, err = ds.Upsert(CokeAdminCtx, &updatedGroup)
+	rowsAffected, err = ds.Upsert(CokeAdminCtx, &updatedGroup)
 	assert.ErrorIs(err, ErrRevisionConflict)
+	assert.EqualValues(0, rowsAffected)
+
+	rowsAffected, err = ds.Delete(CokeAuditorCtx, &updatedGroup)
+	assert.ErrorIs(err, ErrExecutingSqlStmt)
+	assert.EqualValues(0, rowsAffected)
+
+	rowsAffected, err = ds.Delete(CokeAdminCtx, &updatedGroup)
+	assert.NoError(err)
+	assert.EqualValues(1, rowsAffected)
+}
+
+func TestTransactions(t *testing.T) {
+	testSingleTableTransactions(t)
+	testMultiTableTransactions(t)
 }

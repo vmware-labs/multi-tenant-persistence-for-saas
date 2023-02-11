@@ -123,8 +123,51 @@ func (db *relationalDb) getDBTransaction(ctx context.Context, tableName string, 
 		db.logger.Error(err)
 		return nil, err
 	}
+	return tx, nil
+}
 
-	tx = tx.Table(tableName)
+func (db *relationalDb) GetTransaction(ctx context.Context, records ...Record) (tx *gorm.DB, err error) {
+	tableNames := make([]string, 0)
+	for _, record := range records {
+		tableNames = append(tableNames, GetTableName(record))
+	}
+
+	err, orgId, dbRole, isDbRoleTenantScoped := db.getTenantInfoFromCtx(ctx, tableNames...)
+	if err != nil {
+		return nil, err
+	}
+
+	// If the DB role is tenant-specific (TENANT_READER or TENANT_WRITER) and the table is multi-tenant,
+	// make sure that the record being inserted/modified/updated/deleted/queried belongs to the user's org.
+	// If operation is SELECT but no specific tenant's data is being queried (e.g., FindAll() was called),
+	// allow the operation to proceed.
+	for _, record := range records {
+		if dbRole.IsDbRoleTenantScoped() && IsMultitenant(record, GetTableName(record)) {
+			orgIdCol, _ := GetOrgId(record)
+			err = ErrOperationNotAllowed.WithValue("tenant", orgId).WithValue("orgIdCol", orgIdCol)
+			db.logger.Error(err.Error())
+			if orgIdCol != "" && orgIdCol != orgId {
+				err = ErrOperationNotAllowed.WithValue("tenant", orgId).WithValue("orgIdCol", orgIdCol)
+				db.logger.Error(err)
+				return nil, err
+			}
+		}
+	}
+
+	tx, err = db.GetDBConn(dbRole)
+	if err != nil {
+		return nil, err
+	}
+	tx = tx.Begin()
+	if isDbRoleTenantScoped {
+		// Set org. ID
+		stmt := getSetConfigStmt(DbConfigOrgId, orgId)
+		if tx = tx.Exec(stmt); tx.Error != nil {
+			err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
+			db.logger.Errorln(err)
+			return nil, err
+		}
+	}
 	return tx, nil
 }
 
@@ -254,28 +297,12 @@ func (db *relationalDb) Delete(ctx context.Context, record Record) (rowsAffected
  * Drops the DB tables given by Records.
  */
 func (db *relationalDb) DropTables(records ...Record) error {
-	tableNames := make([]string, 0, len(records))
 	for _, record := range records {
-		tableNames = append(tableNames, GetTableName(record))
-	}
-	return db.DropCascade(false, tableNames...)
-}
-
-/*
-Drops given DB tables.
-*/
-func (db *relationalDb) Drop(tableNames ...string) error {
-	return db.DropCascade(false, tableNames...)
-}
-
-func (db *relationalDb) DropCascade(_ bool, tableNames ...string) (err error) {
-	// Drop DB tables
-	for _, tableName := range tableNames {
 		tx, err := db.GetDBConn(MAIN)
 		if err != nil {
 			return err
 		}
-		err = tx.Migrator().DropTable(tableName)
+		err = tx.Migrator().DropTable(record)
 		if err != nil {
 			err = ErrExecutingSqlStmt.Wrap(err)
 			db.logger.Errorln(err)
