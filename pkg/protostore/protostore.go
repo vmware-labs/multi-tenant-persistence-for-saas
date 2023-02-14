@@ -116,13 +116,18 @@ type Metadata struct {
 }
 
 type ProtoStoreMsg struct {
-	Id        string `gorm:"primaryKey"`
-	Msg       []byte
-	ParentId  string
-	Revision  int64
-	OrgId     string `gorm:"primaryKey"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	Id         string `gorm:"primaryKey"`
+	Msg        []byte
+	ParentId   string
+	Revision   int64
+	OrgId      string `gorm:"primaryKey"`
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	XTableName string `gorm:"-"`
+}
+
+func (msg *ProtoStoreMsg) TableName() string {
+	return msg.XTableName
 }
 
 func FromBytes(bytes []byte, message proto.Message) error {
@@ -170,7 +175,7 @@ func (p ProtobufDataStore) GetAuthorizer() authorizer.Authorizer {
 
 func (p ProtobufDataStore) Register(ctx context.Context, roleMapping map[string]dbrole.DbRole, msgs ...proto.Message) error {
 	for _, msg := range msgs {
-		err := p.ds.Helper().RegisterWithDALHelper(ctx, roleMapping, datastore.GetTableName(msg), ProtoStoreMsg{})
+		err := p.ds.Helper().RegisterWithDALHelper(ctx, roleMapping, datastore.GetTableName(msg), ProtoStoreMsg{XTableName: datastore.GetTableName(msg)})
 		if err != nil {
 			p.logger.Errorf("Registering proto message %s failed with error: %v", msg, err)
 			return err
@@ -190,22 +195,9 @@ func (p ProtobufDataStore) Insert(ctx context.Context, id string, msg proto.Mess
 // md - metadata of the new Protobuf record
 // err - error that occurred during insertion, if any.
 func (p ProtobufDataStore) InsertWithMetadata(ctx context.Context, id string, msg proto.Message, metadata Metadata) (rowsAffected int64, md Metadata, err error) {
-	bytes, err := ToBytes(msg)
+	protoStoreMsg, err := p.MsgToPersist(ctx, id, msg, metadata)
 	if err != nil {
 		return 0, Metadata{}, err
-	}
-
-	orgId, err := p.ds.Helper().GetAuthorizer().GetOrgFromContext(ctx)
-	if err != nil {
-		return 0, Metadata{}, err
-	}
-
-	protoStoreMsg := ProtoStoreMsg{
-		Id:       id,
-		Msg:      bytes,
-		ParentId: metadata.ParentId,
-		Revision: metadata.Revision,
-		OrgId:    orgId,
 	}
 	// We cannot use 0 as the starting revision as we cannot
 	// differentiate between 0 vs unset values.
@@ -240,22 +232,9 @@ func (p ProtobufDataStore) Update(ctx context.Context, id string, msg proto.Mess
 // md - metadata of the updated Protobuf record
 // err - error that occurred during update, if any.
 func (p ProtobufDataStore) UpdateWithMetadata(ctx context.Context, id string, msg proto.Message, metadata Metadata) (rowsAffected int64, md Metadata, err error) {
-	bytes, err := ToBytes(msg)
+	protoStoreMsg, err := p.MsgToPersist(ctx, id, msg, metadata)
 	if err != nil {
 		return 0, Metadata{}, err
-	}
-
-	orgId, err := p.ds.Helper().GetAuthorizer().GetOrgFromContext(ctx)
-	if err != nil {
-		return 0, Metadata{}, err
-	}
-
-	protoStoreMsg := ProtoStoreMsg{
-		Id:       id,
-		Msg:      bytes,
-		ParentId: metadata.ParentId,
-		Revision: metadata.Revision,
-		OrgId:    orgId,
 	}
 
 	rowsAffected, err = p.ds.Helper().UpdateInTable(ctx, datastore.GetTableName(msg), &protoStoreMsg)
@@ -292,22 +271,9 @@ func (p ProtobufDataStore) Upsert(ctx context.Context, id string, msg proto.Mess
 func (p ProtobufDataStore) UpsertWithMetadata(ctx context.Context, id string, msg proto.Message, metadata Metadata) (
 	rowsAffected int64, md Metadata, err error,
 ) {
-	bytes, err := ToBytes(msg)
+	protoStoreMsg, err := p.MsgToPersist(ctx, id, msg, metadata)
 	if err != nil {
 		return 0, Metadata{}, err
-	}
-
-	orgId, err := p.ds.Helper().GetAuthorizer().GetOrgFromContext(ctx)
-	if err != nil {
-		return 0, Metadata{}, err
-	}
-
-	protoStoreMsg := ProtoStoreMsg{
-		Id:       id,
-		Msg:      bytes,
-		ParentId: metadata.ParentId,
-		Revision: metadata.Revision,
-		OrgId:    orgId,
 	}
 
 	rowsAffected, err = p.ds.Helper().UpsertInTable(ctx, datastore.GetTableName(msg), &protoStoreMsg)
@@ -325,15 +291,11 @@ func (p ProtobufDataStore) UpsertWithMetadata(ctx context.Context, id string, ms
 // Finds a Protobuf message by ID.
 // If metadata arg. is non-nil, fills it with the metadata (parent ID & revision) of the Protobuf message that was found.
 func (p ProtobufDataStore) FindById(ctx context.Context, id string, msg proto.Message, metadata *Metadata) error {
-	orgId, err := p.ds.Helper().GetAuthorizer().GetOrgFromContext(ctx)
+	protoStoreMsg, err := p.MsgForFind(ctx, id, msg)
 	if err != nil {
 		return err
 	}
 
-	protoStoreMsg := ProtoStoreMsg{
-		Id:    id,
-		OrgId: orgId,
-	}
 	err = p.ds.Helper().FindInTable(ctx, datastore.GetTableName(msg), &protoStoreMsg)
 	if err != nil {
 		return err
@@ -345,14 +307,9 @@ func (p ProtobufDataStore) FindById(ctx context.Context, id string, msg proto.Me
 }
 
 func (p ProtobufDataStore) GetMetadata(ctx context.Context, id string, msg proto.Message) (md Metadata, err error) {
-	orgId, err := p.ds.Helper().GetAuthorizer().GetOrgFromContext(ctx)
+	protoStoreMsg, err := p.MsgForFind(ctx, id, msg)
 	if err != nil {
 		return md, err
-	}
-
-	protoStoreMsg := ProtoStoreMsg{
-		Id:    id,
-		OrgId: orgId,
 	}
 	err = p.ds.Helper().FindInTable(ctx, datastore.GetTableName(msg), &protoStoreMsg)
 	return MetadataFrom(protoStoreMsg), err
@@ -477,14 +434,9 @@ func (p ProtobufDataStore) FindAll(ctx context.Context, msgs interface{}) (metad
 }
 
 func (p ProtobufDataStore) DeleteById(ctx context.Context, id string, msg proto.Message) (int64, error) {
-	orgId, err := p.ds.Helper().GetAuthorizer().GetOrgFromContext(ctx)
+	protoStoreMsg, err := p.MsgForFind(ctx, id, msg)
 	if err != nil {
 		return 0, err
-	}
-
-	protoStoreMsg := ProtoStoreMsg{
-		Id:    id,
-		OrgId: orgId,
 	}
 	return p.ds.Helper().DeleteInTable(ctx, datastore.GetTableName(msg), &protoStoreMsg)
 }
@@ -498,4 +450,38 @@ func (p ProtobufDataStore) DropTables(msgs ...proto.Message) error {
 		}
 	}
 	return nil
+}
+
+func (p ProtobufDataStore) MsgToPersist(ctx context.Context, id string, msg proto.Message, md Metadata) (ProtoStoreMsg, error) {
+	bytes, err := ToBytes(msg)
+	if err != nil {
+		return ProtoStoreMsg{}, err
+	}
+
+	orgId, err := p.ds.Helper().GetAuthorizer().GetOrgFromContext(ctx)
+	if err != nil {
+		return ProtoStoreMsg{}, err
+	}
+
+	return ProtoStoreMsg{
+		Id:         id,
+		Msg:        bytes,
+		ParentId:   md.ParentId,
+		Revision:   md.Revision,
+		OrgId:      orgId,
+		XTableName: datastore.GetTableName(msg),
+	}, nil
+}
+
+func (p ProtobufDataStore) MsgForFind(ctx context.Context, id string, msg proto.Message) (ProtoStoreMsg, error) {
+	orgId, err := p.ds.Helper().GetAuthorizer().GetOrgFromContext(ctx)
+	if err != nil {
+		return ProtoStoreMsg{}, err
+	}
+
+	return ProtoStoreMsg{
+		Id:         id,
+		OrgId:      orgId,
+		XTableName: datastore.GetTableName(msg),
+	}, nil
 }

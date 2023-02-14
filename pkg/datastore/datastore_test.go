@@ -473,7 +473,7 @@ func TestWithMissingEnvVar(t *testing.T) {
 	} {
 		defer os.Setenv(envVar, os.Getenv(envVar))
 		os.Unsetenv(envVar)
-		_, err := datastore.GetDefaultDatastore(LOG, TestMetadataAuthorizer)
+		_, err := datastore.FromEnv(LOG, TestMetadataAuthorizer)
 		assert.ErrorIs(err, ErrMissingEnvVar)
 	}
 }
@@ -487,7 +487,7 @@ func TestWithEmptyEnvVar(t *testing.T) {
 	} {
 		defer os.Setenv(envVar, os.Getenv(envVar))
 		os.Setenv(envVar, "")
-		_, err := datastore.GetDefaultDatastore(LOG, TestMetadataAuthorizer)
+		_, err := datastore.FromEnv(LOG, TestMetadataAuthorizer)
 		assert.ErrorIs(err, ErrMissingEnvVar)
 	}
 }
@@ -501,7 +501,7 @@ func TestWithBlankEnvVar(t *testing.T) {
 	} {
 		defer os.Setenv(envVar, os.Getenv(envVar))
 		os.Setenv(envVar, "    ")
-		_, err := datastore.GetDefaultDatastore(LOG, TestMetadataAuthorizer)
+		_, err := datastore.FromEnv(LOG, TestMetadataAuthorizer)
 		assert.ErrorIs(err, ErrMissingEnvVar)
 	}
 }

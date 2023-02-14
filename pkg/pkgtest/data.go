@@ -50,7 +50,7 @@ var (
 	PepsiAdminCtx                 = TestMetadataAuthorizer.GetAuthContext(PEPSI, TENANT_ADMIN)
 	PepsiAuditorCtx               = TestMetadataAuthorizer.GetAuthContext(PEPSI, TENANT_AUDITOR)
 
-	TestDataStore, _ = datastore.GetDefaultDatastore(datastore.GetCompLogger(), TestMetadataAuthorizer)
+	TestDataStore, _ = datastore.FromEnv(datastore.GetCompLogger(), TestMetadataAuthorizer)
 	TestProtoStore   = protostore.GetProtoStore(datastore.GetCompLogger(), TestDataStore)
 )
 
