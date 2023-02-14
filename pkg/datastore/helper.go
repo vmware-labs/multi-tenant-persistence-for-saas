@@ -43,54 +43,68 @@ const (
 	DB_ADMIN_PASSWORD_ENV_VAR = "DB_ADMIN_PASSWORD"
 )
 
-func GetDefaultDatastore(logger *logrus.Entry, authorizer authorizer.Authorizer) (d DataStore, err error) {
+type DBConfig struct {
+	host     string
+	port     int
+	username string
+	password string
+	dbName   string
+	sslMode  string
+}
+
+func FromEnv(l *logrus.Entry, authorizer authorizer.Authorizer) (d DataStore, err error) {
 	// Ensure all the needed environment variables are present and non-empty
 	for _, envVar := range []string{
+		DB_HOST_ENV_VAR,
+		DB_PORT_ENV_VAR,
 		DB_ADMIN_USERNAME_ENV_VAR,
 		DB_ADMIN_PASSWORD_ENV_VAR,
-		DB_PORT_ENV_VAR,
-		DB_HOST_ENV_VAR,
 		DB_NAME_ENV_VAR,
 		SSL_MODE_ENV_VAR,
 	} {
 		if _, isPresent := os.LookupEnv(envVar); !isPresent {
 			err = ErrMissingEnvVar.WithValue(ENV_VAR, envVar)
-			logger.Error(err)
+			l.Error(err)
 			return nil, err
 		}
 
 		if envVarValue := strings.TrimSpace(os.Getenv(envVar)); len(envVarValue) == 0 {
 			err = ErrMissingEnvVar.WithValue(ENV_VAR, envVar).WithValue(VALUE, os.Getenv(envVar))
-			logger.Error(err)
+			l.Error(err)
 			return nil, err
 		}
 	}
 
-	dbAdminUsername := dbrole.DbRole(strings.TrimSpace(os.Getenv(DB_ADMIN_USERNAME_ENV_VAR)))
-	dbAdminPassword := strings.TrimSpace(os.Getenv(DB_ADMIN_PASSWORD_ENV_VAR))
-	dbName := strings.TrimSpace(os.Getenv(DB_NAME_ENV_VAR))
-	dbHost := strings.TrimSpace(os.Getenv(DB_HOST_ENV_VAR))
-	sslMode := strings.TrimSpace(os.Getenv(SSL_MODE_ENV_VAR))
-	var dbPort int
+	var cfg DBConfig
 
+	cfg.host = strings.TrimSpace(os.Getenv(DB_HOST_ENV_VAR))
 	// Ensure port number is valid
-	if dbPort, err = strconv.Atoi(strings.TrimSpace(os.Getenv(DB_PORT_ENV_VAR))); err != nil {
+	if cfg.port, err = strconv.Atoi(strings.TrimSpace(os.Getenv(DB_PORT_ENV_VAR))); err != nil {
 		err = ErrInvalidPortNumber.Wrap(err).WithValue(ENV_VAR, DB_PORT_ENV_VAR).WithValue(VALUE, os.Getenv(DB_PORT_ENV_VAR))
-		logger.Error(err)
+		l.Error(err)
 		return nil, err
 	}
+	cfg.username = strings.TrimSpace(os.Getenv(DB_ADMIN_USERNAME_ENV_VAR))
+	cfg.password = strings.TrimSpace(os.Getenv(DB_ADMIN_PASSWORD_ENV_VAR))
+	cfg.dbName = strings.TrimSpace(os.Getenv(DB_NAME_ENV_VAR))
+	cfg.sslMode = strings.TrimSpace(os.Getenv(SSL_MODE_ENV_VAR))
 
-	fromEnv := func(db *relationalDb, dbRole dbrole.DbRole) error {
+	return FromConfig(l, authorizer, cfg)
+}
+
+func FromConfig(l *logrus.Entry, authorizer authorizer.Authorizer, cfg DBConfig) (d DataStore, err error) {
+	gl := gormLogger{log: l}
+	dbConnInitializer := func(db *relationalDb, dbRole dbrole.DbRole) error {
 		if dbRole == MAIN {
 			// Create DB connections
-			db.gormDBMap[MAIN], err = openDb(dbHost, dbPort, dbAdminUsername, dbAdminPassword, dbName, sslMode)
+			db.gormDBMap[MAIN], err = openDb(gl, cfg.host, cfg.port, cfg.username, cfg.password, cfg.dbName, cfg.sslMode)
 			if err != nil {
 				args := map[ErrorContextKey]string{
-					DB_HOST:           dbHost,
-					DB_PORT:           strconv.Itoa(dbPort),
-					DB_ADMIN_USERNAME: string(dbAdminUsername),
-					DB_NAME:           dbName,
-					SSL_MODE:          sslMode,
+					DB_HOST:           cfg.host,
+					DB_PORT:           strconv.Itoa(cfg.port),
+					DB_ADMIN_USERNAME: cfg.username,
+					DB_NAME:           cfg.dbName,
+					SSL_MODE:          cfg.sslMode,
 				}
 				err = ErrConnectingToDb.WithMap(args).Wrap(err)
 				db.logger.Error(err)
@@ -110,22 +124,22 @@ func GetDefaultDatastore(logger *logrus.Entry, authorizer authorizer.Authorizer)
 		}
 
 		dbUserSpec := getDbUser(dbRole)
-		db.logger.Infof("Connecting to database %s@%s:%d[%s] ...", dbUserSpec.username, dbHost, dbPort, dbName)
-		db.gormDBMap[dbUserSpec.username], err = openDb(dbHost, dbPort, dbUserSpec.username, dbUserSpec.password, dbName, sslMode)
+		db.logger.Infof("Connecting to database %s@%s:%d[%s] ...", dbUserSpec.username, cfg.host, cfg.port, cfg.dbName)
+		db.gormDBMap[dbUserSpec.username], err = openDb(gl, cfg.host, cfg.port, string(dbUserSpec.username), dbUserSpec.password, cfg.dbName, cfg.sslMode)
 		if err != nil {
 			args := map[ErrorContextKey]string{
-				DB_HOST:     dbHost,
-				DB_PORT:     strconv.Itoa(dbPort),
+				DB_HOST:     cfg.host,
+				DB_PORT:     strconv.Itoa(cfg.port),
 				DB_USERNAME: string(dbUserSpec.username),
-				DB_NAME:     dbName,
-				SSL_MODE:    sslMode,
+				DB_NAME:     cfg.dbName,
+				SSL_MODE:    cfg.sslMode,
 			}
 			err = ErrConnectingToDb.WithMap(args).Wrap(err)
 			db.logger.Error(err)
 			return err
 		}
 		db.logger.Infof("Connecting to database %s@%s:%d[%s] succeeded",
-			dbUserSpec.username, dbHost, dbPort, dbName)
+			dbUserSpec.username, cfg.host, cfg.port, cfg.dbName)
 		if _, ok := db.gormDBMap[dbRole]; ok {
 			return nil
 		}
@@ -135,23 +149,20 @@ func GetDefaultDatastore(logger *logrus.Entry, authorizer authorizer.Authorizer)
 	return &relationalDb{
 		authorizer:  authorizer,
 		gormDBMap:   make(map[dbrole.DbRole]*gorm.DB),
-		initializer: fromEnv,
-		logger:      logger,
+		initializer: dbConnInitializer,
+		logger:      l,
 	}, nil
 }
 
 // Opens a Postgres DB using the provided config. parameters.
-func openDb(dbHost string, dbPort int, dbUsername dbrole.DbRole, dbPassword string,
-	dbName string, sslMode string,
-) (tx *gorm.DB, err error) {
+func openDb(l logger.Interface, dbHost string, dbPort int, dbUsername, dbPassword, dbName, sslMode string) (tx *gorm.DB, err error) {
 	// Create DB connection
 	dataSourceName := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		dbHost, dbPort, dbUsername, dbPassword, dbName, sslMode)
 	db, err := gorm.Open(postgres.Open(dataSourceName),
 		&gorm.Config{
-			Logger: logger.Default.LogMode(logger.Info),
-		},
-	)
+			Logger: l,
+		})
 	if err != nil {
 		return nil, err
 	}

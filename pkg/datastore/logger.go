@@ -19,10 +19,13 @@
 package datastore
 
 import (
+	"context"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
+	"gorm.io/gorm/logger"
 )
 
 const (
@@ -37,6 +40,7 @@ const (
 func GetLogger() *logrus.Logger {
 	log := logrus.New()
 	log.SetFormatter(&logrus.TextFormatter{
+		ForceColors:     true,
 		FullTimestamp:   true,
 		TimestampFormat: "2006-01-02T15:04:05.000",
 	})
@@ -51,4 +55,31 @@ func GetLogger() *logrus.Logger {
 
 func GetCompLogger() *logrus.Entry {
 	return GetLogger().WithField(COMP, SAAS_PERSISTENCE)
+}
+
+type gormLogger struct {
+	log *logrus.Entry
+}
+
+func (l gormLogger) LogMode(level logger.LogLevel) logger.Interface {
+	newlogger := l
+	return newlogger
+}
+
+func (l gormLogger) Info(ctx context.Context, msg string, data ...interface{}) {
+	l.log.WithContext(ctx).Infof(msg, data...)
+}
+
+// Warn print warn messages.
+func (l gormLogger) Warn(ctx context.Context, msg string, data ...interface{}) {
+	l.log.WithContext(ctx).Warnf(msg, data...)
+}
+
+// Error print error messages.
+func (l gormLogger) Error(ctx context.Context, msg string, data ...interface{}) {
+	l.log.WithContext(ctx).Errorf(msg, data...)
+}
+
+func (l gormLogger) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
+	// TBD
 }
