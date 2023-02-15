@@ -29,8 +29,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
 	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/errors"
-	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/pkgtest"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/protostore"
+	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/test"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/test/pb"
 	"google.golang.org/protobuf/proto"
 )

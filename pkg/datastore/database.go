@@ -49,8 +49,7 @@ import (
 )
 
 const (
-	DbConfigOrgId               = "multitenant.orgId" // Name of Postgres run-time config. parameter that will store current user's org. ID
-	MAIN          dbrole.DbRole = "main"
+	DbConfigOrgId = "multitenant.orgId" // Name of Postgres run-time config. parameter that will store current user's org. ID
 )
 
 /*
@@ -90,8 +89,6 @@ func (db *relationalDb) getDBTransaction(ctx context.Context, tableName string, 
 	// allow the operation to proceed.
 	if dbRole.IsDbRoleTenantScoped() && IsMultitenant(record, tableName) {
 		orgIdCol, _ := GetOrgId(record)
-		err = ErrOperationNotAllowed.WithValue("tenant", orgId).WithValue("orgIdCol", orgIdCol)
-		db.logger.Error(err.Error())
 		if orgIdCol != "" && orgIdCol != orgId {
 			err = ErrOperationNotAllowed.WithValue("tenant", orgId).WithValue("orgIdCol", orgIdCol)
 			db.logger.Error(err)
@@ -298,7 +295,7 @@ func (db *relationalDb) Delete(ctx context.Context, record Record) (rowsAffected
  */
 func (db *relationalDb) DropTables(records ...Record) error {
 	for _, record := range records {
-		tx, err := db.GetDBConn(MAIN)
+		tx, err := db.GetDBConn(dbrole.MAIN)
 		if err != nil {
 			return err
 		}
@@ -320,7 +317,7 @@ func (db *relationalDb) TruncateCascade(cascade bool, tableNames ...string) (err
 	// Truncate DB tables
 	for _, tableName := range tableNames {
 		stmt := getTruncateTableStmt(tableName, cascade)
-		tx, err := db.GetDBConn(MAIN)
+		tx, err := db.GetDBConn(dbrole.MAIN)
 		if err != nil {
 			return err
 		}
@@ -435,7 +432,7 @@ func (db *relationalDb) RegisterWithDALHelper(_ context.Context, roleMapping map
 
 	db.logger.Debugf("Registering the struct %q with DAL (backed by Postgres)... Using authorizer %s...", tableName, GetTableName(db.authorizer))
 
-	tx, err := db.GetDBConn(MAIN)
+	tx, err := db.GetDBConn(dbrole.MAIN)
 	if err != nil {
 		return err
 	}
@@ -456,7 +453,7 @@ func (db *relationalDb) RegisterWithDALHelper(_ context.Context, roleMapping map
 	// Enable row-level security in a multi-tenant table
 	if IsMultitenant(record, tableName) {
 		stmt := getEnableRLSStmt(tableName, record)
-		if tx := db.gormDBMap[MAIN].Exec(stmt); tx.Error != nil {
+		if tx := db.gormDBMap[dbrole.MAIN].Exec(stmt); tx.Error != nil {
 			err = ErrRegisteringStruct.Wrap(tx.Error).WithMap(map[ErrorContextKey]string{
 				TABLE_NAME: tableName,
 				SQL_STMT:   stmt,
@@ -488,21 +485,21 @@ If not, update is rejected.
 func (db *relationalDb) enforceRevisioning(tableName string) (err error) {
 	functionName, functionBody := getCheckAndUpdateRevisionFunc()
 	stmt := getCreateTriggerFunctionStmt(functionName, functionBody)
-	if tx := db.gormDBMap[MAIN].Exec(stmt); tx.Error != nil {
+	if tx := db.gormDBMap[dbrole.MAIN].Exec(stmt); tx.Error != nil {
 		err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
 		db.logger.Error(err)
 		return err
 	}
 
 	stmt = getDropTriggerStmt(tableName, functionName)
-	if tx := db.gormDBMap[MAIN].Exec(stmt); tx.Error != nil {
+	if tx := db.gormDBMap[dbrole.MAIN].Exec(stmt); tx.Error != nil {
 		err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
 		db.logger.Error(err)
 		return err
 	}
 
 	stmt = getCreateTriggerStmt(tableName, functionName)
-	if tx := db.gormDBMap[MAIN].Exec(stmt); tx.Error != nil {
+	if tx := db.gormDBMap[dbrole.MAIN].Exec(stmt); tx.Error != nil {
 		err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
 		db.logger.Error(err)
 		return err
@@ -515,7 +512,7 @@ func (db *relationalDb) enforceRevisioning(tableName string) (err error) {
 // to the user (e.g., SELECT only; SELECT, INSERT, UPDATE, DELETE). Creates RLS-policy if the table is multi-tenant.
 func (db *relationalDb) createDbUser(dbUserSpecs dbUserSpecs, tableName string, record Record) (err error) {
 	stmt := getGrantPrivilegesStmt(tableName, string(dbUserSpecs.username), dbUserSpecs.commands)
-	if tx := db.gormDBMap[MAIN].Exec(stmt); tx.Error != nil {
+	if tx := db.gormDBMap[dbrole.MAIN].Exec(stmt); tx.Error != nil {
 		err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
 		db.logger.Error(err)
 		return err
@@ -523,7 +520,7 @@ func (db *relationalDb) createDbUser(dbUserSpecs dbUserSpecs, tableName string, 
 
 	if IsMultitenant(record, tableName) {
 		stmt = getCreatePolicyStmt(tableName, record, dbUserSpecs)
-		if tx := db.gormDBMap[MAIN].Exec(stmt); tx.Error != nil {
+		if tx := db.gormDBMap[dbrole.MAIN].Exec(stmt); tx.Error != nil {
 			err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
 			db.logger.Error(err)
 			return err

@@ -23,7 +23,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/datastore"
-	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/pkgtest"
+	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/test"
 )
 
 /*

@@ -95,9 +95,9 @@ func FromEnv(l *logrus.Entry, authorizer authorizer.Authorizer) (d DataStore, er
 func FromConfig(l *logrus.Entry, authorizer authorizer.Authorizer, cfg DBConfig) (d DataStore, err error) {
 	gl := gormLogger{log: l}
 	dbConnInitializer := func(db *relationalDb, dbRole dbrole.DbRole) error {
-		if dbRole == MAIN {
+		if dbRole == dbrole.MAIN {
 			// Create DB connections
-			db.gormDBMap[MAIN], err = openDb(gl, cfg.host, cfg.port, cfg.username, cfg.password, cfg.dbName, cfg.sslMode)
+			db.gormDBMap[dbrole.MAIN], err = openDb(gl, cfg.host, cfg.port, cfg.username, cfg.password, cfg.dbName, cfg.sslMode)
 			if err != nil {
 				args := map[ErrorContextKey]string{
 					DB_HOST:           cfg.host,
@@ -114,7 +114,7 @@ func FromConfig(l *logrus.Entry, authorizer authorizer.Authorizer, cfg DBConfig)
 			// Create Users when the MAIN connection to DB is established
 			for _, dbUserSpec := range getAllDbUsers() {
 				stmt := getCreateUserStmt(string(dbUserSpec.username), dbUserSpec.password)
-				if tx := db.gormDBMap[MAIN].Exec(stmt); tx.Error != nil {
+				if tx := db.gormDBMap[dbrole.MAIN].Exec(stmt); tx.Error != nil {
 					err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
 					db.logger.Errorln(err)
 					return err

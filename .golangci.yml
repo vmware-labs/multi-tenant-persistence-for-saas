@@ -175,9 +175,9 @@ issues:
     - path: pkg/datastore/sql_struct.go
       linters:
         - gochecknoglobals
-    - path: pkg/pkgtest/data.go
+    - path: test/data.go
       linters:
         - gochecknoglobals
-    - path: pkg/pkgtest/helper.go
+    - path: test/helper.go
       linters:
         - gomnd
