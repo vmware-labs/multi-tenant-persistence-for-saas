@@ -41,6 +41,7 @@ const (
 	READER        DbRole = "reader"
 	TENANT_WRITER DbRole = "tenant_writer"
 	WRITER        DbRole = "writer"
+	MAIN          DbRole = "main"
 )
 
 // Returns *Ordered* slice of DbRoles.
@@ -55,6 +56,7 @@ func DbRoles() DbRoleSlice {
 		READER,
 		TENANT_WRITER,
 		WRITER,
+		MAIN,
 	}
 }
 

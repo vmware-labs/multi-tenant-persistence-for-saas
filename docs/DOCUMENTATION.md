@@ -120,13 +120,6 @@ import "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/datastore"
 
 ```go
 const (
-    DbConfigOrgId               = "multitenant.orgId" // Name of Postgres run-time config. parameter that will store current user's org. ID
-    MAIN          dbrole.DbRole = "main"
-)
-```
-
-```go
-const (
     // Env. variable names.
     DB_NAME_ENV_VAR           = "DB_NAME"
     DB_PORT_ENV_VAR           = "DB_PORT"
@@ -159,6 +152,12 @@ const (
 
     // Messages.
     REVISION_OUTDATED_MSG = "Invalid update - outdated "
+)
+```
+
+```go
+const (
+    DbConfigOrgId = "multitenant.orgId" // Name of Postgres run-time config. parameter that will store current user's org. ID
 )
 ```
 
@@ -353,22 +352,23 @@ const (
     READER        DbRole = "reader"
     TENANT_WRITER DbRole = "tenant_writer"
     WRITER        DbRole = "writer"
+    MAIN          DbRole = "main"
 )
 ```
 
-### func \(DbRole\) [IsDbRoleTenantScoped](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L66>)
+### func \(DbRole\) [IsDbRoleTenantScoped](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L68>)
 
 ```go
 func (dbRole DbRole) IsDbRoleTenantScoped() bool
 ```
 
-## type [DbRoleSlice](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L61>)
+## type [DbRoleSlice](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L63>)
 
 ```go
 type DbRoleSlice []DbRole // Needed for sorting records
 ```
 
-### func [DbRoles](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L51>)
+### func [DbRoles](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L52>)
 
 ```go
 func DbRoles() DbRoleSlice
@@ -376,13 +376,13 @@ func DbRoles() DbRoleSlice
 
 Returns \*Ordered\* slice of DbRoles. A reader role is always considered to have fewer permissions than a writer role. and a tenant\-specific reader/writer role is always considered to have fewer permissions, than a non\-tenant specific reader/writer role, respectively. NO\_ROLE \< TENANT\_READER \< READER \< TENANT\_WRITER \< WRITER.
 
-### func \(DbRoleSlice\) [Len](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L62>)
+### func \(DbRoleSlice\) [Len](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L64>)
 
 ```go
 func (a DbRoleSlice) Len() int
 ```
 
-### func \(DbRoleSlice\) [Less](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L83>)
+### func \(DbRoleSlice\) [Less](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L85>)
 
 ```go
 func (a DbRoleSlice) Less(i, j int) bool
@@ -390,7 +390,7 @@ func (a DbRoleSlice) Less(i, j int) bool
 
 Returns true if the first role has fewer permissions than the second role, and true if the two roles are the same or the second role has more permissions.
 
-### func \(DbRoleSlice\) [Swap](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L87>)
+### func \(DbRoleSlice\) [Swap](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L89>)
 
 ```go
 func (a DbRoleSlice) Swap(i, j int)
