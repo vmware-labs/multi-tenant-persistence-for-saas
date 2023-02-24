@@ -3,6 +3,7 @@
 [![GitHub Actions](https://github.com/vmware-labs/multi-tenant-persistence-for-saas/actions/workflows/go.yml/badge.svg)](https://github.com/vmware-labs/multi-tenant-persistence-for-saas/actions?query=branch%3Amaster)
 [![Go Reference](https://pkg.go.dev/badge/github.com/vmware-labs/multi-tenant-persistence-for-saas/)](https://pkg.go.dev/github.com/vmware-labs/multi-tenant-persistence-for-saas)
 [![Code Coverage](https://codecov.io/gh/vmware-labs/multi-tenant-persistence-for-saas/branch/main/graph/badge.svg?token=F7TQPSFEMCN)](https://app.codecov.io/gh/vmware-labs/multi-tenant-persistence-for-saas)
+[![Daily](https://github.com/vmware-labs/multi-tenant-persistence-for-saas/actions/workflows/daily.yml/badge.svg)](https://github.com/vmware-labs/multi-tenant-persistence-for-saas/actions/workflows/daily.yml)
 
 
 ## Overview
@@ -70,22 +71,13 @@ Currently, following features are supported:
 
 Following interfaces are exposed by the Golang library to be consumed by the user of this library,
 
-### [Authorizer](docs/DOCUMENTATION.md#type-authorizer)
+### [Authorizer](docs/DOCUMENTATION.md#authorizer)
 
-### [Record](docs/DOCUMENTATION.md#type-record)
+### [DataStore](docs/DOCUMENTATION.md#datastore)
 
-### [DataStore](docs/DOCUMENTATION.md#type-datastore)
-
-### [ProtoStore](docs/DOCUMENTATION.md#type-protostore)
+### [ProtoStore](docs/DOCUMENTATION.md#protostore)
 
 ## Getting Started
-
-Import the package and use `DataStore` object to interact with the data access
-layer. If you want DAL to use a Postgres database, ensure you have the following
-environment variables set to relevant values: *DB_ADMIN_USERNAME*, *DB_PORT*,
-*DB_NAME*, *DB_ADMIN_PASSWORD*, *DB_HOST*, *SSL_MODE*. You can also set
-*LOG_LEVEL* environment variable if you want logging at a specific level
-(default is _Info_)
 
 ## Future Support
 

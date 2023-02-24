@@ -20,8 +20,8 @@ if [[ $(uname -s) == "Linux" ]]; then
   fi
   su - postgres -c "psql << end_of_sql
 alter user postgres with password 'postgres';
-drop database test_tmp_db_;
-create database test_tmp_db_;
+drop database tmp_db;
+create database tmp_db;
 end_of_sql"
 
 elif [[ $(uname -s) == "Darwin" ]]; then
@@ -36,11 +36,11 @@ elif [[ $(uname -s) == "Darwin" ]]; then
     brew services info postgresql@14 --json | jq '.[0].running' | grep true
     echo "postgresql: Installation successful"
   fi
-  dropdb test_tmp_db_ --if-exists
-  createdb test_tmp_db_
-  echo "create user postgres superuser" | psql test_tmp_db_ || echo "User postgres exists"
-  echo "alter user postgres with password 'postgres'" | psql test_tmp_db_
-  echo "alter user postgres with superuser;" | psql test_tmp_db_
+  dropdb tmp_db --if-exists
+  createdb tmp_db
+  echo "create user postgres superuser" | psql tmp_db || echo "User postgres exists"
+  echo "alter user postgres with password 'postgres'" | psql tmp_db
+  echo "alter user postgres with superuser;" | psql tmp_db
 fi
 
-export DB_NAME=test_tmp_db_ DB_PORT=5432 DB_ADMIN_USERNAME=postgres DB_ADMIN_PASSWORD=postgres DB_HOST=localhost SSL_MODE=disable
+export DB_NAME=tmp_db DB_PORT=5432 DB_ADMIN_USERNAME=postgres DB_ADMIN_PASSWORD=postgres DB_HOST=localhost SSL_MODE=disable

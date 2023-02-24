@@ -93,8 +93,10 @@ func FromEnv(l *logrus.Entry, authorizer authorizer.Authorizer) (d DataStore, er
 }
 
 func FromConfig(l *logrus.Entry, authorizer authorizer.Authorizer, cfg DBConfig) (d DataStore, err error) {
-	gl := gormLogger{log: l}
+	gl := GetGormLogger(l)
 	dbConnInitializer := func(db *relationalDb, dbRole dbrole.DbRole) error {
+		db.Lock()
+		defer db.Unlock()
 		if dbRole == dbrole.MAIN {
 			// Create DB connections
 			db.gormDBMap[dbrole.MAIN], err = openDb(gl, cfg.host, cfg.port, cfg.username, cfg.password, cfg.dbName, cfg.sslMode)
@@ -116,9 +118,23 @@ func FromConfig(l *logrus.Entry, authorizer authorizer.Authorizer, cfg DBConfig)
 				stmt := getCreateUserStmt(string(dbUserSpec.username), dbUserSpec.password)
 				if tx := db.gormDBMap[dbrole.MAIN].Exec(stmt); tx.Error != nil {
 					err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
+					// Suppresses following duplicate insertion error,
+					// ERROR: duplicate key value violates unique constraint
+					// "pg_authid_rolname_index" (SQLSTATE 23505)
+					if strings.Contains(tx.Error.Error(), "duplicate key value") {
+						db.logger.Infoln(tx.Error)
+						return nil
+					}
 					db.logger.Errorln(err)
 					return err
 				}
+			}
+			functionName, functionBody := getCheckAndUpdateRevisionFunc()
+			stmt := getCreateTriggerFunctionStmt(functionName, functionBody)
+			if tx := db.gormDBMap[dbrole.MAIN].Exec(stmt); tx.Error != nil {
+				err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
+				db.logger.Error(err)
+				return err
 			}
 			return nil
 		}
@@ -159,6 +175,7 @@ func openDb(l logger.Interface, dbHost string, dbPort int, dbUsername, dbPasswor
 	// Create DB connection
 	dataSourceName := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		dbHost, dbPort, dbUsername, dbPassword, dbName, sslMode)
+	_ = l
 	db, err := gorm.Open(postgres.Open(dataSourceName),
 		&gorm.Config{
 			Logger: l,

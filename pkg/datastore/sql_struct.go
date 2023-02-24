@@ -40,8 +40,6 @@ const (
 	REVISION_OUTDATED_MSG = "Invalid update - outdated "
 )
 
-var LOG = GetCompLogger()
-
 // Maps a DB table name to booleans showing if the table is multitenant.
 var multitenancyMap = make(map[string]bool)
 
@@ -110,7 +108,7 @@ func getSetConfigStmt(settingName, settingValue string) string {
 	stmt.WriteString("='")
 	stmt.WriteString(settingValue)
 	stmt.WriteString("';")
-	LOG.Debugf("[SQL] %s", stmt.String())
+	TRACE("[SQL] %s", stmt.String())
 	return stmt.String()
 }
 
@@ -120,7 +118,7 @@ func getEnableRLSStmt(tableName string, _ Record) string {
 	stmt.WriteString("ALTER TABLE ")
 	stmt.WriteString(tableName)
 	stmt.WriteString(" ENABLE ROW LEVEL SECURITY;")
-	LOG.Debugf("[SQL] %s", stmt.String())
+	TRACE("[SQL] %s", stmt.String())
 	return stmt.String()
 }
 
@@ -139,7 +137,7 @@ func getCreateUserStmt(username string, password string) string {
 
 	stmt := addIfNotExists(createUserStmt.String(), findRoleQuery.String())
 	sanitizedStmt := strings.ReplaceAll(stmt, password, "*******")
-	LOG.Debugf("[SQL] %s", sanitizedStmt)
+	TRACE("[SQL] %s", sanitizedStmt)
 	return stmt
 }
 
@@ -152,7 +150,7 @@ func getGrantPrivilegesStmt(tableName string, username string, commands []string
 	stmt.WriteString(" TO ")
 	stmt.WriteString(username)
 	stmt.WriteString(";")
-	LOG.Debugf("[SQL] %s", stmt.String())
+	TRACE("[SQL] %s", stmt.String())
 	return stmt.String()
 }
 
@@ -182,18 +180,30 @@ func getCreatePolicyStmt(tableName string, _ Record, userSpecs dbUserSpecs) stri
 	createPolicyStmt.WriteString(")")
 
 	stmt := addIfNotExists(createPolicyStmt.String(), findPolicyQuery.String())
-	LOG.Debugf("[SQL] %s", stmt)
+	TRACE("[SQL] %s", stmt)
 	return stmt
 }
 
-func TypeName(x interface{}) (typeName string) {
+func typeName(x interface{}, prefix string) string {
 	t := reflect.TypeOf(x)
+	TRACE("type for %+v is %s\n", x, t.Kind())
 	for t.Kind() == reflect.Ptr {
 		t = t.Elem()
-		typeName += "*"
+		prefix += "*"
 	}
-	typeName += t.Name()
-	return
+	for t.Kind() == reflect.Slice {
+		t = t.Elem()
+		prefix += "[]"
+	}
+	for t.Kind() == reflect.Ptr {
+		t = t.Elem()
+		prefix += "*"
+	}
+	return prefix + t.Name()
+}
+
+func TypeName(x interface{}) string {
+	return typeName(x, "")
 }
 
 func IsPointerToStruct(x interface{}) (isPtrType bool) {
@@ -204,34 +214,23 @@ func IsPointerToStruct(x interface{}) (isPtrType bool) {
 
 // Validates tenancy information and returns a transaction with right dbRole.
 func schemaParse(x interface{}) (*schema.Schema, error) {
+	TRACE("Parsing schema for %s, %+v", TypeName(x), x)
 	s, err := schema.Parse(x, &sync.Map{}, schema.NamingStrategy{})
 	if err != nil {
-		LOG.Errorf("Unable to parse schema: %+v, %e", TypeName(x), err)
+		TRACE("Unable to parse schema: %s, %+v, %e", TypeName(x), x, err)
 	}
 	return s, err
 }
 
 // Extracts struct's name, which will serve as DB table name, using reflection.
-func GetTableName(x interface{}) string {
+func GetTableName(x interface{}) (tableName string) {
 	if t, ok := x.(schema.Tabler); ok {
-		return t.TableName()
+		tableName = t.TableName()
+	} else {
+		s, _ := schemaParse(x)
+		tableName = s.Table
 	}
-	s, _ := schemaParse(x)
-	return s.Table
-}
-
-// Extracts name of a struct comprising the input slice.
-func GetTableNameFromSlice(x interface{}) string {
-	sliceType := reflect.TypeOf(x)
-	if sliceType.Kind() == reflect.Ptr {
-		sliceType = sliceType.Elem()
-	}
-
-	sliceElemType := sliceType.Elem()
-	if sliceElemType.Kind() == reflect.Ptr {
-		sliceElemType = sliceElemType.Elem()
-	}
-	tableName := GetTableName(reflect.New(sliceElemType).Interface())
+	TRACE("TableName is %s for %+v\n", tableName, x)
 	return tableName
 }
 
@@ -258,7 +257,7 @@ func getDropTriggerStmt(tableName, functionName string) string {
 	stmt.WriteString(" ON ")
 	stmt.WriteString(tableName)
 	stmt.WriteString(" RESTRICT;")
-	LOG.Debugf("[SQL] %s", stmt.String())
+	TRACE("[SQL] %s", stmt.String())
 	return stmt.String()
 }
 
@@ -278,7 +277,7 @@ func getCreateTriggerStmt(tableName, functionName string) string {
 	stmt.WriteString("\tEXECUTE FUNCTION ")
 	stmt.WriteString(functionName)
 
-	LOG.Debugf("[SQL] %s", stmt.String())
+	TRACE("[SQL] %s", stmt.String())
 	return stmt.String()
 }
 
@@ -330,7 +329,7 @@ func getCreateTriggerFunctionStmt(functionName, functionBody string) string {
 	stmt.WriteString(functionBody)
 	stmt.WriteString("\n\tEND;\n")
 	stmt.WriteString("$$ LANGUAGE PLPGSQL;")
-	LOG.Debugf("[SQL] %s", stmt.String())
+	TRACE("[SQL] %s", stmt.String())
 	return stmt.String()
 }
 

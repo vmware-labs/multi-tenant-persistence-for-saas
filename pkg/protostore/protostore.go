@@ -16,59 +16,52 @@
 // specific language governing permissions and limitations
 // under the License.
 
-/*
-This package exposes `ProtoStore` interface to the consumer, which is a wrapper
-around `DataStore` interface and is used specifically to persist Protobuf messages.
-Just as with `DataStore`, Protobuf messages can be persisted with revisioning and
-multi-tenancy support along with `CreatedAt` and `UpdatedAt` timestamps.
-
-### ProtoStore Example
-
-```go
-
-	// Import the package in your microservice
-	import "github.com/vmware-labs/multi-tenant-persistence-for-saas/data-access-layer/datastore"
-
-	// Initialize protostore with proper logger and role Mappings
-	protoStore := datastore.GetProtoStore(myLogger, myDatastore)
-	roleMappingForMemory := map[string]DbRole{
-	  APP_ADMIN:     datastore.READER,
-	    SERVICE_ADMIN: datastore.WRITER,
-	}
-	protoStore.Register(context.TODO(), roleMappingForMemory, &pb.Memory{})
-
-	// Store protobuf message using Upsert
-	id := "001"
-	memory := pb.Memory{
-	  Brand: "Samsung",
-	  Size:  32,
-	  Speed: 2933,
-	  Type:  "DDR4",
-	}
-	protoStore.Upsert(ctx, id, &memory)
-
-	// Retrieve protobuf message using ID
-	memory = pb.Memory{}
-	var metadata = Metadata{}
-	protoStore.FindById(ctx, id, &memory, &metadata)
-
-	// Update the protobuf message with metadata (existing revision)
-	memory.Speed++
-	protoStore.UpdateWithMetadata(ctx, id, &memory, metadata)
-
-	// Retrieve all the protobuf messages
-	var queryResults = make([]*pb.Memory, 0)
-	metadataMap, _ := protoStore.FindAll(ctx, queryResults)
-
-	// Update the protobuf without metadata (without revision, NOT RECOMMENDED)
-	memory.Speed++
-	protoStore.Update(ctx, id, memory) //Update()
-
-	// Delete the protobuf
-	protoStore.DeleteById(ctx, id, &pb.Memory{})
-
-```
-*/
+// This package exposes interface [pkg.protostore.ProtoStore] to the consumer, which is a wrapper
+// around [pkg.datastore.DataStore] interface and is used specifically to persist Protobuf messages.
+// Just as with [pkg.datastore.DataStore], Protobuf messages can be persisted with revisioning and
+// multi-tenancy support along with `CreatedAt` and `UpdatedAt` timestamps.
+//
+// Sample Usage,
+//
+//	import "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/protostore"
+//
+//	// Initialize protostore with proper logger and role Mappings
+//	protoStore := protostore.GetProtoStore(myLogger, myDatastore)
+//	roleMappingForMemory := map[string]DbRole{
+//		APP_ADMIN:     datastore.READER,
+//	    SERVICE_ADMIN: datastore.WRITER,
+//	}
+//	protoStore.Register(context.TODO(), roleMappingForMemory, &pb.Memory{})
+//
+//	// Store protobuf message using Upsert
+//	id := "001"
+//	memory := pb.Memory{
+//	  Brand: "Samsung",
+//	  Size:  32,
+//	  Speed: 2933,
+//	  Type:  "DDR4",
+//	}
+//	protoStore.Upsert(ctx, id, &memory)
+//
+//	// Retrieve protobuf message using ID
+//	memory = pb.Memory{}
+//	var metadata = Metadata{}
+//	protoStore.FindById(ctx, id, &memory, &metadata)
+//
+//	// Update the protobuf message with metadata (existing revision)
+//	memory.Speed++
+//	protoStore.UpdateWithMetadata(ctx, id, &memory, metadata)
+//
+//	// Retrieve all the protobuf messages
+//	var queryResults = make([]*pb.Memory, 0)
+//	metadataMap, _ := protoStore.FindAll(ctx, queryResults)
+//
+//	// Update the protobuf without metadata (without revision, NOT RECOMMENDED)
+//	memory.Speed++
+//	protoStore.Update(ctx, id, memory) //Update()
+//
+//	// Delete the protobuf
+//	protoStore.DeleteById(ctx, id, &pb.Memory{})
 package protostore
 
 import (
@@ -102,6 +95,9 @@ type ProtoStore interface {
 
 	GetMetadata(ctx context.Context, id string, msg proto.Message) (md Metadata, err error)
 	GetRevision(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, err error)
+
+	MsgToFilter(ctx context.Context, id string, msg proto.Message) (pMsg *ProtoStoreMsg, err error)
+	MsgToPersist(ctx context.Context, id string, msg proto.Message, md Metadata) (pMsg *ProtoStoreMsg, err error)
 
 	GetAuthorizer() authorizer.Authorizer
 	DropTables(msgs ...proto.Message) error
@@ -170,12 +166,17 @@ func GetProtoStore(logger *logrus.Entry, ds datastore.DataStore) ProtoStore {
 }
 
 func (p ProtobufDataStore) GetAuthorizer() authorizer.Authorizer {
-	return p.ds.Helper().GetAuthorizer()
+	return p.ds.GetAuthorizer()
 }
 
 func (p ProtobufDataStore) Register(ctx context.Context, roleMapping map[string]dbrole.DbRole, msgs ...proto.Message) error {
 	for _, msg := range msgs {
-		err := p.ds.Helper().RegisterWithDALHelper(ctx, roleMapping, datastore.GetTableName(msg), ProtoStoreMsg{XTableName: datastore.GetTableName(msg)})
+		pMsg, err := p.MsgToFilter(ctx, "", msg)
+		if err != nil {
+			p.logger.Errorf("Registering proto message %s failed with error: %v", msg, err)
+			return err
+		}
+		err = p.ds.RegisterWithDAL(ctx, roleMapping, pMsg)
 		if err != nil {
 			p.logger.Errorf("Registering proto message %s failed with error: %v", msg, err)
 			return err
@@ -207,11 +208,11 @@ func (p ProtobufDataStore) InsertWithMetadata(ctx context.Context, id string, ms
 		protoStoreMsg.Revision = 1
 	}
 
-	rowsAffected, err = p.ds.Helper().InsertInTable(ctx, datastore.GetTableName(msg), &protoStoreMsg)
+	rowsAffected, err = p.ds.Insert(ctx, protoStoreMsg)
 	if err != nil {
 		return 0, Metadata{}, err
 	}
-	metadata = MetadataFrom(protoStoreMsg)
+	metadata = MetadataFrom(*protoStoreMsg)
 	return rowsAffected, metadata, nil
 }
 
@@ -237,8 +238,8 @@ func (p ProtobufDataStore) UpdateWithMetadata(ctx context.Context, id string, ms
 		return 0, Metadata{}, err
 	}
 
-	rowsAffected, err = p.ds.Helper().UpdateInTable(ctx, datastore.GetTableName(msg), &protoStoreMsg)
-	metadata = MetadataFrom(protoStoreMsg)
+	rowsAffected, err = p.ds.Update(ctx, protoStoreMsg)
+	metadata = MetadataFrom(*protoStoreMsg)
 	if err != nil {
 		return 0, Metadata{}, err
 	} else if rowsAffected == 1 {
@@ -276,7 +277,7 @@ func (p ProtobufDataStore) UpsertWithMetadata(ctx context.Context, id string, ms
 		return 0, Metadata{}, err
 	}
 
-	rowsAffected, err = p.ds.Helper().UpsertInTable(ctx, datastore.GetTableName(msg), &protoStoreMsg)
+	rowsAffected, err = p.ds.Upsert(ctx, protoStoreMsg)
 	if err != nil {
 		return 0, Metadata{}, err
 	}
@@ -291,28 +292,28 @@ func (p ProtobufDataStore) UpsertWithMetadata(ctx context.Context, id string, ms
 // Finds a Protobuf message by ID.
 // If metadata arg. is non-nil, fills it with the metadata (parent ID & revision) of the Protobuf message that was found.
 func (p ProtobufDataStore) FindById(ctx context.Context, id string, msg proto.Message, metadata *Metadata) error {
-	protoStoreMsg, err := p.MsgForFind(ctx, id, msg)
+	protoStoreMsg, err := p.MsgToFilter(ctx, id, msg)
 	if err != nil {
 		return err
 	}
 
-	err = p.ds.Helper().FindInTable(ctx, datastore.GetTableName(msg), &protoStoreMsg)
+	err = p.ds.Find(ctx, protoStoreMsg)
 	if err != nil {
 		return err
 	}
 	if metadata != nil {
-		*metadata = MetadataFrom(protoStoreMsg)
+		*metadata = MetadataFrom(*protoStoreMsg)
 	}
 	return FromBytes(protoStoreMsg.Msg, msg)
 }
 
 func (p ProtobufDataStore) GetMetadata(ctx context.Context, id string, msg proto.Message) (md Metadata, err error) {
-	protoStoreMsg, err := p.MsgForFind(ctx, id, msg)
+	protoStoreMsg, err := p.MsgToFilter(ctx, id, msg)
 	if err != nil {
 		return md, err
 	}
-	err = p.ds.Helper().FindInTable(ctx, datastore.GetTableName(msg), &protoStoreMsg)
-	return MetadataFrom(protoStoreMsg), err
+	err = p.ds.Find(ctx, protoStoreMsg)
+	return MetadataFrom(*protoStoreMsg), err
 }
 
 func (p ProtobufDataStore) GetRevision(ctx context.Context, id string, msg proto.Message) (int64, error) {
@@ -348,9 +349,7 @@ func (p ProtobufDataStore) FindAllAsMap(ctx context.Context, msgsMap interface{}
 		return nil, err
 	}
 
-	// True if msgsMap is a map of strings to POINTERS OF STRUCTS
-	// False if msgsMap is a map of strings to STRUCTS
-	tableName := datastore.GetTableNameFromSlice(msgsMap)
+	tableName := datastore.GetTableName(reflect.New(elemType).Interface())
 
 	protoStoreMsgs := make([]ProtoStoreMsg, 0)
 	err = p.ds.Helper().FindAllInTable(ctx, tableName, &protoStoreMsgs)
@@ -398,7 +397,7 @@ func (p ProtobufDataStore) FindAll(ctx context.Context, msgs interface{}) (metad
 	// True if msgs is a pointer to a slice of pointers to structs
 	// False if msgs is a pointer to a slice of structs
 	isSlicePtrToStructs := reflect.TypeOf(msgs).Elem().Elem().Kind() == reflect.Ptr
-	tableName := datastore.GetTableNameFromSlice(msgs)
+	tableName := datastore.GetTableName(msgs)
 
 	protoStoreMsgs := make([]ProtoStoreMsg, 0)
 	err = p.ds.Helper().FindAllInTable(ctx, tableName, &protoStoreMsgs)
@@ -434,11 +433,11 @@ func (p ProtobufDataStore) FindAll(ctx context.Context, msgs interface{}) (metad
 }
 
 func (p ProtobufDataStore) DeleteById(ctx context.Context, id string, msg proto.Message) (int64, error) {
-	protoStoreMsg, err := p.MsgForFind(ctx, id, msg)
+	protoStoreMsg, err := p.MsgToFilter(ctx, id, msg)
 	if err != nil {
 		return 0, err
 	}
-	return p.ds.Helper().DeleteInTable(ctx, datastore.GetTableName(msg), &protoStoreMsg)
+	return p.ds.Delete(ctx, protoStoreMsg)
 }
 
 func (p ProtobufDataStore) DropTables(msgs ...proto.Message) error {
@@ -452,34 +451,34 @@ func (p ProtobufDataStore) DropTables(msgs ...proto.Message) error {
 	return nil
 }
 
-func (p ProtobufDataStore) MsgToPersist(ctx context.Context, id string, msg proto.Message, md Metadata) (ProtoStoreMsg, error) {
+// Return the serialized ProtoStoreMsg that can be persisted to database
+// and error that occurred during extraction orgId from context, or serialization.
+func (p ProtobufDataStore) MsgToPersist(ctx context.Context, id string, msg proto.Message, md Metadata) (pMsg *ProtoStoreMsg, err error) {
+	pMsg, err = p.MsgToFilter(ctx, id, msg)
+	if err != nil {
+		return &ProtoStoreMsg{}, err
+	}
 	bytes, err := ToBytes(msg)
 	if err != nil {
-		return ProtoStoreMsg{}, err
+		return &ProtoStoreMsg{}, err
 	}
 
-	orgId, err := p.ds.Helper().GetAuthorizer().GetOrgFromContext(ctx)
-	if err != nil {
-		return ProtoStoreMsg{}, err
-	}
-
-	return ProtoStoreMsg{
-		Id:         id,
-		Msg:        bytes,
-		ParentId:   md.ParentId,
-		Revision:   md.Revision,
-		OrgId:      orgId,
-		XTableName: datastore.GetTableName(msg),
-	}, nil
+	// Fill up the actual protobuf message and metadata from md
+	pMsg.Msg = bytes
+	pMsg.ParentId = md.ParentId
+	pMsg.Revision = md.Revision
+	return pMsg, nil
 }
 
-func (p ProtobufDataStore) MsgForFind(ctx context.Context, id string, msg proto.Message) (ProtoStoreMsg, error) {
-	orgId, err := p.ds.Helper().GetAuthorizer().GetOrgFromContext(ctx)
+// Return the ProtoStoreMsg that can be used for filtering with id/orgId filled up
+// and error that occurred during extraction orgId from context.
+func (p ProtobufDataStore) MsgToFilter(ctx context.Context, id string, msg proto.Message) (pMsg *ProtoStoreMsg, err error) {
+	orgId, err := p.ds.GetAuthorizer().GetOrgFromContext(ctx)
 	if err != nil {
-		return ProtoStoreMsg{}, err
+		return &ProtoStoreMsg{}, err
 	}
 
-	return ProtoStoreMsg{
+	return &ProtoStoreMsg{
 		Id:         id,
 		OrgId:      orgId,
 		XTableName: datastore.GetTableName(msg),

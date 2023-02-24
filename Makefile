@@ -17,7 +17,7 @@ lint_fix: ## Run golang linters in fix mode
 	build/lint_fix.sh
 
 test:  install_tools ## Run unit-tests
-	build/unit_tests.sh
+	LOG_LEVEL=trace build/unit_tests.sh
 
 benchmarks:
 	build/benchmarks.sh

@@ -172,6 +172,9 @@ issues:
         - gosec
         - typecheck
         - unparam
+    - path: pkg/datastore/logger.go
+      linters:
+        - gochecknoglobals
     - path: pkg/datastore/sql_struct.go
       linters:
         - gochecknoglobals

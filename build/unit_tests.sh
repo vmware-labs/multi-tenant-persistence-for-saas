@@ -17,10 +17,10 @@ fi
 echo "Creating results directory to store unit tests result"
 mkdir -p $RESULTS_DIR
 
-if [[ "debug" == "${LOG_LEVEL:-unset}" ]]; then
-  TEST_VERBOSE="-v "
-else
+if [[ "unset" == "${LOG_LEVEL:-unset}" ]]; then
   TEST_VERBOSE=""
+else
+  TEST_VERBOSE="-v "
 fi
 
 echo "running go test, excluding test and proto folders"

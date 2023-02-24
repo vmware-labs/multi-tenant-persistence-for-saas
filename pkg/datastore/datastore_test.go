@@ -616,4 +616,5 @@ func TestRevision(t *testing.T) {
 func TestTransactions(t *testing.T) {
 	testSingleTableTransactions(t)
 	testMultiTableTransactions(t)
+	testMultiProtoTransactions(t)
 }

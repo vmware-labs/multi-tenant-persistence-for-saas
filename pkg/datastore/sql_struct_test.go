@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/datastore"
 	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/test"
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/test/pb"
 )
 
 /*
@@ -32,19 +33,61 @@ Checks if table name can be extracted from struct/slice of structs using utility
 func TestGettingTableName(t *testing.T) {
 	assert := assert.New(t)
 
-	assert.Equal("application", datastore.GetTableName(App{}))
-	assert.Equal("application", datastore.GetTableName(&App{}))
+	{
+		for _, x := range []interface{}{
+			App{},
+			&App{},
+			[]App{},
+			&[]App{},
+			[]*App{},
+			&[]*App{},
+		} {
+			t.Logf("Testing GetTableName with %+v", datastore.TypeName(x))
+			assert.Equal("application", datastore.GetTableName(x))
+		}
+	}
 
-	assert.Equal("app_users", datastore.GetTableName(AppUser{}))
-	assert.Equal("app_users", datastore.GetTableName(&AppUser{}))
+	{
+		for _, x := range []interface{}{
+			AppUser{},
+			&AppUser{},
+			[]AppUser{},
+			&[]AppUser{},
+			[]*AppUser{},
+			&[]*AppUser{},
+		} {
+			t.Logf("Testing GetTableName with %+v", datastore.TypeName(x))
+			assert.Equal("app_users", datastore.GetTableName(x))
+		}
+	}
 
-	assert.Equal("groups", datastore.GetTableName(Group{}))
-	assert.Equal("groups", datastore.GetTableName(&Group{}))
+	{
+		for _, x := range []interface{}{
+			Group{},
+			&Group{},
+			[]Group{},
+			&[]Group{},
+			[]*Group{},
+			&[]*Group{},
+		} {
+			t.Logf("Testing GetTableName with %+v", datastore.TypeName(x))
+			assert.Equal("groups", datastore.GetTableName(x))
+		}
+	}
 
-	assert.Equal("app_users", datastore.GetTableNameFromSlice([]AppUser{}))
-	assert.Equal("app_users", datastore.GetTableNameFromSlice(&[]AppUser{}))
-	assert.Equal("app_users", datastore.GetTableNameFromSlice([]*AppUser{}))
-	assert.Equal("app_users", datastore.GetTableNameFromSlice(&[]*AppUser{}))
+	{
+		for _, x := range []interface{}{
+			pb.CPU{},
+			&pb.CPU{},
+			[]pb.CPU{},
+			[]*pb.CPU{},
+			&[]pb.CPU{},
+			&[]*pb.CPU{},
+		} {
+			t.Logf("Testing GetTableName with %+v", datastore.TypeName(x))
+			assert.Equal("processor", datastore.GetTableName(x))
+		}
+	}
 }
 
 func TestIsRevisioningSupported(t *testing.T) {
