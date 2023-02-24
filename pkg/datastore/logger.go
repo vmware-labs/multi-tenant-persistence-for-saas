@@ -37,6 +37,17 @@ const (
 	SAAS_PERSISTENCE = "persistence"
 )
 
+var TRACE = func(format string, v ...any) {
+}
+
+func logTrace(format string, v ...any) {
+	GetCompLogger().Tracef(format, v...)
+}
+
+func GetLogLevel() string {
+	return strings.ToLower(os.Getenv(LOG_LEVEL_ENV_VAR))
+}
+
 func GetLogger() *logrus.Logger {
 	log := logrus.New()
 	log.SetFormatter(&logrus.TextFormatter{
@@ -44,13 +55,24 @@ func GetLogger() *logrus.Logger {
 		FullTimestamp:   true,
 		TimestampFormat: "2006-01-02T15:04:05.000",
 	})
-	loglevel := strings.ToLower(os.Getenv(LOG_LEVEL_ENV_VAR))
-	if level, err := logrus.ParseLevel(loglevel); err != nil {
+	loglevel := GetLogLevel()
+	if loglevel == "trace" {
+		log.SetLevel(logrus.TraceLevel)
+		TRACE = logTrace
+	} else if level, err := logrus.ParseLevel(loglevel); err != nil {
 		log.SetLevel(logrus.InfoLevel) // Default logging level
 	} else {
 		log.SetLevel(level)
 	}
 	return log
+}
+
+func GetGormLogger(l *logrus.Entry) logger.Interface {
+	loglevel := GetLogLevel()
+	if loglevel == "trace" || loglevel == "debug" {
+		return logger.Default.LogMode(logger.Info)
+	}
+	return gormLogger{log: l}
 }
 
 func GetCompLogger() *logrus.Entry {

@@ -23,7 +23,10 @@ import (
 
 	"github.com/bxcodec/faker/v4"
 	"github.com/stretchr/testify/assert"
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/datastore"
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/protostore"
 	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/test"
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/test/pb"
 	"gorm.io/gorm"
 )
 
@@ -126,7 +129,7 @@ func testMultiTableTransactions(t *testing.T) {
 	t.Log("Getting DBTransaction for creating App and AppUser")
 	tx, err := TestDataStore.GetTransaction(CokeAdminCtx, a1, a2)
 	assert.NoError(err)
-	t.Log("Creating a1 and a2 in single transaction")
+	t.Log("Creating App and AppUser in single transaction")
 	err = tx.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(a1).Error; err != nil {
 			return err
@@ -143,7 +146,7 @@ func testMultiTableTransactions(t *testing.T) {
 
 	tx, err = TestDataStore.GetTransaction(CokeAuditorCtx, a1, a2)
 	assert.NoError(err)
-	t.Log("Finding app a1 and appuser a2 in single transaction")
+	t.Log("Finding App and Appuser in single transaction")
 	f1, f2 := &App{Id: a1.Id, TenantId: a1.TenantId}, &AppUser{Id: a2.Id}
 	err = tx.Transaction(func(tx *gorm.DB) error {
 		if err := tx.First(f1).Error; err != nil {
@@ -155,7 +158,7 @@ func testMultiTableTransactions(t *testing.T) {
 		}
 		return nil
 	})
-	t.Log("Verifying a1 and a2 are properly retrieved")
+	t.Log("Verifying App and AppUser are properly retrieved")
 	tx.Commit()
 	assert.NoError(err)
 	assert.NoError(tx.Error)
@@ -164,7 +167,7 @@ func testMultiTableTransactions(t *testing.T) {
 	t.Log(a1, a2)
 	t.Log(f1, f2)
 
-	t.Log("Deleting a1 and a2 in single transaction")
+	t.Log("Deleting App and AppUser in single transaction")
 	tx, err = TestDataStore.GetTransaction(ServiceAdminCtx, a1)
 	assert.NoError(err)
 	err = tx.Transaction(func(tx *gorm.DB) error {
@@ -177,8 +180,109 @@ func testMultiTableTransactions(t *testing.T) {
 		}
 		return nil
 	})
-	t.Log("Verifying a1 and a2 are deleted successfully")
+	t.Log("Verifying App and AppUser are deleted successfully")
 	tx.Commit()
 	assert.NoError(err)
 	assert.NoError(tx.Error)
+}
+
+func testMultiProtoTransactions(t *testing.T) {
+	t.Helper()
+	assert := assert.New(t)
+
+	c1 := &pb.CPU{}
+	a2 := &App{}
+	_ = faker.FakeData(c1)
+	_ = faker.FakeData(a2)
+	a1, err := TestProtoStore.MsgToPersist(CokeAdminCtx, "a1", c1, protostore.Metadata{})
+	assert.NoError(err)
+	a2.TenantId = COKE
+	t1 := datastore.GetTableName(a1)
+
+	t.Log("Getting DBTransaction for creating pb.CPU and App")
+	tx, err := TestDataStore.GetTransaction(CokeAdminCtx, a1, a2)
+	assert.NoError(err)
+	t.Log("Creating pb.CPU and App in single transaction")
+	err = tx.Transaction(func(tx *gorm.DB) error {
+		t.Logf("Creating %+v", a1)
+		if err := tx.Table(t1).Create(a1).Error; err != nil {
+			return err
+		}
+		t.Logf("Creating %+v", a2)
+		if err := tx.Create(a2).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+	tx.Commit()
+	assert.NoError(err)
+	assert.NoError(tx.Error)
+
+	tx, err = TestDataStore.GetTransaction(CokeAuditorCtx, a1, a2)
+	assert.NoError(err)
+	t.Log("Finding pb.CPU and App in single transaction")
+	f1, err := TestProtoStore.MsgToFilter(CokeAuditorCtx, "a1", c1)
+	assert.NoError(err)
+	f2 := &App{Id: a2.Id, TenantId: a2.TenantId}
+	err = tx.Transaction(func(tx *gorm.DB) error {
+		t.Logf("Finding %+v", f1)
+		if err := tx.Table(t1).First(f1).Error; err != nil {
+			return err
+		}
+
+		t.Logf("Finding %+v", f2)
+		if err := tx.First(f2).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	t.Log("Verifying pb.CPU and App are properly retrieved")
+	tx.Commit()
+	assert.NoError(err)
+	assert.NoError(tx.Error)
+	assert.Equal(a1.Msg, f1.Msg)
+	assert.Equal(a2, f2)
+	t.Log(a1, a2)
+	t.Log(f1, f2)
+
+	t.Log("Deleting pb.CPU and App in single transaction")
+	tx, err = TestDataStore.GetTransaction(ServiceAdminCtx, a1)
+	assert.NoError(err)
+	err = tx.Transaction(func(tx *gorm.DB) error {
+		t.Logf("Deleting %+v", a1)
+		if err := tx.Table(t1).Delete(a1).Error; err != nil {
+			return err
+		}
+
+		t.Logf("Deleting %+v", a2)
+		if err := tx.Delete(a2).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	t.Log("Verifying pb.CPU and App are deleted successfully")
+	tx.Commit()
+	assert.NoError(err)
+	assert.NoError(tx.Error)
+
+	t.Log("Finding pb.CPU and App after delete should return error")
+	tx, err = TestDataStore.GetTransaction(ServiceAdminCtx, a1)
+	assert.NoError(err)
+	f1, err = TestProtoStore.MsgToFilter(CokeAuditorCtx, "a1", c1)
+	assert.NoError(err)
+	f2 = &App{Id: a2.Id, TenantId: a2.TenantId}
+	err = tx.Transaction(func(tx *gorm.DB) error {
+		t.Logf("Finding %+v", f1)
+		x := tx.Table(t1).First(f1)
+		assert.EqualValues(0, x.RowsAffected, x)
+
+		t.Logf("Finding %+v", f2)
+		y := tx.First(f2)
+		assert.EqualValues(0, y.RowsAffected, y)
+		return nil
+	})
+	t.Log("Verifying pb.CPU and App are properly retrieved")
+	tx.Commit()
+	assert.NoError(err)
 }

@@ -27,6 +27,7 @@ import (
 	"github.com/bxcodec/faker/v3"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/datastore"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
 	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/errors"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/protostore"
@@ -192,8 +193,8 @@ func testProtoStoreFindWithInvalidParams(t *testing.T, ctx context.Context) {
 			map[string]*pb.CPU{},
 		}
 
-		for i := range invalidParams {
-			invalidParam := invalidParams[i]
+		for _, invalidParam := range invalidParams {
+			t.Logf("Testing with invalidParam %s=%+v", datastore.TypeName(invalidParam), invalidParam)
 			_, err := p.FindAll(ctx, invalidParam)
 			assert.ErrorIs(err, ErrNotPtrToStructSlice)
 		}
@@ -203,8 +204,8 @@ func testProtoStoreFindWithInvalidParams(t *testing.T, ctx context.Context) {
 			&[]*pb.CPU{},
 		}
 
-		for i := range validParams {
-			validParam := validParams[i]
+		for _, validParam := range validParams {
+			t.Logf("Testing with validParam %s=%+v", datastore.TypeName(validParam), validParam)
 			_, err := p.FindAll(ctx, validParam)
 			assert.NoError(err)
 		}

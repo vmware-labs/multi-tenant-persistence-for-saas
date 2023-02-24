@@ -38,6 +38,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 
 	_ "github.com/lib/pq"
 	"github.com/sirupsen/logrus"
@@ -56,6 +57,7 @@ const (
 Postgres-backed implementation of DataStore interface. By default, uses MetadataBasedAuthorizer for authentication & authorization.
 */
 type relationalDb struct {
+	sync.RWMutex
 	authorizer  authorizer.Authorizer // Allows or cancels operations on the DB depending on user's org. and service roles
 	gormDBMap   map[dbrole.DbRole]*gorm.DB
 	logger      *logrus.Entry
@@ -141,8 +143,6 @@ func (db *relationalDb) GetTransaction(ctx context.Context, records ...Record) (
 	for _, record := range records {
 		if dbRole.IsDbRoleTenantScoped() && IsMultitenant(record, GetTableName(record)) {
 			orgIdCol, _ := GetOrgId(record)
-			err = ErrOperationNotAllowed.WithValue("tenant", orgId).WithValue("orgIdCol", orgIdCol)
-			db.logger.Error(err.Error())
 			if orgIdCol != "" && orgIdCol != orgId {
 				err = ErrOperationNotAllowed.WithValue("tenant", orgId).WithValue("orgIdCol", orgIdCol)
 				db.logger.Error(err)
@@ -216,7 +216,7 @@ func (db *relationalDb) FindAll(ctx context.Context, records interface{}) error 
 		return err
 	}
 
-	tableName := GetTableNameFromSlice(records)
+	tableName := GetTableName(records)
 	return db.FindAllInTable(ctx, tableName, records)
 }
 
@@ -453,7 +453,11 @@ func (db *relationalDb) RegisterWithDALHelper(_ context.Context, roleMapping map
 	// Enable row-level security in a multi-tenant table
 	if IsMultitenant(record, tableName) {
 		stmt := getEnableRLSStmt(tableName, record)
-		if tx := db.gormDBMap[dbrole.MAIN].Exec(stmt); tx.Error != nil {
+		tx, err = db.GetDBConn(dbrole.MAIN)
+		if err != nil {
+			return err
+		}
+		if tx := tx.Exec(stmt); tx.Error != nil {
 			err = ErrRegisteringStruct.Wrap(tx.Error).WithMap(map[ErrorContextKey]string{
 				TABLE_NAME: tableName,
 				SQL_STMT:   stmt,
@@ -483,23 +487,25 @@ Creates a Postgres trigger that checks if a record being updated contains the mo
 If not, update is rejected.
 */
 func (db *relationalDb) enforceRevisioning(tableName string) (err error) {
-	functionName, functionBody := getCheckAndUpdateRevisionFunc()
-	stmt := getCreateTriggerFunctionStmt(functionName, functionBody)
-	if tx := db.gormDBMap[dbrole.MAIN].Exec(stmt); tx.Error != nil {
+	functionName, _ := getCheckAndUpdateRevisionFunc()
+
+	tx, err := db.GetDBConn(dbrole.MAIN)
+	if err != nil {
+		return err
+	}
+	stmt := getDropTriggerStmt(tableName, functionName)
+	if tx = tx.Exec(stmt); tx.Error != nil {
 		err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
 		db.logger.Error(err)
 		return err
 	}
 
-	stmt = getDropTriggerStmt(tableName, functionName)
-	if tx := db.gormDBMap[dbrole.MAIN].Exec(stmt); tx.Error != nil {
-		err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
-		db.logger.Error(err)
+	tx, err = db.GetDBConn(dbrole.MAIN)
+	if err != nil {
 		return err
 	}
-
 	stmt = getCreateTriggerStmt(tableName, functionName)
-	if tx := db.gormDBMap[dbrole.MAIN].Exec(stmt); tx.Error != nil {
+	if tx := tx.Exec(stmt); tx.Error != nil {
 		err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
 		db.logger.Error(err)
 		return err
@@ -511,16 +517,24 @@ func (db *relationalDb) enforceRevisioning(tableName string) (err error) {
 // Creates a Postgres user (which is the same as role in Postgres). Grants certain privileges to perform certain operations
 // to the user (e.g., SELECT only; SELECT, INSERT, UPDATE, DELETE). Creates RLS-policy if the table is multi-tenant.
 func (db *relationalDb) createDbUser(dbUserSpecs dbUserSpecs, tableName string, record Record) (err error) {
+	tx, err := db.GetDBConn(dbrole.MAIN)
+	if err != nil {
+		return err
+	}
 	stmt := getGrantPrivilegesStmt(tableName, string(dbUserSpecs.username), dbUserSpecs.commands)
-	if tx := db.gormDBMap[dbrole.MAIN].Exec(stmt); tx.Error != nil {
+	if tx := tx.Exec(stmt); tx.Error != nil {
 		err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
 		db.logger.Error(err)
 		return err
 	}
 
 	if IsMultitenant(record, tableName) {
+		tx, err = db.GetDBConn(dbrole.MAIN)
+		if err != nil {
+			return err
+		}
 		stmt = getCreatePolicyStmt(tableName, record, dbUserSpecs)
-		if tx := db.gormDBMap[dbrole.MAIN].Exec(stmt); tx.Error != nil {
+		if tx := tx.Exec(stmt); tx.Error != nil {
 			err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
 			db.logger.Error(err)
 			return err

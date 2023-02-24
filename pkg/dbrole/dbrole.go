@@ -16,19 +16,17 @@
 // specific language governing permissions and limitations
 // under the License.
 
-/*
-DAL uses 4 database roles/users to perform all operations:
-
-- `TENANT_READER` - has read access to its tenant's data
-- `READER` - has read access to all tenants' data
-- `TENANT_WRITER` - has read & write access to its tenant's data
-- `WRITER` - has read & write access to all tenants' data
-
-DAL allows to map a user's service role to the DB role that will be used for
-that user. If a user has multiple service roles which map to several DB roles,
-the DB role with the most extensive privileges will be used (see `DbRoles()`
-for reference to ordered list of DbRoles.
-*/
+//	 DAL uses 4 database roles/users to perform all operations,
+//
+//		- `TENANT_READER` - has read access to its tenant's data
+//		- `READER` - has read access to all tenants' data
+//		- `TENANT_WRITER` - has read & write access to its tenant's data
+//		- `WRITER` - has read & write access to all tenants' data
+//
+//	 DAL allows to map a user's service role to the DB role that will be used for
+//	 that user. If a user has multiple service roles which map to several DB roles,
+//	 the DB role with the most extensive privileges will be used (see `DbRoles()`
+//	 for reference to ordered list of DbRoles.
 package dbrole
 
 // DbRole Database roles/users.

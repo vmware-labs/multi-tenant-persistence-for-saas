@@ -16,6 +16,57 @@
 // specific language governing permissions and limitations
 // under the License.
 
+// Import the package and use `DataStore` interface to interact with the data access
+// layer. If you want DAL to use a Postgres database, ensure you have the following
+// environment variables set to relevant values: *DB_ADMIN_USERNAME*, *DB_PORT*,
+// *DB_NAME*, *DB_ADMIN_PASSWORD*, *DB_HOST*, *SSL_MODE*. You can also set
+// *LOG_LEVEL* environment variable to debug/trace, if you want logging at a
+// specific level (default is _Info_)
+//
+// Define structs that will be persisted using datastore similar to any gorm Models,
+// for reference [https://gorm.io/docs/models.html]
+//
+// - At least one field must be a primary key (contain a *primary_key* tag with the value of *true*).
+// - For revision support to block concurrent updates, add __revision_ as column tag.
+// - For multi-tenancy support, add an _org_id_ tag to a field.
+//
+//		type App struct {
+//			Id       string `gorm:"primaryKey;column:application_id"`
+//			Name     string
+//			TenantId string `gorm:"primaryKey;column:org_id"`
+//			Revision int64  `gorm:"column:revision"`
+//		}
+//
+//	DataStore.RegisterWithDAL(context.TODO(), roleMappingForAppUser, appUser{})
+//
+//	datastore.DataStore.Insert(ctx, user1)
+//	var queryResult appUser = appUser{Id: user1.Id}
+//	DataStore.Find(ctx, &queryResult)
+//
+//	queryResults := make([]appUser, 0)
+//	DataStore.FindAll(ctx, &queryResults)
+//
+//	DataStore.Delete(ctx, user1)
+//
+// DataStore interface exposes basic methods like Find/FindAll/Upsert/Delete, for richer queries
+// and transaction based filtering and pagination please use GetTransaction() method.
+// Sample usage using db transactions,
+//
+//	t.Log("Getting DBTransaction for creating App and AppUser")
+//	tx, err := TestDataStore.GetTransaction(CokeAdminCtx, app, appUser)
+//	assert.NoError(err)
+//	t.Log("Creating app and appUser in single transaction")
+//	err = tx.Transaction(func(tx *gorm.DB) error {
+//		if err := tx.Create(app).Error; err != nil {
+//			return err
+//		}
+//		if err := tx.Create(appUser).Error; err != nil {
+//			return err
+//		}
+//
+//		return nil
+//	})
+//	tx.Commit()
 package datastore
 
 import (
@@ -44,16 +95,9 @@ type DataStore interface {
 }
 
 type Helper interface {
-	GetAuthorizer() authorizer.Authorizer
 	GetDBTransaction(ctx context.Context, tableName string, record Record) (tx *gorm.DB, err error)
-	RegisterWithDALHelper(ctx context.Context, roleMapping map[string]dbrole.DbRole, tableName string, record Record) error
-	FindInTable(ctx context.Context, tableName string, record Record) error
 	FindAllInTable(ctx context.Context, tableName string, records interface{}) error
 	FindWithFilterInTable(ctx context.Context, tableName string, record Record, records interface{}) error
-	InsertInTable(ctx context.Context, tableName string, record Record) (int64, error)
-	UpdateInTable(ctx context.Context, tableName string, record Record) (int64, error)
-	UpsertInTable(ctx context.Context, tableName string, record Record) (int64, error)
-	DeleteInTable(ctx context.Context, tableName string, record Record) (int64, error)
 }
 
 type TestHelper interface {
