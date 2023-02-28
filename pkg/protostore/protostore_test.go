@@ -36,11 +36,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-var protoMsgs = []proto.Message{
-	&pb.CPU{},
-	&pb.Memory{},
-}
-
 var p = TestProtoStore
 
 type MemorySlice []pb.Memory
@@ -155,6 +150,10 @@ func TestProtoConversion(t *testing.T) {
 func setupDbContext(t *testing.T) {
 	t.Helper()
 	assert := assert.New(t)
+	protoMsgs := []proto.Message{
+		&pb.CPU{},
+		&pb.Memory{},
+	}
 
 	if err := p.DropTables(protoMsgs...); err != nil {
 		assert.FailNow("Dropping tables failed with error: " + err.Error())
@@ -195,7 +194,7 @@ func testProtoStoreFindWithInvalidParams(t *testing.T, ctx context.Context) {
 
 		for _, invalidParam := range invalidParams {
 			t.Logf("Testing with invalidParam %s=%+v", datastore.TypeName(invalidParam), invalidParam)
-			_, err := p.FindAll(ctx, invalidParam)
+			_, err := p.FindAll(ctx, invalidParam, datastore.NoPagination())
 			assert.ErrorIs(err, ErrNotPtrToStructSlice)
 		}
 
@@ -206,7 +205,7 @@ func testProtoStoreFindWithInvalidParams(t *testing.T, ctx context.Context) {
 
 		for _, validParam := range validParams {
 			t.Logf("Testing with validParam %s=%+v", datastore.TypeName(validParam), validParam)
-			_, err := p.FindAll(ctx, validParam)
+			_, err := p.FindAll(ctx, validParam, datastore.NoPagination())
 			assert.NoError(err)
 		}
 	}
@@ -223,7 +222,7 @@ func testProtoStoreFindWithInvalidParams(t *testing.T, ctx context.Context) {
 
 		for i := range invalidParams {
 			invalidParam := invalidParams[i]
-			_, err := p.FindAllAsMap(ctx, invalidParam)
+			_, err := p.FindAllAsMap(ctx, invalidParam, datastore.NoPagination())
 			assert.ErrorIs(err, ErrNotPtrToStructSlice)
 		}
 
@@ -234,7 +233,7 @@ func testProtoStoreFindWithInvalidParams(t *testing.T, ctx context.Context) {
 
 		for i := range validParams {
 			validParam := validParams[i]
-			_, err := p.FindAllAsMap(ctx, validParam)
+			_, err := p.FindAllAsMap(ctx, validParam, datastore.NoPagination())
 			assert.NoError(err)
 		}
 	}
@@ -291,7 +290,7 @@ func testProtoStoreFindAll(t *testing.T, ctx context.Context) {
 	{
 		// Check if you can find all memory records when passing a pointer to slice of structs
 		var actualQueryResults MemorySlice = make([]pb.Memory, 0)
-		metadataMap, err := p.FindAll(ctx, &actualQueryResults)
+		metadataMap, err := p.FindAll(ctx, &actualQueryResults, datastore.NoPagination())
 		assert.NoError(err)
 		assert.Len(actualQueryResults, 2)
 		assert.Len(metadataMap, 2)
@@ -304,10 +303,28 @@ func testProtoStoreFindAll(t *testing.T, ctx context.Context) {
 	{
 		// Check if you can find all memory records when passing a pointer to slice of pointers to structs
 		var actualQueryResults MemoryPtrSlice = make([]*pb.Memory, 0)
-		metadataMap, err := p.FindAll(ctx, &actualQueryResults)
+		metadataMap, err := p.FindAll(ctx, &actualQueryResults, datastore.NoPagination())
 		assert.NoError(err)
 		assert.Len(actualQueryResults, 2)
 		assert.Len(metadataMap, 2)
+
+		sort.Sort(actualQueryResults)
+		assert.Equal(expectedMemoryQueryResults[0].String(), actualQueryResults[0].String())
+		assert.Equal(expectedMemoryQueryResults[1].String(), actualQueryResults[1].String())
+
+		actualQueryResults = make([]*pb.Memory, 0)
+		page1 := make([]*pb.Memory, 0)
+		page2 := make([]*pb.Memory, 0)
+		metadataMap, err = p.FindAll(ctx, &page1, datastore.GetPagination(0, 1, ""))
+		assert.NoError(err)
+		assert.Len(page1, 1)
+		assert.Len(metadataMap, 1)
+		actualQueryResults = append(actualQueryResults, page1[0])
+		metadataMap, err = p.FindAll(ctx, &page2, datastore.GetPagination(1, 1, ""))
+		assert.NoError(err)
+		assert.Len(page2, 1)
+		assert.Len(metadataMap, 1)
+		actualQueryResults = append(actualQueryResults, page2[0])
 
 		sort.Sort(actualQueryResults)
 		assert.Equal(expectedMemoryQueryResults[0].String(), actualQueryResults[0].String())
@@ -317,7 +334,7 @@ func testProtoStoreFindAll(t *testing.T, ctx context.Context) {
 	{
 		// Check if you can find all memory records when passing a pointer to map of strings to structs
 		actualQueryResults := make(map[string]pb.Memory)
-		metadataMap, err := p.FindAllAsMap(ctx, actualQueryResults)
+		metadataMap, err := p.FindAllAsMap(ctx, actualQueryResults, datastore.NoPagination())
 		assert.NoError(err)
 		assert.Len(actualQueryResults, 2)
 		assert.Len(metadataMap, 2)
@@ -356,7 +373,7 @@ func testProtoStoreFindAll(t *testing.T, ctx context.Context) {
 	{
 		// Check if you can find all memory records when passing a pointer to map of strings to pointers to structs
 		actualQueryResults := make(map[string]*pb.Memory)
-		metadataMap, err := p.FindAllAsMap(ctx, actualQueryResults)
+		metadataMap, err := p.FindAllAsMap(ctx, actualQueryResults, datastore.NoPagination())
 		assert.NoError(err)
 		assert.Len(actualQueryResults, 2)
 		assert.Len(metadataMap, 2)
@@ -374,7 +391,7 @@ func testProtoStoreFindAll(t *testing.T, ctx context.Context) {
 	{
 		// Check if you can find all CPU records when passing a pointer to slice of structs
 		var actualQueryResults CPUSlice = make([]pb.CPU, 0)
-		metadataMap, err := p.FindAll(ctx, &actualQueryResults)
+		metadataMap, err := p.FindAll(ctx, &actualQueryResults, datastore.NoPagination())
 		assert.NoError(err)
 		assert.Len(actualQueryResults, 2)
 		assert.Len(metadataMap, 2)
@@ -387,7 +404,7 @@ func testProtoStoreFindAll(t *testing.T, ctx context.Context) {
 	{
 		// Check if you can find all CPU records when passing a pointer to slice of pointers to structs
 		var actualQueryResults CPUPtrSlice = make([]*pb.CPU, 0)
-		metadataMap, err := p.FindAll(ctx, &actualQueryResults)
+		metadataMap, err := p.FindAll(ctx, &actualQueryResults, datastore.NoPagination())
 		assert.NoError(err)
 		assert.Len(actualQueryResults, 2)
 		assert.Len(metadataMap, 2)
@@ -400,7 +417,7 @@ func testProtoStoreFindAll(t *testing.T, ctx context.Context) {
 	{
 		// Check if you can find all CPU records when passing a pointer to map of strings to structs
 		actualQueryResults := make(map[string]pb.CPU)
-		metadataMap, err := p.FindAllAsMap(ctx, actualQueryResults)
+		metadataMap, err := p.FindAllAsMap(ctx, actualQueryResults, datastore.NoPagination())
 		assert.NoError(err)
 		assert.Len(actualQueryResults, 2)
 		assert.Len(metadataMap, 2)
@@ -447,7 +464,7 @@ func testProtoStoreFindAll(t *testing.T, ctx context.Context) {
 	{
 		// Check if you can find all CPU records when passing a pointer to map of strings to pointers to structs
 		actualQueryResults := make(map[string]*pb.CPU)
-		metadataMap, err := p.FindAllAsMap(ctx, actualQueryResults)
+		metadataMap, err := p.FindAllAsMap(ctx, actualQueryResults, datastore.NoPagination())
 		assert.NoError(err)
 		assert.Len(actualQueryResults, 2)
 		assert.Len(metadataMap, 2)
@@ -462,26 +479,20 @@ func testProtoStoreFindAll(t *testing.T, ctx context.Context) {
 		}
 	}
 	{
-		assert.NotNil(p.GetAuthorizer())
-		_, err := p.FindAll(ctx, pb.CPU{})
-		assert.ErrorIs(err, ErrNotPtrToStructSlice)
-		_, err = p.FindAll(ctx, &pb.CPU{})
-		assert.ErrorIs(err, ErrNotPtrToStructSlice)
-		_, err = p.FindAllAsMap(ctx, pb.CPU{})
-		assert.ErrorIs(err, ErrNotPtrToStructSlice)
-		_, err = p.FindAllAsMap(ctx, &pb.CPU{})
-		assert.ErrorIs(err, ErrNotPtrToStructSlice)
-	}
-	{
+		protoMsgs := []proto.Message{
+			&pb.CPU{},
+			&pb.Memory{},
+		}
+
 		err := p.DropTables(protoMsgs...)
 		assert.NoError(err)
 
 		cpuQueryResults := make(map[string]*pb.CPU)
-		_, err = p.FindAllAsMap(ctx, cpuQueryResults)
+		_, err = p.FindAllAsMap(ctx, cpuQueryResults, datastore.NoPagination())
 		assert.ErrorIs(err, ErrExecutingSqlStmt)
 
 		memoryQueryResults := make([]*pb.Memory, 0)
-		_, err = p.FindAll(ctx, &memoryQueryResults)
+		_, err = p.FindAll(ctx, &memoryQueryResults, datastore.NoPagination())
 		assert.ErrorIs(err, ErrExecutingSqlStmt)
 	}
 }
@@ -574,7 +585,7 @@ func testProtoStoreCrud(t *testing.T, ctx context.Context, useUpsert bool) {
 
 	// Query all Protobuf records
 	allCpus := make([]pb.CPU, 0)
-	metadataMap, err := p.FindAll(ctx, &allCpus)
+	metadataMap, err := p.FindAll(ctx, &allCpus, datastore.NoPagination())
 	assert.NoError(err)
 	assert.Len(allCpus, 1)
 	assert.Len(metadataMap, 1)

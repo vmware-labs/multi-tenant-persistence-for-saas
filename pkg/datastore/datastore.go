@@ -37,7 +37,7 @@
 //			Revision int64  `gorm:"column:revision"`
 //		}
 //
-//	DataStore.RegisterWithDAL(context.TODO(), roleMappingForAppUser, appUser{})
+//	DataStore.Register(context.TODO(), roleMappingForAppUser, appUser{})
 //
 //	datastore.DataStore.Insert(ctx, user1)
 //	var queryResult appUser = appUser{Id: user1.Id}
@@ -79,25 +79,29 @@ import (
 
 // DataStore /*.
 type DataStore interface {
-	GetAuthorizer() authorizer.Authorizer
 	Find(ctx context.Context, record Record) error
-	FindAll(ctx context.Context, records interface{}) error
-	FindWithFilter(ctx context.Context, record Record, records interface{}) error
+	FindAll(ctx context.Context, records interface{}, pagination *Pagination) error
+	FindWithFilter(ctx context.Context, filter Record, records interface{}, pagination *Pagination) error
 	Insert(ctx context.Context, record Record) (int64, error)
 	Delete(ctx context.Context, record Record) (int64, error)
 	Update(ctx context.Context, record Record) (int64, error)
 	Upsert(ctx context.Context, record Record) (int64, error)
-	RegisterWithDAL(ctx context.Context, roleMapping map[string]dbrole.DbRole, record Record) error
+	GetTransaction(ctx context.Context, record ...Record) (tx *gorm.DB, err error)
+
+	Register(ctx context.Context, roleMapping map[string]dbrole.DbRole, records ...Record) error
 	Reset()
+
+	GetAuthorizer() authorizer.Authorizer
 	Helper() Helper
 	TestHelper() TestHelper
-	GetTransaction(ctx context.Context, record ...Record) (tx *gorm.DB, err error)
 }
 
 type Helper interface {
+	FindAllInTable(ctx context.Context, tableName string, records interface{}, pagination *Pagination) error
+	FindWithFilterInTable(ctx context.Context, tableName string, record Record, records interface{}, pagination *Pagination) error
 	GetDBTransaction(ctx context.Context, tableName string, record Record) (tx *gorm.DB, err error)
-	FindAllInTable(ctx context.Context, tableName string, records interface{}) error
-	FindWithFilterInTable(ctx context.Context, tableName string, record Record, records interface{}) error
+
+	RegisterHelper(ctx context.Context, roleMapping map[string]dbrole.DbRole, tableName string, record Record) error
 }
 
 type TestHelper interface {

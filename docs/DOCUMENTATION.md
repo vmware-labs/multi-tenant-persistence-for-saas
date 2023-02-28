@@ -107,7 +107,7 @@ type App struct {
 		Revision int64  `gorm:"column:revision"`
 	}
 
-DataStore.RegisterWithDAL(context.TODO(), roleMappingForAppUser, appUser{})
+DataStore.Register(context.TODO(), roleMappingForAppUser, appUser{})
 
 datastore.DataStore.Insert(ctx, user1)
 var queryResult appUser = appUser{Id: user1.Id}
@@ -158,6 +158,10 @@ tx.Commit()
   - [func FromConfig(l *logrus.Entry, authorizer authorizer.Authorizer, cfg DBConfig) (d DataStore, err error)](<#func-fromconfig>)
   - [func FromEnv(l *logrus.Entry, authorizer authorizer.Authorizer) (d DataStore, err error)](<#func-fromenv>)
 - [type Helper](<#type-helper>)
+- [type Pagination](<#type-pagination>)
+  - [func DefaultPagination() *Pagination](<#func-defaultpagination>)
+  - [func GetPagination(offset int, limit int, sortBy string) *Pagination](<#func-getpagination>)
+  - [func NoPagination() *Pagination](<#func-nopagination>)
 - [type Record](<#type-record>)
   - [func GetRecordInstanceFromSlice(x interface{}) Record](<#func-getrecordinstancefromslice>)
 - [type TestHelper](<#type-testhelper>)
@@ -185,6 +189,14 @@ const (
     // Constants for LOG field names & values.
     COMP             = "comp"
     SAAS_PERSISTENCE = "persistence"
+)
+```
+
+```go
+const (
+    DEFAULT_OFFSET = 0
+    DEFAULT_LIMIT  = 1000
+    DEFAULT_SORTBY = ""
 )
 ```
 
@@ -291,25 +303,27 @@ type DBConfig struct {
 }
 ```
 
-## type [DataStore](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/datastore.go#L81-L95>)
+## type [DataStore](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/datastore.go#L81-L97>)
 
 DataStore /\*.
 
 ```go
 type DataStore interface {
-    GetAuthorizer() authorizer.Authorizer
     Find(ctx context.Context, record Record) error
-    FindAll(ctx context.Context, records interface{}) error
-    FindWithFilter(ctx context.Context, record Record, records interface{}) error
+    FindAll(ctx context.Context, records interface{}, pagination *Pagination) error
+    FindWithFilter(ctx context.Context, filter Record, records interface{}, pagination *Pagination) error
     Insert(ctx context.Context, record Record) (int64, error)
     Delete(ctx context.Context, record Record) (int64, error)
     Update(ctx context.Context, record Record) (int64, error)
     Upsert(ctx context.Context, record Record) (int64, error)
-    RegisterWithDAL(ctx context.Context, roleMapping map[string]dbrole.DbRole, record Record) error
+    GetTransaction(ctx context.Context, record ...Record) (tx *gorm.DB, err error)
+
+    Register(ctx context.Context, roleMapping map[string]dbrole.DbRole, records ...Record) error
     Reset()
+
+    GetAuthorizer() authorizer.Authorizer
     Helper() Helper
     TestHelper() TestHelper
-    GetTransaction(ctx context.Context, record ...Record) (tx *gorm.DB, err error)
 }
 ```
 
@@ -325,14 +339,44 @@ func FromConfig(l *logrus.Entry, authorizer authorizer.Authorizer, cfg DBConfig)
 func FromEnv(l *logrus.Entry, authorizer authorizer.Authorizer) (d DataStore, err error)
 ```
 
-## type [Helper](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/datastore.go#L97-L101>)
+## type [Helper](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/datastore.go#L99-L105>)
 
 ```go
 type Helper interface {
+    FindAllInTable(ctx context.Context, tableName string, records interface{}, pagination *Pagination) error
+    FindWithFilterInTable(ctx context.Context, tableName string, record Record, records interface{}, pagination *Pagination) error
     GetDBTransaction(ctx context.Context, tableName string, record Record) (tx *gorm.DB, err error)
-    FindAllInTable(ctx context.Context, tableName string, records interface{}) error
-    FindWithFilterInTable(ctx context.Context, tableName string, record Record, records interface{}) error
+
+    RegisterHelper(ctx context.Context, roleMapping map[string]dbrole.DbRole, tableName string, record Record) error
 }
+```
+
+## type [Pagination](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/pagination.go#L27-L31>)
+
+```go
+type Pagination struct {
+    Offset int
+    Limit  int
+    SortBy string
+}
+```
+
+### func [DefaultPagination](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/pagination.go#L41>)
+
+```go
+func DefaultPagination() *Pagination
+```
+
+### func [GetPagination](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/pagination.go#L33>)
+
+```go
+func GetPagination(offset int, limit int, sortBy string) *Pagination
+```
+
+### func [NoPagination](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/pagination.go#L45>)
+
+```go
+func NoPagination() *Pagination
 ```
 
 ## type [Record](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/record.go#L23-L26>)
@@ -348,7 +392,7 @@ type Record interface {
 func GetRecordInstanceFromSlice(x interface{}) Record
 ```
 
-## type [TestHelper](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/datastore.go#L103-L107>)
+## type [TestHelper](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/datastore.go#L107-L111>)
 
 ```go
 type TestHelper interface {
@@ -656,8 +700,8 @@ protoStore.DeleteById(ctx, id, &pb.Memory{})
 - [type ProtobufDataStore](<#type-protobufdatastore>)
   - [func (p ProtobufDataStore) DeleteById(ctx context.Context, id string, msg proto.Message) (int64, error)](<#func-protobufdatastore-deletebyid>)
   - [func (p ProtobufDataStore) DropTables(msgs ...proto.Message) error](<#func-protobufdatastore-droptables>)
-  - [func (p ProtobufDataStore) FindAll(ctx context.Context, msgs interface{}) (metadataMap map[string]Metadata, err error)](<#func-protobufdatastore-findall>)
-  - [func (p ProtobufDataStore) FindAllAsMap(ctx context.Context, msgsMap interface{}) (metadataMap map[string]Metadata, err error)](<#func-protobufdatastore-findallasmap>)
+  - [func (p ProtobufDataStore) FindAll(ctx context.Context, msgs interface{}, pagination *datastore.Pagination) (metadataMap map[string]Metadata, err error)](<#func-protobufdatastore-findall>)
+  - [func (p ProtobufDataStore) FindAllAsMap(ctx context.Context, msgsMap interface{}, pagination *datastore.Pagination) (metadataMap map[string]Metadata, err error)](<#func-protobufdatastore-findallasmap>)
   - [func (p ProtobufDataStore) FindById(ctx context.Context, id string, msg proto.Message, metadata *Metadata) error](<#func-protobufdatastore-findbyid>)
   - [func (p ProtobufDataStore) GetAuthorizer() authorizer.Authorizer](<#func-protobufdatastore-getauthorizer>)
   - [func (p ProtobufDataStore) GetMetadata(ctx context.Context, id string, msg proto.Message) (md Metadata, err error)](<#func-protobufdatastore-getmetadata>)
@@ -712,8 +756,8 @@ type ProtoStore interface {
     Update(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, md Metadata, err error)
     Upsert(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, md Metadata, err error)
     FindById(ctx context.Context, id string, msg proto.Message, metadata *Metadata) error
-    FindAll(ctx context.Context, msgs interface{}) (metadataMap map[string]Metadata, err error)
-    FindAllAsMap(ctx context.Context, msgsMap interface{}) (metadataMap map[string]Metadata, err error)
+    FindAll(ctx context.Context, msgs interface{}, pagination *datastore.Pagination) (metadataMap map[string]Metadata, err error)
+    FindAllAsMap(ctx context.Context, msgsMap interface{}, pagination *datastore.Pagination) (metadataMap map[string]Metadata, err error)
     DeleteById(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, err error)
 
     InsertWithMetadata(ctx context.Context, id string, msg proto.Message, metadata Metadata) (rowsAffected int64, md Metadata, err error)
@@ -781,7 +825,7 @@ func (p ProtobufDataStore) DropTables(msgs ...proto.Message) error
 ### func \(ProtobufDataStore\) [FindAll](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L386>)
 
 ```go
-func (p ProtobufDataStore) FindAll(ctx context.Context, msgs interface{}) (metadataMap map[string]Metadata, err error)
+func (p ProtobufDataStore) FindAll(ctx context.Context, msgs interface{}, pagination *datastore.Pagination) (metadataMap map[string]Metadata, err error)
 ```
 
 FindAll Finds all messages \(of the same type as the element of msgs\) in Protostore and stores the result in msgs. msgs must be a pointer to a slice of Protobuf structs or a pointer to a slice of pointers to Protobuf structs. It will be modified in\-place. Returns a map of Protobuf messages' IDs to their metadata \(parent ID & revision\).
@@ -789,7 +833,7 @@ FindAll Finds all messages \(of the same type as the element of msgs\) in Protos
 ### func \(ProtobufDataStore\) [FindAllAsMap](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L328>)
 
 ```go
-func (p ProtobufDataStore) FindAllAsMap(ctx context.Context, msgsMap interface{}) (metadataMap map[string]Metadata, err error)
+func (p ProtobufDataStore) FindAllAsMap(ctx context.Context, msgsMap interface{}, pagination *datastore.Pagination) (metadataMap map[string]Metadata, err error)
 ```
 
 ### func \(ProtobufDataStore\) [FindById](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L294>)
