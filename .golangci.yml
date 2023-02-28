@@ -141,7 +141,7 @@ linters-settings:
       - name: atomic
       - name: line-length-limit
         severity: error
-        arguments: [ 330 ]
+        arguments: [330]
   tagliatelle:
     # Check the struct tag name case.
     case:
@@ -172,6 +172,9 @@ issues:
         - gosec
         - typecheck
         - unparam
+    - path: pkg/protostore/protostore_test.go
+      linters:
+        - maintidx
     - path: pkg/datastore/logger.go
       linters:
         - gochecknoglobals

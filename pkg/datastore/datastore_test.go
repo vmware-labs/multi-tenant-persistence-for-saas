@@ -29,17 +29,20 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bxcodec/faker/v4"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/datastore"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
 	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/errors"
 	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/test"
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/test/pb"
 )
 
 var (
 	LOG *logrus.Entry
 	ds  = TestDataStore
+	ps  = TestProtoStore
 )
 
 // TODO - add a test that would show that the DB users are not able to create, drop, or truncate tables
@@ -50,7 +53,7 @@ func TestTruncate(t *testing.T) {
 	_, _, _ = SetupDbTables(ds)
 
 	queryResults := make([]App, 0)
-	if err := ds.FindAll(CokeAdminCtx, &queryResults); err != nil {
+	if err := ds.FindAll(CokeAdminCtx, &queryResults, datastore.DefaultPagination()); err != nil {
 		assert.FailNow(fmt.Sprintf("Failed to query DB table %s: %s", datastore.GetTableName(App{}), err.Error()))
 	} else if len(queryResults) == 0 {
 		assert.FailNow("Failed to set up test case")
@@ -60,7 +63,7 @@ func TestTruncate(t *testing.T) {
 	assert.NoError(err)
 
 	queryResults = make([]App, 0)
-	err = ds.FindAll(CokeAdminCtx, &queryResults)
+	err = ds.FindAll(CokeAdminCtx, &queryResults, datastore.DefaultPagination())
 	assert.NoError(err)
 	assert.Empty(queryResults, "Expected all records to be deleted after table truncate")
 }
@@ -85,14 +88,14 @@ func TestFindInEmpty(t *testing.T) {
 
 	{
 		records := make([]AppUser, 0)
-		err := ds.FindAll(CokeAdminCtx, &records)
+		err := ds.FindAll(CokeAdminCtx, &records, datastore.DefaultPagination())
 		assert.NoError(err)
 		assert.Empty(records)
 	}
 
 	{
 		records := make([]App, 0)
-		err := ds.FindAll(CokeAdminCtx, &records)
+		err := ds.FindAll(CokeAdminCtx, &records, datastore.DefaultPagination())
 		assert.NoError(err)
 		assert.Empty(records)
 	}
@@ -188,7 +191,7 @@ func TestFindAll(t *testing.T) {
 
 	// FindAll should return all (two) records
 	queryResults := make([]AppUser, 0)
-	err := ds.FindAll(CokeAdminCtx, &queryResults)
+	err := ds.FindAll(CokeAdminCtx, &queryResults, datastore.DefaultPagination())
 	sort.Sort(AppUserSlice(queryResults))
 	assert.NoError(err)
 	assert.Len(queryResults, 2)
@@ -197,6 +200,50 @@ func TestFindAll(t *testing.T) {
 
 	for i := 0; i < len(queryResults); i++ {
 		assert.Equal(expected[i], &queryResults[i])
+	}
+}
+
+func myID(i int) string {
+	return fmt.Sprintf("id-%04d", i)
+}
+
+func TestFindAllWithPagination(t *testing.T) {
+	assert := assert.New(t)
+	RecreateAllTables(ds)
+
+	a1 := &App{}
+	for i := 0; i < 100; i++ {
+		_ = faker.FakeData(a1)
+		a1.Id = myID(i)
+		a1.TenantId = COKE
+		rowsAffected, err := ds.Insert(CokeAdminCtx, a1)
+		assert.NoError(err)
+		assert.Equal(int64(1), rowsAffected)
+	}
+	// FindAll should return all (two) records
+	queryResults := make([]App, 0)
+	err := ds.FindAll(CokeAdminCtx, &queryResults, datastore.DefaultPagination())
+	assert.NoError(err)
+	assert.Len(queryResults, 100)
+
+	for i := 0; i < len(queryResults); i++ {
+		assert.Equal(myID(i), queryResults[i].Id)
+	}
+
+	i := 0
+	for {
+		queryResults := make([]App, 0)
+		err = ds.FindAll(CokeAdminCtx, &queryResults, datastore.GetPagination(i, 1, "application_id desc"))
+		if i == 100 {
+			assert.NoError(err)
+			assert.Len(queryResults, 0)
+			break
+		}
+		t.Logf("Verifying entry[%+v] with %+v", i, queryResults[0])
+		assert.NoError(err)
+		assert.Len(queryResults, 1)
+		assert.Equal(myID(99-i), queryResults[0].Id)
+		i += 1
 	}
 }
 
@@ -211,14 +258,14 @@ func TestFindWithCriteria(t *testing.T) {
 	for _, user := range expected {
 		// Search by all fields
 		queryResults := make([]AppUser, 0)
-		err := ds.FindWithFilter(CokeAdminCtx, user, &queryResults)
+		err := ds.FindWithFilter(CokeAdminCtx, user, &queryResults, datastore.NoPagination())
 		assert.NoError(err)
 		assert.Len(queryResults, 1)
 		assert.Equal(user, &queryResults[0])
 
 		// Search only by name
 		queryResults = make([]AppUser, 0)
-		err = ds.FindWithFilter(CokeAdminCtx, &AppUser{Name: user.Name}, &queryResults)
+		err = ds.FindWithFilter(CokeAdminCtx, &AppUser{Name: user.Name}, &queryResults, datastore.NoPagination())
 		assert.NoError(err)
 		assert.Len(queryResults, 1)
 		assert.Equal(user, &queryResults[0])
@@ -236,7 +283,7 @@ func TestCrudWithMissingOrgId(t *testing.T) {
 	assert.Equal(int64(1), rowsAffected)
 
 	// FIND ALL
-	err = ds.FindAll(context.Background(), &apps) // Missing org. ID in context
+	err = ds.FindAll(context.Background(), &apps, datastore.DefaultPagination()) // Missing org. ID in context
 	assert.ErrorIs(err, ErrFetchingMetadata)
 
 	// FIND BY ID
@@ -271,17 +318,17 @@ func testCrudWithInvalidParams(t *testing.T, ctx context.Context) {
 
 	// FIND ALL
 	var apps []App
-	err = ds.FindAll(ctx, apps) // Passing a nil slice
+	err = ds.FindAll(ctx, apps, datastore.NoPagination()) // Passing a nil slice
 	assert.ErrorIs(err, ErrNotPtrToStructSlice)
 
 	apps = make([]App, 0)
 
 	// FIND ALL
-	err = ds.FindAll(ctx, apps) // Passing slice by value
+	err = ds.FindAll(ctx, apps, datastore.NoPagination()) // Passing slice by value
 	assert.ErrorIs(err, ErrNotPtrToStructSlice)
 
 	// FIND ALL
-	err = ds.FindAll(ctx, &App{}) // Passing a struct by reference (instead of a slice of structs by reference)
+	err = ds.FindAll(ctx, &App{}, datastore.NoPagination()) // Passing a struct by reference (instead of a slice of structs by reference)
 	assert.ErrorIs(err, ErrNotPtrToStructSlice)
 
 	// FIND BY ID
@@ -306,29 +353,29 @@ func TestDALRegistration(t *testing.T) {
 
 	roleMapping := map[string]dbrole.DbRole{SERVICE_AUDITOR: dbrole.READER}
 	// When registering a struct with DAL, you should be able to pass it either by value or by reference
-	err := ds.RegisterWithDAL(CokeAdminCtx, roleMapping, App{})
+	err := ds.Register(CokeAdminCtx, roleMapping, App{})
 	assert.NoError(err)
 
-	err = ds.RegisterWithDAL(CokeAdminCtx, roleMapping, &AppUser{})
+	err = ds.Register(CokeAdminCtx, roleMapping, &AppUser{})
 	assert.NoError(err)
 
 	// You should be able to register a struct that happens to have a name that's a reserved keyword in Postgres
-	err = ds.RegisterWithDAL(CokeAdminCtx, roleMapping, &Group{})
+	err = ds.Register(CokeAdminCtx, roleMapping, &Group{})
 	assert.NoError(err)
 
-	// Reset DB connections. Check if RegisterWithDAL() is still able to reconnect to DB
+	// Reset DB connections. Check if Register() is still able to reconnect to DB
 	ds.Reset()
 
 	roleMapping = map[string]dbrole.DbRole{SERVICE_AUDITOR: dbrole.READER}
 	// When registering a struct with DAL, you should be able to pass it either by value or by reference
-	err = ds.RegisterWithDAL(CokeAdminCtx, roleMapping, App{})
+	err = ds.Register(CokeAdminCtx, roleMapping, App{})
 	assert.NoError(err)
 
-	err = ds.RegisterWithDAL(CokeAdminCtx, roleMapping, &AppUser{})
+	err = ds.Register(CokeAdminCtx, roleMapping, &AppUser{})
 	assert.NoError(err)
 
 	// You should be able to register a struct that happens to have a name that's a reserved keyword in Postgres
-	err = ds.RegisterWithDAL(CokeAdminCtx, roleMapping, &Group{})
+	err = ds.Register(CokeAdminCtx, roleMapping, &Group{})
 	assert.NoError(err)
 }
 
@@ -344,7 +391,7 @@ func TestDeleteWithMultipleCSPRoles(t *testing.T) {
 
 	// The custom admin will have a read access being an app admin and read & write access being a service admin
 	roleMapping := map[string]dbrole.DbRole{APP_ADMIN: dbrole.READER, SERVICE_ADMIN: dbrole.WRITER}
-	err := ds.RegisterWithDAL(customCtx, roleMapping, App{})
+	err := ds.Register(customCtx, roleMapping, App{})
 	if err != nil {
 		assert.FailNow("Failed to setup the test case for the following reason:\n")
 	}
@@ -394,13 +441,13 @@ func TestCrudWithMismatchingOrgId(t *testing.T) {
 
 	{
 		queryResult := make([]App, 0)
-		err := ds.FindAll(PepsiAdminCtx, &queryResult)
+		err := ds.FindAll(PepsiAdminCtx, &queryResult, datastore.NoPagination())
 		assert.NoError(err)       // Pepsi tried to read all the records in DB - no error should be returned
 		assert.Empty(queryResult) // But Pepsi should not see Coke's data
 
 		// Try to read a specific record from DB that definitely exists but belongs to another tenant
 		queryResult = make([]App, 0)
-		err = ds.FindWithFilter(PepsiAdminCtx, myCokeApp, &queryResult)
+		err = ds.FindWithFilter(PepsiAdminCtx, myCokeApp, &queryResult, datastore.NoPagination())
 		assert.ErrorIs(err, ErrOperationNotAllowed)
 		assert.True(strings.Contains(err.Error(), tenantStr))
 		assert.True(strings.Contains(err.Error(), orgIdStr))
@@ -540,7 +587,7 @@ func TestRevision(t *testing.T) {
 		SERVICE_ADMIN:   dbrole.WRITER,
 	}
 
-	err := ds.RegisterWithDAL(CokeAdminCtx, roleMapping, Group{})
+	err := ds.Register(CokeAdminCtx, roleMapping, Group{})
 	assert.NoError(err)
 	myGroup := Group{Id: "withRevisionId-12345", Name: "withRevisionName"}
 
@@ -614,6 +661,18 @@ func TestRevision(t *testing.T) {
 }
 
 func TestTransactions(t *testing.T) {
+	assert := assert.New(t)
+
+	roleMapping := map[string]dbrole.DbRole{
+		TENANT_AUDITOR:  dbrole.TENANT_READER,
+		TENANT_ADMIN:    dbrole.TENANT_WRITER,
+		SERVICE_AUDITOR: dbrole.READER,
+		SERVICE_ADMIN:   dbrole.WRITER,
+	}
+
+	err := ps.Register(CokeAdminCtx, roleMapping, &pb.CPU{})
+	assert.NoError(err)
+
 	testSingleTableTransactions(t)
 	testMultiTableTransactions(t)
 	testMultiProtoTransactions(t)

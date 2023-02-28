@@ -85,8 +85,8 @@ type ProtoStore interface {
 	Update(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, md Metadata, err error)
 	Upsert(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, md Metadata, err error)
 	FindById(ctx context.Context, id string, msg proto.Message, metadata *Metadata) error
-	FindAll(ctx context.Context, msgs interface{}) (metadataMap map[string]Metadata, err error)
-	FindAllAsMap(ctx context.Context, msgsMap interface{}) (metadataMap map[string]Metadata, err error)
+	FindAll(ctx context.Context, msgs interface{}, pagination *datastore.Pagination) (metadataMap map[string]Metadata, err error)
+	FindAllAsMap(ctx context.Context, msgsMap interface{}, pagination *datastore.Pagination) (metadataMap map[string]Metadata, err error)
 	DeleteById(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, err error)
 
 	InsertWithMetadata(ctx context.Context, id string, msg proto.Message, metadata Metadata) (rowsAffected int64, md Metadata, err error)
@@ -176,7 +176,7 @@ func (p ProtobufDataStore) Register(ctx context.Context, roleMapping map[string]
 			p.logger.Errorf("Registering proto message %s failed with error: %v", msg, err)
 			return err
 		}
-		err = p.ds.RegisterWithDAL(ctx, roleMapping, pMsg)
+		err = p.ds.Helper().RegisterHelper(ctx, roleMapping, datastore.GetTableName(msg), pMsg)
 		if err != nil {
 			p.logger.Errorf("Registering proto message %s failed with error: %v", msg, err)
 			return err
@@ -325,7 +325,7 @@ func (p ProtobufDataStore) GetRevision(ctx context.Context, id string, msg proto
 	return md.Revision, err
 }
 
-func (p ProtobufDataStore) FindAllAsMap(ctx context.Context, msgsMap interface{}) (metadataMap map[string]Metadata, err error) {
+func (p ProtobufDataStore) FindAllAsMap(ctx context.Context, msgsMap interface{}, pagination *datastore.Pagination) (metadataMap map[string]Metadata, err error) {
 	// Type of value in msgsMap
 	var elemType reflect.Type
 	switch reflect.TypeOf(msgsMap).Kind() {
@@ -352,7 +352,7 @@ func (p ProtobufDataStore) FindAllAsMap(ctx context.Context, msgsMap interface{}
 	tableName := datastore.GetTableName(reflect.New(elemType).Interface())
 
 	protoStoreMsgs := make([]ProtoStoreMsg, 0)
-	err = p.ds.Helper().FindAllInTable(ctx, tableName, &protoStoreMsgs)
+	err = p.ds.Helper().FindAllInTable(ctx, tableName, &protoStoreMsgs, pagination)
 	if err != nil {
 		return nil, err
 	}
@@ -383,7 +383,7 @@ func (p ProtobufDataStore) FindAllAsMap(ctx context.Context, msgsMap interface{}
 // msgs must be a pointer to a slice of Protobuf structs or a pointer to a slice of pointers to Protobuf structs.
 // It will be modified in-place.
 // Returns a map of Protobuf messages' IDs to their metadata (parent ID & revision).
-func (p ProtobufDataStore) FindAll(ctx context.Context, msgs interface{}) (metadataMap map[string]Metadata, err error) {
+func (p ProtobufDataStore) FindAll(ctx context.Context, msgs interface{}, pagination *datastore.Pagination) (metadataMap map[string]Metadata, err error) {
 	if reflect.TypeOf(msgs).Kind() != reflect.Ptr || reflect.TypeOf(msgs).Elem().Kind() != reflect.Slice {
 		errMsg := "\"msgs\" argument has to be a pointer to a slice"
 		p.logger.Error(errMsg)
@@ -400,7 +400,7 @@ func (p ProtobufDataStore) FindAll(ctx context.Context, msgs interface{}) (metad
 	tableName := datastore.GetTableName(msgs)
 
 	protoStoreMsgs := make([]ProtoStoreMsg, 0)
-	err = p.ds.Helper().FindAllInTable(ctx, tableName, &protoStoreMsgs)
+	err = p.ds.Helper().FindAllInTable(ctx, tableName, &protoStoreMsgs, pagination)
 	if err != nil {
 		return nil, err
 	}

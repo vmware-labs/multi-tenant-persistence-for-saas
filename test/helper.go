@@ -40,7 +40,7 @@ func RecreateAllTables(ds datastore.DataStore) {
 		SERVICE_ADMIN:   dbrole.WRITER,
 	}
 	for _, record := range []datastore.Record{&App{}, &AppUser{}, &Group{}} {
-		if err := ds.RegisterWithDAL(ServiceAdminCtx, roleMapping, record); err != nil {
+		if err := ds.Register(ServiceAdminCtx, roleMapping, record); err != nil {
 			log.Fatalf("Failed to create DB tables: %+v", err)
 		}
 	}

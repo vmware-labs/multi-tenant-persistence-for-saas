@@ -208,7 +208,7 @@ func (db *relationalDb) FindInTable(ctx context.Context, tableName string, recor
 
 // Finds all records in a DB table.
 // records must be a pointer to a slice of structs and will be modified in-place.
-func (db *relationalDb) FindAll(ctx context.Context, records interface{}) error {
+func (db *relationalDb) FindAll(ctx context.Context, records interface{}, pagination *Pagination) error {
 	if reflect.TypeOf(records).Kind() != reflect.Ptr || reflect.TypeOf(records).Elem().Kind() != reflect.Slice {
 		errMsg := "\"records\" argument has to be a pointer to a slice of structs implementing \"Record\" interface"
 		err := ErrNotPtrToStructSlice.Wrap(fmt.Errorf(errMsg))
@@ -217,27 +217,27 @@ func (db *relationalDb) FindAll(ctx context.Context, records interface{}) error 
 	}
 
 	tableName := GetTableName(records)
-	return db.FindAllInTable(ctx, tableName, records)
+	return db.FindAllInTable(ctx, tableName, records, pagination)
 }
 
 // FindAllInTable Finds all records in DB table tableName.
 // records must be a pointer to a slice of structs and will be modified in-place.
-func (db *relationalDb) FindAllInTable(ctx context.Context, tableName string, records interface{}) error {
+func (db *relationalDb) FindAllInTable(ctx context.Context, tableName string, records interface{}, pagination *Pagination) error {
 	record := GetRecordInstanceFromSlice(records)
-	return db.FindWithFilterInTable(ctx, tableName, record, records)
+	return db.FindWithFilterInTable(ctx, tableName, record, records, pagination)
 }
 
 // FindWithFilter Finds multiple records in a DB table.
 // If record argument is non-empty, uses the non-empty fields as criteria in a query.
 // records must be a pointer to a slice of structs and will be modified in-place.
-func (db *relationalDb) FindWithFilter(ctx context.Context, record Record, records interface{}) error {
-	return db.FindWithFilterInTable(ctx, GetTableName(record), record, records)
+func (db *relationalDb) FindWithFilter(ctx context.Context, record Record, records interface{}, pagination *Pagination) error {
+	return db.FindWithFilterInTable(ctx, GetTableName(record), record, records, pagination)
 }
 
 // Finds multiple records in DB table tableName.
 // If record argument is non-empty, uses the non-empty fields as criteria in a query.
 // records must be a pointer to a slice of structs and will be modified in-place.
-func (db *relationalDb) FindWithFilterInTable(ctx context.Context, tableName string, record Record, records interface{}) (err error) {
+func (db *relationalDb) FindWithFilterInTable(ctx context.Context, tableName string, record Record, records interface{}, pagination *Pagination) (err error) {
 	if reflect.TypeOf(records).Kind() != reflect.Ptr || reflect.TypeOf(records).Elem().Kind() != reflect.Slice {
 		return ErrNotPtrToStruct.WithValue(TYPE, TypeName(records))
 	}
@@ -247,7 +247,15 @@ func (db *relationalDb) FindWithFilterInTable(ctx context.Context, tableName str
 		return err
 	}
 
-	tx.Where(record).Find(records) // FILTER by record too
+	tx.Where(record)
+	if pagination != nil {
+		tx.Offset(pagination.Offset).Limit(pagination.Limit)
+		if pagination.SortBy != "" {
+			tx.Order(pagination.SortBy)
+		}
+	}
+	tx.Find(records)
+
 	tx.Commit()
 	if tx.Error != nil {
 		err = ErrExecutingSqlStmt.Wrap(tx.Error)
@@ -411,9 +419,15 @@ func (db *relationalDb) UpdateInTable(ctx context.Context, tableName string, rec
 	return tx.RowsAffected, nil
 }
 
-// Registers a struct with DAL. See RegisterWithDALHelper() for more info.
-func (db *relationalDb) RegisterWithDAL(ctx context.Context, roleMapping map[string]dbrole.DbRole, record Record) error {
-	return db.RegisterWithDALHelper(ctx, roleMapping, GetTableName(record), record)
+// Registers a struct with DAL. See RegisterHelper() for more info.
+func (db *relationalDb) Register(ctx context.Context, roleMapping map[string]dbrole.DbRole, records ...Record) error {
+	for _, record := range records {
+		err := db.RegisterHelper(ctx, roleMapping, GetTableName(record), record)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Create a DB table for the given struct. Enables RLS in it if it is multi-tenant.
@@ -425,7 +439,7 @@ func (db *relationalDb) RegisterWithDAL(ctx context.Context, roleMapping map[str
 // - WRITER, which gives read & write access to all the records in the table
 // - TENANT_READER, which gives read access to current tenant's records
 // - TENANT_WRITER, which gives read & write access to current tenant's records.
-func (db *relationalDb) RegisterWithDALHelper(_ context.Context, roleMapping map[string]dbrole.DbRole, tableName string, record Record) (err error) {
+func (db *relationalDb) RegisterHelper(_ context.Context, roleMapping map[string]dbrole.DbRole, tableName string, record Record) (err error) {
 	if roleMapping == nil {
 		roleMapping = make(map[string]dbrole.DbRole)
 	}
