@@ -190,7 +190,7 @@ func testMultiProtoTransactions(t *testing.T) {
 	t.Helper()
 	assert := assert.New(t)
 
-	c1 := &pb.CPU{}
+	c1 := &pb.Disk{}
 	a2 := &App{}
 	_ = faker.FakeData(c1)
 	_ = faker.FakeData(a2)
@@ -199,10 +199,10 @@ func testMultiProtoTransactions(t *testing.T) {
 	a2.TenantId = COKE
 	t1 := datastore.GetTableName(a1)
 
-	t.Log("Getting DBTransaction for creating pb.CPU and App")
+	t.Log("Getting DBTransaction for creating pb.Disk and App")
 	tx, err := TestDataStore.GetTransaction(CokeAdminCtx, a1, a2)
 	assert.NoError(err)
-	t.Log("Creating pb.CPU and App in single transaction")
+	t.Log("Creating pb.Disk and App in single transaction")
 	err = tx.Transaction(func(tx *gorm.DB) error {
 		t.Logf("Creating %+v", a1)
 		if err := tx.Table(t1).Create(a1).Error; err != nil {
@@ -221,7 +221,7 @@ func testMultiProtoTransactions(t *testing.T) {
 
 	tx, err = TestDataStore.GetTransaction(CokeAuditorCtx, a1, a2)
 	assert.NoError(err)
-	t.Log("Finding pb.CPU and App in single transaction")
+	t.Log("Finding pb.Disk and App in single transaction")
 	f1, err := TestProtoStore.MsgToFilter(CokeAuditorCtx, "a1", c1)
 	assert.NoError(err)
 	f2 := &App{Id: a2.Id, TenantId: a2.TenantId}
@@ -237,7 +237,7 @@ func testMultiProtoTransactions(t *testing.T) {
 		}
 		return nil
 	})
-	t.Log("Verifying pb.CPU and App are properly retrieved")
+	t.Log("Verifying pb.Disk and App are properly retrieved")
 	tx.Commit()
 	assert.NoError(err)
 	assert.NoError(tx.Error)
@@ -246,7 +246,7 @@ func testMultiProtoTransactions(t *testing.T) {
 	t.Log(a1, a2)
 	t.Log(f1, f2)
 
-	t.Log("Deleting pb.CPU and App in single transaction")
+	t.Log("Deleting pb.Disk and App in single transaction")
 	tx, err = TestDataStore.GetTransaction(ServiceAdminCtx, a1)
 	assert.NoError(err)
 	err = tx.Transaction(func(tx *gorm.DB) error {
@@ -261,12 +261,12 @@ func testMultiProtoTransactions(t *testing.T) {
 		}
 		return nil
 	})
-	t.Log("Verifying pb.CPU and App are deleted successfully")
+	t.Log("Verifying pb.Disk and App are deleted successfully")
 	tx.Commit()
 	assert.NoError(err)
 	assert.NoError(tx.Error)
 
-	t.Log("Finding pb.CPU and App after delete should return error")
+	t.Log("Finding pb.Disk and App after delete should return error")
 	tx, err = TestDataStore.GetTransaction(ServiceAdminCtx, a1)
 	assert.NoError(err)
 	f1, err = TestProtoStore.MsgToFilter(CokeAuditorCtx, "a1", c1)
@@ -282,7 +282,7 @@ func testMultiProtoTransactions(t *testing.T) {
 		assert.EqualValues(0, y.RowsAffected, y)
 		return nil
 	})
-	t.Log("Verifying pb.CPU and App are properly retrieved")
+	t.Log("Verifying pb.Disk and App are properly retrieved")
 	tx.Commit()
 	assert.NoError(err)
 }

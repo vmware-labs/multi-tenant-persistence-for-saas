@@ -227,7 +227,7 @@ var TRACE = func(format string, v ...any) {
 }
 ```
 
-## func [GetCompLogger](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/logger.go#L78>)
+## func [GetCompLogger](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/logger.go#L79>)
 
 ```go
 func GetCompLogger() *logrus.Entry
@@ -251,7 +251,7 @@ func GetLogLevel() string
 func GetLogger() *logrus.Logger
 ```
 
-## func [GetOrgId](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L363>)
+## func [GetOrgId](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L362>)
 
 ```go
 func GetOrgId(record Record) (string, bool)
@@ -259,7 +259,7 @@ func GetOrgId(record Record) (string, bool)
 
 Returns the requested OrgId field's value from record, which is a pointer to a struct implementing Record interface.  Uses a tag rather than field name to find the desired field. Returns an empty string and false if such a field is not present.
 
-## func [GetTableName](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L226>)
+## func [GetTableName](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L225>)
 
 ```go
 func GetTableName(x interface{}) (tableName string)

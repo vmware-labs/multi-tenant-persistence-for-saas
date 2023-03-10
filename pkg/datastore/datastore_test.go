@@ -670,7 +670,7 @@ func TestTransactions(t *testing.T) {
 		SERVICE_ADMIN:   dbrole.WRITER,
 	}
 
-	err := ps.Register(CokeAdminCtx, roleMapping, &pb.CPU{})
+	err := ps.Register(CokeAdminCtx, roleMapping, &pb.Disk{})
 	assert.NoError(err)
 
 	testSingleTableTransactions(t)

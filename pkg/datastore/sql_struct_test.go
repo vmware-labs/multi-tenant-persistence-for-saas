@@ -77,17 +77,28 @@ func TestGettingTableName(t *testing.T) {
 
 	{
 		for _, x := range []interface{}{
-			pb.CPU{},
-			&pb.CPU{},
-			[]pb.CPU{},
-			[]*pb.CPU{},
-			&[]pb.CPU{},
-			&[]*pb.CPU{},
+			pb.Disk{},
+			&pb.Disk{},
+			[]pb.Disk{},
+			[]*pb.Disk{},
+			&[]pb.Disk{},
+			&[]*pb.Disk{},
 		} {
 			t.Logf("Testing GetTableName with %+v", datastore.TypeName(x))
-			assert.Equal("processor", datastore.GetTableName(x))
+			assert.Equal("disks", datastore.GetTableName(x))
 		}
 	}
+}
+
+func TestGetTableName(t *testing.T) {
+	assert := assert.New(t)
+	type GroupMsg struct {
+		Name           string
+		ExpressionList []*string
+		Next           *GroupMsg
+		Children       []*GroupMsg
+	}
+	assert.Equal("group_msgs", datastore.GetTableName(GroupMsg{}))
 }
 
 func TestIsRevisioningSupported(t *testing.T) {
