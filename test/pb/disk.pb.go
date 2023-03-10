@@ -20,7 +20,7 @@
 // versions:
 // 	protoc-gen-go v1.28.0
 // 	protoc        v3.21.10
-// source: memory.proto
+// source: disk.proto
 
 package pb
 
@@ -39,7 +39,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type Memory struct {
+type Disk struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -50,23 +50,23 @@ type Memory struct {
 	Type  string `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
 }
 
-func (x *Memory) Reset() {
-	*x = Memory{}
+func (x *Disk) Reset() {
+	*x = Disk{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_memory_proto_msgTypes[0]
+		mi := &file_disk_proto_msgTypes[0]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
 }
 
-func (x *Memory) String() string {
+func (x *Disk) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Memory) ProtoMessage() {}
+func (*Disk) ProtoMessage() {}
 
-func (x *Memory) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_proto_msgTypes[0]
+func (x *Disk) ProtoReflect() protoreflect.Message {
+	mi := &file_disk_proto_msgTypes[0]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -77,70 +77,69 @@ func (x *Memory) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Memory.ProtoReflect.Descriptor instead.
-func (*Memory) Descriptor() ([]byte, []int) {
-	return file_memory_proto_rawDescGZIP(), []int{0}
+// Deprecated: Use Disk.ProtoReflect.Descriptor instead.
+func (*Disk) Descriptor() ([]byte, []int) {
+	return file_disk_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *Memory) GetBrand() string {
+func (x *Disk) GetBrand() string {
 	if x != nil {
 		return x.Brand
 	}
 	return ""
 }
 
-func (x *Memory) GetSize() uint32 {
+func (x *Disk) GetSize() uint32 {
 	if x != nil {
 		return x.Size
 	}
 	return 0
 }
 
-func (x *Memory) GetSpeed() uint32 {
+func (x *Disk) GetSpeed() uint32 {
 	if x != nil {
 		return x.Speed
 	}
 	return 0
 }
 
-func (x *Memory) GetType() string {
+func (x *Disk) GetType() string {
 	if x != nil {
 		return x.Type
 	}
 	return ""
 }
 
-var File_memory_proto protoreflect.FileDescriptor
+var File_disk_proto protoreflect.FileDescriptor
 
-var file_memory_proto_rawDesc = []byte{
-	0x0a, 0x0c, 0x6d, 0x65, 0x6d, 0x6f, 0x72, 0x79, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x05,
-	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0x5c, 0x0a, 0x06, 0x4d, 0x65, 0x6d, 0x6f, 0x72, 0x79, 0x12,
-	0x14, 0x0a, 0x05, 0x62, 0x72, 0x61, 0x6e, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05,
-	0x62, 0x72, 0x61, 0x6e, 0x64, 0x12, 0x12, 0x0a, 0x04, 0x73, 0x69, 0x7a, 0x65, 0x18, 0x02, 0x20,
-	0x01, 0x28, 0x0d, 0x52, 0x04, 0x73, 0x69, 0x7a, 0x65, 0x12, 0x14, 0x0a, 0x05, 0x73, 0x70, 0x65,
-	0x65, 0x64, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x05, 0x73, 0x70, 0x65, 0x65, 0x64, 0x12,
-	0x12, 0x0a, 0x04, 0x74, 0x79, 0x70, 0x65, 0x18, 0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x74,
-	0x79, 0x70, 0x65, 0x42, 0x06, 0x5a, 0x04, 0x2e, 0x3b, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x33,
+var file_disk_proto_rawDesc = []byte{
+	0x0a, 0x0a, 0x64, 0x69, 0x73, 0x6b, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x05, 0x70, 0x72,
+	0x6f, 0x74, 0x6f, 0x22, 0x5a, 0x0a, 0x04, 0x44, 0x69, 0x73, 0x6b, 0x12, 0x14, 0x0a, 0x05, 0x62,
+	0x72, 0x61, 0x6e, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x62, 0x72, 0x61, 0x6e,
+	0x64, 0x12, 0x12, 0x0a, 0x04, 0x73, 0x69, 0x7a, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0d, 0x52,
+	0x04, 0x73, 0x69, 0x7a, 0x65, 0x12, 0x14, 0x0a, 0x05, 0x73, 0x70, 0x65, 0x65, 0x64, 0x18, 0x03,
+	0x20, 0x01, 0x28, 0x0d, 0x52, 0x05, 0x73, 0x70, 0x65, 0x65, 0x64, 0x12, 0x12, 0x0a, 0x04, 0x74,
+	0x79, 0x70, 0x65, 0x18, 0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x74, 0x79, 0x70, 0x65, 0x42,
+	0x06, 0x5a, 0x04, 0x2e, 0x3b, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
-	file_memory_proto_rawDescOnce sync.Once
-	file_memory_proto_rawDescData = file_memory_proto_rawDesc
+	file_disk_proto_rawDescOnce sync.Once
+	file_disk_proto_rawDescData = file_disk_proto_rawDesc
 )
 
-func file_memory_proto_rawDescGZIP() []byte {
-	file_memory_proto_rawDescOnce.Do(func() {
-		file_memory_proto_rawDescData = protoimpl.X.CompressGZIP(file_memory_proto_rawDescData)
+func file_disk_proto_rawDescGZIP() []byte {
+	file_disk_proto_rawDescOnce.Do(func() {
+		file_disk_proto_rawDescData = protoimpl.X.CompressGZIP(file_disk_proto_rawDescData)
 	})
-	return file_memory_proto_rawDescData
+	return file_disk_proto_rawDescData
 }
 
-var file_memory_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
-var file_memory_proto_goTypes = []interface{}{
-	(*Memory)(nil), // 0: proto.Memory
+var file_disk_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
+var file_disk_proto_goTypes = []interface{}{
+	(*Disk)(nil), // 0: proto.Disk
 }
-var file_memory_proto_depIdxs = []int32{
+var file_disk_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
 	0, // [0:0] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
@@ -148,14 +147,14 @@ var file_memory_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_memory_proto_init() }
-func file_memory_proto_init() {
-	if File_memory_proto != nil {
+func init() { file_disk_proto_init() }
+func file_disk_proto_init() {
+	if File_disk_proto != nil {
 		return
 	}
 	if !protoimpl.UnsafeEnabled {
-		file_memory_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Memory); i {
+		file_disk_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*Disk); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -171,18 +170,18 @@ func file_memory_proto_init() {
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: file_memory_proto_rawDesc,
+			RawDescriptor: file_disk_proto_rawDesc,
 			NumEnums:      0,
 			NumMessages:   1,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
-		GoTypes:           file_memory_proto_goTypes,
-		DependencyIndexes: file_memory_proto_depIdxs,
-		MessageInfos:      file_memory_proto_msgTypes,
+		GoTypes:           file_disk_proto_goTypes,
+		DependencyIndexes: file_disk_proto_depIdxs,
+		MessageInfos:      file_disk_proto_msgTypes,
 	}.Build()
-	File_memory_proto = out.File
-	file_memory_proto_rawDesc = nil
-	file_memory_proto_goTypes = nil
-	file_memory_proto_depIdxs = nil
+	File_disk_proto = out.File
+	file_disk_proto_rawDesc = nil
+	file_disk_proto_goTypes = nil
+	file_disk_proto_depIdxs = nil
 }

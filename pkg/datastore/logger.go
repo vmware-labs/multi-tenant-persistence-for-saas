@@ -72,7 +72,8 @@ func GetGormLogger(l *logrus.Entry) logger.Interface {
 	if loglevel == "trace" || loglevel == "debug" {
 		return logger.Default.LogMode(logger.Info)
 	}
-	return gormLogger{log: l}
+	_ = gormLogger{log: l}
+	return logger.Default.LogMode(logger.Silent)
 }
 
 func GetCompLogger() *logrus.Entry {

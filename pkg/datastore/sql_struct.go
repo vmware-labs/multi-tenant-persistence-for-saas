@@ -212,7 +212,6 @@ func IsPointerToStruct(x interface{}) (isPtrType bool) {
 	return
 }
 
-// Validates tenancy information and returns a transaction with right dbRole.
 func schemaParse(x interface{}) (*schema.Schema, error) {
 	TRACE("Parsing schema for %s, %+v", TypeName(x), x)
 	s, err := schema.Parse(x, &sync.Map{}, schema.NamingStrategy{})
