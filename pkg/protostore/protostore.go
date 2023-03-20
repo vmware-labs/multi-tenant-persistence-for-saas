@@ -171,12 +171,8 @@ func (p ProtobufDataStore) GetAuthorizer() authorizer.Authorizer {
 
 func (p ProtobufDataStore) Register(ctx context.Context, roleMapping map[string]dbrole.DbRole, msgs ...proto.Message) error {
 	for _, msg := range msgs {
-		pMsg, err := p.MsgToFilter(ctx, "", msg)
-		if err != nil {
-			p.logger.Errorf("Registering proto message %s failed with error: %v", msg, err)
-			return err
-		}
-		err = p.ds.Helper().RegisterHelper(ctx, roleMapping, datastore.GetTableName(msg), pMsg)
+		pMsg := &ProtoStoreMsg{XTableName: datastore.GetTableName(msg)}
+		err := p.ds.Helper().RegisterHelper(ctx, roleMapping, datastore.GetTableName(msg), pMsg)
 		if err != nil {
 			p.logger.Errorf("Registering proto message %s failed with error: %v", msg, err)
 			return err

@@ -165,7 +165,7 @@ func setupDbContext(t *testing.T) {
 		SERVICE_AUDITOR: dbrole.READER,
 		SERVICE_ADMIN:   dbrole.WRITER,
 	}
-	err := p.Register(ServiceAdminCtx, roleMapping, protoMsgs...)
+	err := p.Register(context.TODO(), roleMapping, protoMsgs...)
 	assert.NoError(err)
 }
 
