@@ -144,14 +144,18 @@ tx.Commit()
 - [Constants](<#constants>)
 - [Variables](<#variables>)
 - [func GetCompLogger() *logrus.Entry](<#func-getcomplogger>)
+- [func GetFieldValue(record Record, fieldName, columnName string) (string, bool)](<#func-getfieldvalue>)
 - [func GetGormLogger(l *logrus.Entry) logger.Interface](<#func-getgormlogger>)
+- [func GetInstanceId(record Record) (string, bool)](<#func-getinstanceid>)
 - [func GetLogLevel() string](<#func-getloglevel>)
 - [func GetLogger() *logrus.Logger](<#func-getlogger>)
 - [func GetOrgId(record Record) (string, bool)](<#func-getorgid>)
 - [func GetTableName(x interface{}) (tableName string)](<#func-gettablename>)
-- [func IsMultitenant(x Record, tableNames ...string) bool](<#func-ismultitenant>)
+- [func IsColumnPresent(x Record, tableName, columnName string) bool](<#func-iscolumnpresent>)
+- [func IsMultiInstanced(x Record, tableName string) bool](<#func-ismultiinstanced>)
+- [func IsMultiTenanted(x Record, tableName string) bool](<#func-ismultitenanted>)
 - [func IsPointerToStruct(x interface{}) (isPtrType bool)](<#func-ispointertostruct>)
-- [func IsRevisioningSupported(tableName string, x Record) bool](<#func-isrevisioningsupported>)
+- [func IsRevisioned(x Record, tableName string) bool](<#func-isrevisioned>)
 - [func TypeName(x interface{}) string](<#func-typename>)
 - [type DBConfig](<#type-dbconfig>)
 - [type DataStore](<#type-datastore>)
@@ -206,11 +210,13 @@ const (
 ```go
 const (
     // Struct Field Names.
-    FIELD_ORGID = "OrgId"
+    FIELD_ORGID      = "OrgId"
+    FIELD_INSTANCEID = "InstanceId"
 
     // SQL Columns.
-    COLUMN_ORGID    = "org_id"
-    COLUMN_REVISION = "revision"
+    COLUMN_ORGID      = "org_id"
+    COLUMN_INSTANCEID = "instance_id"
+    COLUMN_REVISION   = "revision"
 
     // Messages.
     REVISION_OUTDATED_MSG = "Invalid update - outdated "
@@ -236,11 +242,27 @@ var TRACE = func(format string, v ...any) {
 func GetCompLogger() *logrus.Entry
 ```
 
+## func [GetFieldValue](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L382>)
+
+```go
+func GetFieldValue(record Record, fieldName, columnName string) (string, bool)
+```
+
+Returns the requested fields value from record, which is a pointer to a struct implementing Record interface.  Uses a tag rather than field name to find the desired field. Returns an empty string and false if such a field is not present.
+
 ## func [GetGormLogger](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/logger.go#L70>)
 
 ```go
 func GetGormLogger(l *logrus.Entry) logger.Interface
 ```
+
+## func [GetInstanceId](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L374>)
+
+```go
+func GetInstanceId(record Record) (string, bool)
+```
+
+Returns the requested InstanceId field's value from record, which is a pointer to a struct implementing Record interface.  Uses a tag rather than field name to find the desired field. Returns an empty string and false if such a field is not present.
 
 ## func [GetLogLevel](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/logger.go#L47>)
 
@@ -254,7 +276,7 @@ func GetLogLevel() string
 func GetLogger() *logrus.Logger
 ```
 
-## func [GetOrgId](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L362>)
+## func [GetOrgId](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L366>)
 
 ```go
 func GetOrgId(record Record) (string, bool)
@@ -262,7 +284,7 @@ func GetOrgId(record Record) (string, bool)
 
 Returns the requested OrgId field's value from record, which is a pointer to a struct implementing Record interface.  Uses a tag rather than field name to find the desired field. Returns an empty string and false if such a field is not present.
 
-## func [GetTableName](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L225>)
+## func [GetTableName](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L229>)
 
 ```go
 func GetTableName(x interface{}) (tableName string)
@@ -270,29 +292,43 @@ func GetTableName(x interface{}) (tableName string)
 
 Extracts struct's name, which will serve as DB table name, using reflection.
 
-## func [IsMultitenant](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L62>)
+## func [IsColumnPresent](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L73>)
 
 ```go
-func IsMultitenant(x Record, tableNames ...string) bool
+func IsColumnPresent(x Record, tableName, columnName string) bool
 ```
 
-Checks if any of the tables in tableNames are multi\-tenant.
+## func [IsMultiInstanced](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L69>)
 
-## func [IsPointerToStruct](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L209>)
+```go
+func IsMultiInstanced(x Record, tableName string) bool
+```
+
+Checks if multiple deployment instances are supported in the given table.
+
+## func [IsMultiTenanted](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L64>)
+
+```go
+func IsMultiTenanted(x Record, tableName string) bool
+```
+
+Checks if multiple tenants are supported in the given table.
+
+## func [IsPointerToStruct](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L213>)
 
 ```go
 func IsPointerToStruct(x interface{}) (isPtrType bool)
 ```
 
-## func [IsRevisioningSupported](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L51>)
+## func [IsRevisioned](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L59>)
 
 ```go
-func IsRevisioningSupported(tableName string, x Record) bool
+func IsRevisioned(x Record, tableName string) bool
 ```
 
-Checks if revisioning is supported in the given table \(if the struct contains a field with column name equal to "revision"\).
+Checks if revisioning is supported in the given table.
 
-## func [TypeName](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L205>)
+## func [TypeName](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L209>)
 
 ```go
 func TypeName(x interface{}) string

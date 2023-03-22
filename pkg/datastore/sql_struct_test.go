@@ -101,9 +101,61 @@ func TestGetTableName(t *testing.T) {
 	assert.Equal("group_msgs", datastore.GetTableName(GroupMsg{}))
 }
 
-func TestIsRevisioningSupported(t *testing.T) {
+func TestIsRevisioned(t *testing.T) {
 	assert := assert.New(t)
 
-	assert.Equal(true, datastore.IsRevisioningSupported("groups", Group{}))
-	assert.Equal(true, datastore.IsRevisioningSupported("groups", &Group{}))
+	assert.True(datastore.IsRevisioned(Group{}, "groups"))
+	assert.True(datastore.IsRevisioned(&Group{}, "groups"))
+}
+
+func TestSchemaParseFeatures(t *testing.T) {
+	assert := assert.New(t)
+
+	// No Features
+	type S1 struct {
+		Id   string
+		Name string
+	}
+
+	// No Features
+	type S2 struct {
+		Id         string
+		Name       string
+		OrgId      string `gorm:"primaryKey;column:organization"`
+		InstanceId string `gorm:"primaryKey;column:instance"`
+		Revision   string `gorm:"-"`
+	}
+
+	// Features by field names
+	type S3 struct {
+		Id         string
+		Name       string
+		OrgId      string
+		InstanceId string
+		Revision   string
+	}
+
+	// Features by golang tags
+	type S4 struct {
+		Id            string
+		Name          string
+		TenantId      string `gorm:"primaryKey;column:org_id"`
+		DeploymentId  string `gorm:"column:instance_id"`
+		UpdateVersion string `gorm:"column:revision"`
+	}
+
+	assert.False(datastore.IsMultiTenanted(S1{}, "S1"))
+	assert.False(datastore.IsMultiTenanted(S2{}, "S2"))
+	assert.True(datastore.IsMultiTenanted(S3{}, "S3"))
+	assert.True(datastore.IsMultiTenanted(S4{}, "S4"))
+
+	assert.False(datastore.IsRevisioned(S1{}, "S1"))
+	assert.False(datastore.IsRevisioned(S2{}, "S2"))
+	assert.True(datastore.IsRevisioned(S3{}, "S3"))
+	assert.True(datastore.IsRevisioned(S4{}, "S4"))
+
+	assert.False(datastore.IsMultiInstanced(S1{}, "S1"))
+	assert.False(datastore.IsMultiInstanced(S2{}, "S2"))
+	assert.True(datastore.IsMultiInstanced(S3{}, "S3"))
+	assert.True(datastore.IsMultiInstanced(S4{}, "S4"))
 }

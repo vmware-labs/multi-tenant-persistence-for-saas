@@ -30,48 +30,52 @@ import (
 
 const (
 	// Struct Field Names.
-	FIELD_ORGID = "OrgId"
+	FIELD_ORGID      = "OrgId"
+	FIELD_INSTANCEID = "InstanceId"
 
 	// SQL Columns.
-	COLUMN_ORGID    = "org_id"
-	COLUMN_REVISION = "revision"
+	COLUMN_ORGID      = "org_id"
+	COLUMN_INSTANCEID = "instance_id"
+	COLUMN_REVISION   = "revision"
 
 	// Messages.
 	REVISION_OUTDATED_MSG = "Invalid update - outdated "
 )
 
-// Maps a DB table name to booleans showing if the table is multitenant.
-var multitenancyMap = make(map[string]bool)
+// Maps DB table name to booleans showing if the table is multitenant and revisioning.
+var schemaMap = map[string]map[string]bool{}
 
-// Maps DB table name to boolean showing if the table is concurrent with revision column.
-var revisionSupportMap = make(map[string]bool)
-
-// Checks if revisioning is supported in the given table (if
-// the struct contains a field with column name equal to "revision").
-func IsRevisioningSupported(tableName string, x Record) bool {
-	if _, ok := revisionSupportMap[tableName]; !ok {
-		s, _ := schemaParse(x)
-		if _, ok := s.FieldsByDBName[COLUMN_REVISION]; ok {
-			revisionSupportMap[tableName] = true
-		}
-	}
-	return revisionSupportMap[tableName]
+func cacheSchemaSpec(tableName string, s *schema.Schema) {
+	schemaMap[tableName] = make(map[string]bool)
+	_, ok := s.FieldsByDBName[COLUMN_REVISION]
+	schemaMap[tableName][COLUMN_REVISION] = ok
+	_, ok = s.FieldsByDBName[COLUMN_ORGID]
+	schemaMap[tableName][COLUMN_ORGID] = ok
+	_, ok = s.FieldsByDBName[COLUMN_INSTANCEID]
+	schemaMap[tableName][COLUMN_INSTANCEID] = ok
 }
 
-// Checks if any of the tables in tableNames are multi-tenant.
-func IsMultitenant(x Record, tableNames ...string) bool {
-	for _, tableName := range tableNames {
-		s, _ := schemaParse(x)
-		if _, ok := s.FieldsByDBName[COLUMN_ORGID]; ok {
-			multitenancyMap[tableName] = true
-		}
-	}
+// Checks if revisioning is supported in the given table.
+func IsRevisioned(x Record, tableName string) bool {
+	return IsColumnPresent(x, tableName, COLUMN_REVISION)
+}
 
-	isMultitenant := false
-	for i := 0; i < len(tableNames) && !isMultitenant; i++ {
-		isMultitenant = multitenancyMap[tableNames[i]]
+// Checks if multiple tenants are supported in the given table.
+func IsMultiTenanted(x Record, tableName string) bool {
+	return IsColumnPresent(x, tableName, COLUMN_ORGID)
+}
+
+// Checks if multiple deployment instances are supported in the given table.
+func IsMultiInstanced(x Record, tableName string) bool {
+	return IsColumnPresent(x, tableName, COLUMN_INSTANCEID)
+}
+
+func IsColumnPresent(x Record, tableName, columnName string) bool {
+	if _, ok := schemaMap[tableName]; !ok {
+		s, _ := schemaParse(x)
+		cacheSchemaSpec(tableName, s)
 	}
-	return isMultitenant
+	return schemaMap[tableName][columnName]
 }
 
 // Wraps IF NOT EXISTS around the given statement.
@@ -360,9 +364,24 @@ func getTruncateTableStmt(tableName string, cascade bool) string {
 // name to find the desired field. Returns an empty string and false if such
 // a field is not present.
 func GetOrgId(record Record) (string, bool) {
-	fieldName := FIELD_ORGID
+	return GetFieldValue(record, FIELD_ORGID, COLUMN_ORGID)
+}
+
+// Returns the requested InstanceId field's value from record, which is a pointer
+// to a struct implementing Record interface.  Uses a tag rather than field
+// name to find the desired field. Returns an empty string and false if such
+// a field is not present.
+func GetInstanceId(record Record) (string, bool) {
+	return GetFieldValue(record, FIELD_INSTANCEID, COLUMN_INSTANCEID)
+}
+
+// Returns the requested fields value from record, which is a pointer
+// to a struct implementing Record interface.  Uses a tag rather than field
+// name to find the desired field. Returns an empty string and false if such
+// a field is not present.
+func GetFieldValue(record Record, fieldName, columnName string) (string, bool) {
 	if s, err := schemaParse(record); err == nil {
-		if f, ok := s.FieldsByDBName[COLUMN_ORGID]; ok {
+		if f, ok := s.FieldsByDBName[columnName]; ok {
 			fieldName = f.Name
 		}
 	}
