@@ -89,7 +89,7 @@ func (db *relationalDb) getDBTransaction(ctx context.Context, tableName string, 
 	// make sure that the record being inserted/modified/updated/deleted/queried belongs to the user's org.
 	// If operation is SELECT but no specific tenant's data is being queried (e.g., FindAll() was called),
 	// allow the operation to proceed.
-	if dbRole.IsDbRoleTenantScoped() && IsMultitenant(record, tableName) {
+	if dbRole.IsDbRoleTenantScoped() && IsMultiTenanted(record, tableName) {
 		orgIdCol, _ := GetOrgId(record)
 		if orgIdCol != "" && orgIdCol != orgId {
 			err = ErrOperationNotAllowed.WithValue("tenant", orgId).WithValue("orgIdCol", orgIdCol)
@@ -141,7 +141,7 @@ func (db *relationalDb) GetTransaction(ctx context.Context, records ...Record) (
 	// If operation is SELECT but no specific tenant's data is being queried (e.g., FindAll() was called),
 	// allow the operation to proceed.
 	for _, record := range records {
-		if dbRole.IsDbRoleTenantScoped() && IsMultitenant(record, GetTableName(record)) {
+		if dbRole.IsDbRoleTenantScoped() && IsMultiTenanted(record, GetTableName(record)) {
 			orgIdCol, _ := GetOrgId(record)
 			if orgIdCol != "" && orgIdCol != orgId {
 				err = ErrOperationNotAllowed.WithValue("tenant", orgId).WithValue("orgIdCol", orgIdCol)
@@ -458,14 +458,14 @@ func (db *relationalDb) RegisterHelper(_ context.Context, roleMapping map[string
 	}
 
 	// Set up trigger on revision column for tables that need it
-	if IsRevisioningSupported(tableName, record) {
+	if IsRevisioned(record, tableName) {
 		if err = db.enforceRevisioning(tableName); err != nil {
 			return err
 		}
 	}
 
 	// Enable row-level security in a multi-tenant table
-	if IsMultitenant(record, tableName) {
+	if IsMultiTenanted(record, tableName) {
 		stmt := getEnableRLSStmt(tableName, record)
 		tx, err = db.GetDBConn(dbrole.MAIN)
 		if err != nil {
@@ -542,7 +542,7 @@ func (db *relationalDb) createDbUser(dbUserSpecs dbUserSpecs, tableName string, 
 		return err
 	}
 
-	if IsMultitenant(record, tableName) {
+	if IsMultiTenanted(record, tableName) {
 		tx, err = db.GetDBConn(dbrole.MAIN)
 		if err != nil {
 			return err
