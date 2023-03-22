@@ -178,6 +178,9 @@ const (
     SSL_MODE_ENV_VAR          = "SSL_MODE"
     DB_ADMIN_USERNAME_ENV_VAR = "DB_ADMIN_USERNAME"
     DB_ADMIN_PASSWORD_ENV_VAR = "DB_ADMIN_PASSWORD"
+
+    // SQL Error Codes.
+    ERROR_DUPLICATE_KEY = "SQLSTATE 23505"
 )
 ```
 
@@ -295,7 +298,7 @@ Checks if revisioning is supported in the given table \(if the struct contains a
 func TypeName(x interface{}) string
 ```
 
-## type [DBConfig](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/helper.go#L46-L53>)
+## type [DBConfig](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/helper.go#L49-L56>)
 
 ```go
 type DBConfig struct {
@@ -327,13 +330,13 @@ type DataStore interface {
 }
 ```
 
-### func [FromConfig](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/helper.go#L95>)
+### func [FromConfig](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/helper.go#L98>)
 
 ```go
 func FromConfig(l *logrus.Entry, authorizer authorizer.Authorizer, cfg DBConfig) (d DataStore, err error)
 ```
 
-### func [FromEnv](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/helper.go#L55>)
+### func [FromEnv](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/helper.go#L58>)
 
 ```go
 func FromEnv(l *logrus.Entry, authorizer authorizer.Authorizer) (d DataStore, err error)
