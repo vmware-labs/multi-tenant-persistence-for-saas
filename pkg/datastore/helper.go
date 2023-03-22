@@ -41,6 +41,9 @@ const (
 	SSL_MODE_ENV_VAR          = "SSL_MODE"
 	DB_ADMIN_USERNAME_ENV_VAR = "DB_ADMIN_USERNAME"
 	DB_ADMIN_PASSWORD_ENV_VAR = "DB_ADMIN_PASSWORD"
+
+	// SQL Error Codes.
+	ERROR_DUPLICATE_KEY = "SQLSTATE 23505"
 )
 
 type DBConfig struct {
@@ -121,7 +124,7 @@ func FromConfig(l *logrus.Entry, authorizer authorizer.Authorizer, cfg DBConfig)
 					// Suppresses following duplicate insertion error,
 					// ERROR: duplicate key value violates unique constraint
 					// "pg_authid_rolname_index" (SQLSTATE 23505)
-					if strings.Contains(tx.Error.Error(), "duplicate key value") {
+					if strings.Contains(tx.Error.Error(), ERROR_DUPLICATE_KEY) {
 						db.logger.Infoln(tx.Error)
 						return nil
 					}
@@ -132,6 +135,13 @@ func FromConfig(l *logrus.Entry, authorizer authorizer.Authorizer, cfg DBConfig)
 			functionName, functionBody := getCheckAndUpdateRevisionFunc()
 			stmt := getCreateTriggerFunctionStmt(functionName, functionBody)
 			if tx := db.gormDBMap[dbrole.MAIN].Exec(stmt); tx.Error != nil {
+				// Suppresses following duplicate insertion error,
+				// ERROR: duplicate key value violates unique constraint
+				// "pg_authid_rolname_index" (SQLSTATE 23505)
+				if strings.Contains(tx.Error.Error(), ERROR_DUPLICATE_KEY) {
+					db.logger.Infoln(tx.Error)
+					return nil
+				}
 				err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
 				db.logger.Error(err)
 				return err
