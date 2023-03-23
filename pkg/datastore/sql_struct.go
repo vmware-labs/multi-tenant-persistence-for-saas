@@ -42,7 +42,7 @@ const (
 	REVISION_OUTDATED_MSG = "Invalid update - outdated "
 )
 
-// Maps DB table name to booleans showing if the table is multitenant and revisioning.
+// Maps DB table name to booleans showing if the table supports multitenancy and revisioning.
 var schemaMap = map[string]map[string]bool{}
 
 func cacheSchemaSpec(tableName string, s *schema.Schema) {
