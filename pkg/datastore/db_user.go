@@ -27,7 +27,7 @@ import (
 )
 
 // Specifications for database user.
-type dbUserSpecs struct {
+type dbUserSpec struct {
 	username         dbrole.DbRole // Username/role name (in Postgres, users and roles are equivalent)
 	password         string
 	policyName       string
@@ -36,12 +36,7 @@ type dbUserSpecs struct {
 	newRowsCond      string   // SQL conditional expression to be checked for rows being inserted or updated. Only those rows for which the condition is true will be inserted/updated
 }
 
-// Generates specifications of 4 DB users:
-// - user with read-only access to his org
-// - user with read & write access to his org
-// - user with read-only access to all orgs
-// - user with read & write access to all orgs.
-func getDbUser(dbRole dbrole.DbRole) dbUserSpecs {
+func getDbUser(dbRole dbrole.DbRole) dbUserSpec {
 	for _, spec := range getAllDbUsers() {
 		if spec.username == dbRole {
 			return spec
@@ -56,42 +51,61 @@ Generates specifications of 4 DB users:
 - user with read & write access to his org
 - user with read-only access to all orgs
 - user with read & write access to all orgs.
+All the users have additional conditions to restrict access to records
+belonging to specific instance, if withInstanceIdCheck is set.
 */
-func getDbUsers(tableName string) []dbUserSpecs {
-	writer := dbUserSpecs{
+func getDbUsers(tableName string, withTenantIdCheck, withInstanceIdCheck bool) []dbUserSpec {
+	cond := "true"
+	if withInstanceIdCheck {
+		cond = COLUMN_INSTANCEID + " = current_setting('" + DbConfigInstanceId + "')"
+	}
+
+	writer := dbUserSpec{
 		username:         dbrole.WRITER,
 		commands:         []string{"SELECT", "INSERT", "UPDATE", "DELETE"},
-		existingRowsCond: "true", // Allow access to all existing records
-		newRowsCond:      "true", // Allow inserting or updating records
+		existingRowsCond: cond, // Allow access to all existing records
+		newRowsCond:      cond, // Allow inserting or updating records
 	}
 
-	reader := dbUserSpecs{
+	reader := dbUserSpec{
 		username:         dbrole.READER,
 		commands:         []string{"SELECT"}, // Allow to perform SELECT on all records
-		existingRowsCond: "true",             // Allow access to all existing records
+		existingRowsCond: cond,               // Allow access to all existing records
 		newRowsCond:      "false",            // Prevent inserting or updating records
 	}
 
-	tenancyCond := COLUMN_ORGID + " = current_setting('" + DbConfigOrgId + "')"
-	tenantWriter := dbUserSpecs{
+	rlsCond := "true"
+	if withTenantIdCheck && withInstanceIdCheck {
+		rlsCond = COLUMN_ORGID + " = current_setting('" + DbConfigOrgId + "')"
+		rlsCond += " AND " + COLUMN_INSTANCEID + " = current_setting('" + DbConfigInstanceId + "')"
+	}
+	if !withTenantIdCheck && withInstanceIdCheck {
+		rlsCond = COLUMN_INSTANCEID + " = current_setting('" + DbConfigInstanceId + "')"
+	}
+	if withTenantIdCheck && !withInstanceIdCheck {
+		rlsCond = COLUMN_ORGID + " = current_setting('" + DbConfigOrgId + "')"
+	}
+
+	tenantWriter := dbUserSpec{
 		username:         dbrole.TENANT_WRITER,
 		commands:         []string{"SELECT", "INSERT", "UPDATE", "DELETE"},
-		existingRowsCond: tenancyCond, // Allow access only to its tenant's records
-		newRowsCond:      tenancyCond, // Allow inserting for or updating records of its own tenant
+		existingRowsCond: rlsCond, // Allow access only to its tenant's records
+		newRowsCond:      rlsCond, // Allow inserting for or updating records of its own tenant
 	}
 
-	tenantReader := dbUserSpecs{
+	tenantReader := dbUserSpec{
 		username:         dbrole.TENANT_READER,
 		commands:         []string{"SELECT"}, // Allow to perform SELECT on its tenant's records
-		existingRowsCond: tenancyCond,        // Allow access only to its tenant's records
+		existingRowsCond: rlsCond,            // Allow access only to its tenant's records
 		newRowsCond:      "false",            // Prevent inserting or updating records
 	}
 
-	dbUsers := []dbUserSpecs{writer, reader, tenantWriter, tenantReader}
+	dbUsers := []dbUserSpec{writer, reader, tenantWriter, tenantReader}
 	for i := 0; i < len(dbUsers); i++ {
 		dbUsers[i].password = getPassword(string(dbUsers[i].username))
 		dbUsers[i].policyName = getRlsPolicyName(string(dbUsers[i].username), tableName)
 	}
+	TRACE("Returning db user specs for %s, %s, %s: %+v", tableName, withTenantIdCheck, withInstanceIdCheck, dbUsers)
 	return dbUsers
 }
 
@@ -103,6 +117,6 @@ func getPassword(username string) string {
 	return strconv.FormatInt(int64(h.Sum32()), 16)
 }
 
-func getAllDbUsers() []dbUserSpecs {
-	return getDbUsers("ANY")
+func getAllDbUsers() []dbUserSpec {
+	return getDbUsers("ANY", false, false) // Used for creating users only
 }

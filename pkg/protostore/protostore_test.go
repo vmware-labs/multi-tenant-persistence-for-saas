@@ -171,7 +171,7 @@ func setupDbContext(t *testing.T) {
 
 func TestProtoStoreInDbFindWithInvalidParams(t *testing.T) {
 	setupDbContext(t)
-	testProtoStoreFindWithInvalidParams(t, PepsiAdminCtx)
+	testProtoStoreFindWithInvalidParams(t, AmericasPepsiAdminCtx)
 }
 
 /*
@@ -241,7 +241,7 @@ func testProtoStoreFindWithInvalidParams(t *testing.T, ctx context.Context) {
 
 func TestProtoStoreInDbFindAll(t *testing.T) {
 	setupDbContext(t)
-	testProtoStoreFindAll(t, PepsiAdminCtx)
+	testProtoStoreFindAll(t, AmericasPepsiAdminCtx)
 }
 
 /*
@@ -499,13 +499,13 @@ func testProtoStoreFindAll(t *testing.T, ctx context.Context) {
 
 func TestProtoStoreInDbCrud(t *testing.T) {
 	setupDbContext(t)
-	testProtoStoreCrud(t, PepsiAdminCtx, false)
+	testProtoStoreCrud(t, AmericasPepsiAdminCtx, false)
 }
 
 // Same as TestProtoStoreInDbCrud, but uses Upsert instead of Insert or Update.
 func TestProtoStoreInDbCrudUpsert(t *testing.T) {
 	setupDbContext(t)
-	testProtoStoreCrud(t, PepsiAdminCtx, true)
+	testProtoStoreCrud(t, AmericasPepsiAdminCtx, true)
 }
 
 /*
@@ -671,15 +671,15 @@ func TestProtoStoreInDbMultitenancy(t *testing.T) {
 
 	cpuMsg1 := pb.CPU{}
 	_ = faker.FakeData(&cpuMsg1)
-	rowsAffected, md, err := p.Insert(PepsiAdminCtx, cpuMsg1.Name, &cpuMsg1) // Pepsi inserts a record into Protostore
+	rowsAffected, md, err := p.Insert(AmericasPepsiAdminCtx, cpuMsg1.Name, &cpuMsg1) // Pepsi inserts a record into Protostore
 	assert.NoError(err)
 	assert.Equal(int64(1), rowsAffected)
 	assert.Equal(cpuMsg1.Name, md.Id)
 	assert.Equal(int64(1), md.Revision)
 
 	queryResult := pb.CPU{}
-	err = p.FindById(CokeAdminCtx, cpuMsg1.Name, &queryResult, nil) // Coke tries to read Pepsi's Protobuf message
-	assert.ErrorIs(err, ErrRecordNotFound)                          // Coke won't be able to see that record due to RLS
+	err = p.FindById(AmericasCokeAdminCtx, cpuMsg1.Name, &queryResult, nil) // Coke tries to read Pepsi's Protobuf message
+	assert.ErrorIs(err, ErrRecordNotFound)                                  // Coke won't be able to see that record due to RLS
 	assert.Empty(queryResult.GetName(), "Coke user found a record belonging to Pepsi tenant")
 }
 
@@ -689,7 +689,7 @@ func BenchmarkCrudProtoStoreInDb(b *testing.B) {
 	var t testing.T
 	setupDbContext(&t)
 	for n := 0; n < b.N; n++ {
-		testProtoStoreCrud(&t, CokeAdminCtx, false)
-		testProtoStoreCrud(&t, CokeAdminCtx, true)
+		testProtoStoreCrud(&t, AmericasCokeAdminCtx, false)
+		testProtoStoreCrud(&t, AmericasCokeAdminCtx, true)
 	}
 }

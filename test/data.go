@@ -26,12 +26,14 @@ import (
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/protostore"
 )
 
-// Organizations.
 const (
+	// Organizations.
 	COKE  = "Coke"
 	PEPSI = "Pepsi"
 
-	AMERICAS = "americas"
+	// Instances.
+	AMERICAS = "Americas"
+	EUROPE   = "Europe"
 )
 
 // Service roles for test cases.
@@ -45,6 +47,7 @@ const (
 var (
 	RANDOM_ID              string = uuid.New().String()
 	TestMetadataAuthorizer        = authorizer.MetadataBasedAuthorizer{}
+	TestInstancer                 = authorizer.SimpleInstancer{}
 	ServiceAdminCtx               = TestMetadataAuthorizer.GetAuthContext("", SERVICE_ADMIN)
 	ServiceAuditorCtx             = TestMetadataAuthorizer.GetAuthContext("", SERVICE_AUDITOR)
 	CokeAdminCtx                  = TestMetadataAuthorizer.GetAuthContext(COKE, TENANT_ADMIN)
@@ -52,7 +55,13 @@ var (
 	PepsiAdminCtx                 = TestMetadataAuthorizer.GetAuthContext(PEPSI, TENANT_ADMIN)
 	PepsiAuditorCtx               = TestMetadataAuthorizer.GetAuthContext(PEPSI, TENANT_AUDITOR)
 
-	TestDataStore, _ = datastore.FromEnv(datastore.GetCompLogger(), TestMetadataAuthorizer)
+	AmericasCokeAdminCtx   = TestInstancer.WithInstanceId(CokeAdminCtx, AMERICAS)
+	AmericasCokeAuditorCtx = TestInstancer.WithInstanceId(CokeAuditorCtx, AMERICAS)
+	AmericasPepsiAdminCtx  = TestInstancer.WithInstanceId(PepsiAdminCtx, AMERICAS)
+	EuropeCokeAdminCtx     = TestInstancer.WithInstanceId(CokeAdminCtx, EUROPE)
+	EuropeCokeAuditorCtx   = TestInstancer.WithInstanceId(CokeAuditorCtx, EUROPE)
+
+	TestDataStore, _ = datastore.FromEnv(datastore.GetCompLogger(), TestMetadataAuthorizer, TestInstancer)
 	TestProtoStore   = protostore.GetProtoStore(datastore.GetCompLogger(), TestDataStore)
 )
 
@@ -99,7 +108,8 @@ func (a App) AreNonKeyFieldsEmpty() bool {
 }
 
 type Group struct {
-	Id       string
-	Name     string
-	Revision int
+	Id         string `gorm:"primaryKey"`
+	Name       string
+	Revision   int
+	InstanceId string `gorm:"primaryKey"`
 }

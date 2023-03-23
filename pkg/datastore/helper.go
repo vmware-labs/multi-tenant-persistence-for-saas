@@ -55,7 +55,7 @@ type DBConfig struct {
 	sslMode  string
 }
 
-func FromEnv(l *logrus.Entry, authorizer authorizer.Authorizer) (d DataStore, err error) {
+func FromEnv(l *logrus.Entry, authorizer authorizer.Authorizer, instancer authorizer.Instancer) (d DataStore, err error) {
 	// Ensure all the needed environment variables are present and non-empty
 	for _, envVar := range []string{
 		DB_HOST_ENV_VAR,
@@ -92,10 +92,10 @@ func FromEnv(l *logrus.Entry, authorizer authorizer.Authorizer) (d DataStore, er
 	cfg.dbName = strings.TrimSpace(os.Getenv(DB_NAME_ENV_VAR))
 	cfg.sslMode = strings.TrimSpace(os.Getenv(SSL_MODE_ENV_VAR))
 
-	return FromConfig(l, authorizer, cfg)
+	return FromConfig(l, authorizer, instancer, cfg)
 }
 
-func FromConfig(l *logrus.Entry, authorizer authorizer.Authorizer, cfg DBConfig) (d DataStore, err error) {
+func FromConfig(l *logrus.Entry, authorizer authorizer.Authorizer, instancer authorizer.Instancer, cfg DBConfig) (d DataStore, err error) {
 	gl := GetGormLogger(l)
 	dbConnInitializer := func(db *relationalDb, dbRole dbrole.DbRole) error {
 		db.Lock()
@@ -174,6 +174,7 @@ func FromConfig(l *logrus.Entry, authorizer authorizer.Authorizer, cfg DBConfig)
 	}
 	return &relationalDb{
 		authorizer:  authorizer,
+		instancer:   instancer,
 		gormDBMap:   make(map[dbrole.DbRole]*gorm.DB),
 		initializer: dbConnInitializer,
 		logger:      l,

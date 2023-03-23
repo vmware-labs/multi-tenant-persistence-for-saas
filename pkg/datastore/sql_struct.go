@@ -66,8 +66,13 @@ func IsMultiTenanted(x Record, tableName string) bool {
 }
 
 // Checks if multiple deployment instances are supported in the given table.
-func IsMultiInstanced(x Record, tableName string) bool {
-	return IsColumnPresent(x, tableName, COLUMN_INSTANCEID)
+func IsMultiInstanced(x Record, tableName string, instancerConfigured bool) bool {
+	return instancerConfigured && IsColumnPresent(x, tableName, COLUMN_INSTANCEID)
+}
+
+// Row Level Security to used to partition tables for multi-tenancy and multi-instance support.
+func IsRowLevelSecurityRequired(record Record, tableName string, instancerConfigured bool) bool {
+	return IsMultiTenanted(record, tableName) || IsMultiInstanced(record, tableName, instancerConfigured)
 }
 
 func IsColumnPresent(x Record, tableName, columnName string) bool {
@@ -159,28 +164,28 @@ func getGrantPrivilegesStmt(tableName string, username string, commands []string
 }
 
 // Returns a SQL statement that creates an RLS-policy with the given specs, if it does not exist yet.
-func getCreatePolicyStmt(tableName string, _ Record, userSpecs dbUserSpecs) string {
-	if userSpecs.existingRowsCond == "" || userSpecs.newRowsCond == "" {
-		panic(userSpecs)
+func getCreatePolicyStmt(tableName string, _ Record, dbUser dbUserSpec) string {
+	if dbUser.existingRowsCond == "" || dbUser.newRowsCond == "" {
+		panic(dbUser)
 	}
 
 	var createPolicyStmt, findPolicyQuery strings.Builder
 	findPolicyQuery.WriteString("SELECT * FROM pg_policy WHERE polname = '")
-	findPolicyQuery.WriteString(userSpecs.policyName)
+	findPolicyQuery.WriteString(dbUser.policyName)
 	findPolicyQuery.WriteString("'")
 
 	createPolicyStmt.WriteString("CREATE POLICY ")
-	createPolicyStmt.WriteString(userSpecs.policyName)
+	createPolicyStmt.WriteString(dbUser.policyName)
 	createPolicyStmt.WriteString(" ON ")
 	createPolicyStmt.WriteString(tableName)
 	createPolicyStmt.WriteString(" TO ")
-	createPolicyStmt.WriteString(string(userSpecs.username))
+	createPolicyStmt.WriteString(string(dbUser.username))
 	createPolicyStmt.WriteString("\n\t\t")
 	createPolicyStmt.WriteString("USING (")
-	createPolicyStmt.WriteString(userSpecs.existingRowsCond)
+	createPolicyStmt.WriteString(dbUser.existingRowsCond)
 	createPolicyStmt.WriteString(")\n\t\t")
 	createPolicyStmt.WriteString("WITH CHECK (")
-	createPolicyStmt.WriteString(userSpecs.newRowsCond)
+	createPolicyStmt.WriteString(dbUser.newRowsCond)
 	createPolicyStmt.WriteString(")")
 
 	stmt := addIfNotExists(createPolicyStmt.String(), findPolicyQuery.String())
@@ -375,6 +380,10 @@ func GetInstanceId(record Record) (string, bool) {
 	return GetFieldValue(record, FIELD_INSTANCEID, COLUMN_INSTANCEID)
 }
 
+func SetInstanceId(record Record, value string) bool {
+	return SetFieldValue(record, FIELD_INSTANCEID, COLUMN_INSTANCEID, value)
+}
+
 // Returns the requested fields value from record, which is a pointer
 // to a struct implementing Record interface.  Uses a tag rather than field
 // name to find the desired field. Returns an empty string and false if such
@@ -398,4 +407,26 @@ func GetFieldValue(record Record, fieldName, columnName string) (string, bool) {
 	}
 
 	return "", false
+}
+
+func SetFieldValue(record Record, fieldName, columnName, value string) bool {
+	if s, err := schemaParse(record); err == nil {
+		if f, ok := s.FieldsByDBName[columnName]; ok {
+			fieldName = f.Name
+		}
+	}
+	structValue := reflect.ValueOf(record)
+	if structValue.Kind() == reflect.Ptr {
+		structValue = structValue.Elem()
+	}
+	structType := structValue.Type()
+
+	for i := 0; i < structType.NumField(); i++ {
+		if structType.Field(i).Name == fieldName {
+			structValue.FieldByName(fieldName).SetString(value)
+			return true
+		}
+	}
+
+	return false
 }
