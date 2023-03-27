@@ -28,9 +28,13 @@ import (
 Authorizer Interface defines the methods required for datastore to restrict access based on roles configured in context.
 */
 type Authorizer interface {
+	Tenancer
 	Configure(tableName string, roleMapping map[string]dbrole.DbRole)
 	GetAuthContext(orgId string, roles ...string) context.Context
 	GetDefaultOrgAdminContext() context.Context
-	GetOrgFromContext(ctx context.Context) (string, error)
 	GetMatchingDbRole(ctx context.Context, tableNames ...string) (dbrole.DbRole, error)
+}
+
+type Tenancer interface {
+	GetOrgFromContext(ctx context.Context) (string, error)
 }
