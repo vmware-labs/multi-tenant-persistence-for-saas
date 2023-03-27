@@ -30,6 +30,8 @@ import (
 const (
 	COKE  = "Coke"
 	PEPSI = "Pepsi"
+
+	AMERICAS = "americas"
 )
 
 // Service roles for test cases.

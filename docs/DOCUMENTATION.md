@@ -14,12 +14,18 @@ import "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
 
 - [Constants](<#constants>)
 - [type Authorizer](<#type-authorizer>)
+- [type ContextKey](<#type-contextkey>)
+- [type Instancer](<#type-instancer>)
 - [type MetadataBasedAuthorizer](<#type-metadatabasedauthorizer>)
   - [func (s MetadataBasedAuthorizer) Configure(_ string, _ map[string]dbrole.DbRole)](<#func-metadatabasedauthorizer-configure>)
   - [func (s MetadataBasedAuthorizer) GetAuthContext(orgId string, roles ...string) context.Context](<#func-metadatabasedauthorizer-getauthcontext>)
   - [func (s MetadataBasedAuthorizer) GetDefaultOrgAdminContext() context.Context](<#func-metadatabasedauthorizer-getdefaultorgadmincontext>)
   - [func (s MetadataBasedAuthorizer) GetMatchingDbRole(ctx context.Context, _ ...string) (dbrole.DbRole, error)](<#func-metadatabasedauthorizer-getmatchingdbrole>)
   - [func (s MetadataBasedAuthorizer) GetOrgFromContext(ctx context.Context) (string, error)](<#func-metadatabasedauthorizer-getorgfromcontext>)
+- [type SimpleInstancer](<#type-simpleinstancer>)
+  - [func (s SimpleInstancer) GetInstanceId(ctx context.Context) (string, error)](<#func-simpleinstancer-getinstanceid>)
+  - [func (s SimpleInstancer) WithInstanceId(ctx context.Context, instanceId string) context.Context](<#func-simpleinstancer-withinstanceid>)
+- [type Tenancer](<#type-tenancer>)
 
 
 ## Constants
@@ -37,17 +43,38 @@ const (
 )
 ```
 
+```go
+const (
+    INSTANCE_ID = ContextKey("multiinstance.id")
+)
+```
+
 ## type [Authorizer](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/authorizer.go#L30-L36>)
 
 Authorizer Interface defines the methods required for datastore to restrict access based on roles configured in context.
 
 ```go
 type Authorizer interface {
+    Tenancer
     Configure(tableName string, roleMapping map[string]dbrole.DbRole)
     GetAuthContext(orgId string, roles ...string) context.Context
     GetDefaultOrgAdminContext() context.Context
-    GetOrgFromContext(ctx context.Context) (string, error)
     GetMatchingDbRole(ctx context.Context, tableNames ...string) (dbrole.DbRole, error)
+}
+```
+
+## type [ContextKey](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/instancer.go#L10>)
+
+```go
+type ContextKey string
+```
+
+## type [Instancer](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/instancer.go#L16-L19>)
+
+```go
+type Instancer interface {
+    GetInstanceId(ctx context.Context) (string, error)
+    WithInstanceId(ctx context.Context, instanceId string) context.Context
 }
 ```
 
@@ -85,6 +112,32 @@ func (s MetadataBasedAuthorizer) GetMatchingDbRole(ctx context.Context, _ ...str
 
 ```go
 func (s MetadataBasedAuthorizer) GetOrgFromContext(ctx context.Context) (string, error)
+```
+
+## type [SimpleInstancer](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/instancer.go#L21>)
+
+```go
+type SimpleInstancer struct{}
+```
+
+### func \(SimpleInstancer\) [GetInstanceId](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/instancer.go#L23>)
+
+```go
+func (s SimpleInstancer) GetInstanceId(ctx context.Context) (string, error)
+```
+
+### func \(SimpleInstancer\) [WithInstanceId](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/instancer.go#L30>)
+
+```go
+func (s SimpleInstancer) WithInstanceId(ctx context.Context, instanceId string) context.Context
+```
+
+## type [Tenancer](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/authorizer.go#L38-L40>)
+
+```go
+type Tenancer interface {
+    GetOrgFromContext(ctx context.Context) (string, error)
+}
 ```
 
 # datastore
@@ -603,6 +656,7 @@ var (
     ErrNoAuthContext     = ErrBaseDb.With("Permission denied because authContext is missing")
     ErrNoUserContext     = ErrBaseDb.With("Permission denied because userInformation is missing")
     ErrUserNotAuthorized = ErrBaseDb.With("User is not authorized to access this API")
+    ErrMissingInstanceId = ErrBaseDb.With("Instance ID is not configured in the context")
 )
 ```
 

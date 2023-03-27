@@ -46,12 +46,12 @@ func (s MetadataBasedAuthorizer) GetOrgFromContext(ctx context.Context) (string,
 		return "", ErrFetchingMetadata
 	}
 
-	org := md[METADATA_KEY_ORGID]
-	if len(org) == 0 {
+	orgIds := md[METADATA_KEY_ORGID]
+	if len(orgIds) == 0 {
 		return "", ErrMissingOrgId
 	}
 
-	return org[len(org)-1], nil
+	return orgIds[len(orgIds)-1], nil
 }
 
 func (s MetadataBasedAuthorizer) GetMatchingDbRole(ctx context.Context, _ ...string) (dbrole.DbRole, error) {

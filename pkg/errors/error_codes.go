@@ -182,4 +182,5 @@ var (
 	ErrNoAuthContext     = ErrBaseDb.With("Permission denied because authContext is missing")
 	ErrNoUserContext     = ErrBaseDb.With("Permission denied because userInformation is missing")
 	ErrUserNotAuthorized = ErrBaseDb.With("User is not authorized to access this API")
+	ErrMissingInstanceId = ErrBaseDb.With("Instance ID is not configured in the context")
 )
