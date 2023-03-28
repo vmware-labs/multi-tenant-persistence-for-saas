@@ -117,6 +117,7 @@ type ProtoStoreMsg struct {
 	ParentId   string
 	Revision   int64
 	OrgId      string `gorm:"primaryKey"`
+	InstanceId string `gorm:"primaryKey"`
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
 	XTableName string `gorm:"-"`
@@ -474,9 +475,15 @@ func (p ProtobufDataStore) MsgToFilter(ctx context.Context, id string, msg proto
 		return &ProtoStoreMsg{}, err
 	}
 
+	instanceId, err := p.ds.GetInstancer().GetInstanceId(ctx)
+	if err != nil {
+		return &ProtoStoreMsg{}, err
+	}
+
 	return &ProtoStoreMsg{
 		Id:         id,
 		OrgId:      orgId,
+		InstanceId: instanceId,
 		XTableName: datastore.GetTableName(msg),
 	}, nil
 }

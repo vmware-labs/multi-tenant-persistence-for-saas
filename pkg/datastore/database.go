@@ -50,7 +50,8 @@ import (
 )
 
 const (
-	DbConfigOrgId = "multitenant.orgId" // Name of Postgres run-time config. parameter that will store current user's org. ID
+	DbConfigOrgId      = "multitenant.orgId"      // Name of Postgres run-time config. parameter that will store current user's org. ID
+	DbConfigInstanceId = "multitenant.instanceId" // Name of Postgres run-time config. parameter that will store current session's instance ID
 )
 
 /*
@@ -59,9 +60,16 @@ Postgres-backed implementation of DataStore interface. By default, uses Metadata
 type relationalDb struct {
 	sync.RWMutex
 	authorizer  authorizer.Authorizer // Allows or cancels operations on the DB depending on user's org. and service roles
+	instancer   authorizer.Instancer  // Allows multi instance services to persist data with separation
 	gormDBMap   map[dbrole.DbRole]*gorm.DB
 	logger      *logrus.Entry
 	initializer func(db *relationalDb, dbRole dbrole.DbRole) error
+}
+
+type TenancyInfo struct {
+	DbRole     dbrole.DbRole
+	InstanceId string
+	OrgId      string
 }
 
 func (db *relationalDb) TestHelper() TestHelper {
@@ -80,42 +88,25 @@ func (db *relationalDb) GetDBTransaction(ctx context.Context, tableName string, 
 }
 
 func (db *relationalDb) getDBTransaction(ctx context.Context, tableName string, record Record) (tx *gorm.DB, err error) {
-	err, orgId, dbRole, isDbRoleTenantScoped := db.getTenantInfoFromCtx(ctx, tableName)
+	err, tenancyInfo := db.getTenantInfoFromCtx(ctx, tableName)
 	if err != nil {
 		return nil, err
 	}
 
-	// If the DB role is tenant-specific (TENANT_READER or TENANT_WRITER) and the table is multi-tenant,
-	// make sure that the record being inserted/modified/updated/deleted/queried belongs to the user's org.
-	// If operation is SELECT but no specific tenant's data is being queried (e.g., FindAll() was called),
-	// allow the operation to proceed.
-	if dbRole.IsDbRoleTenantScoped() && IsMultiTenanted(record, tableName) {
-		orgIdCol, _ := GetOrgId(record)
-		if orgIdCol != "" && orgIdCol != orgId {
-			err = ErrOperationNotAllowed.WithValue("tenant", orgId).WithValue("orgIdCol", orgIdCol)
-			db.logger.Error(err)
-			return nil, err
-		}
-	}
-
-	tx, err = db.GetDBConn(dbRole)
+	err = db.ValidateTenancyScope(tenancyInfo, record, tableName)
 	if err != nil {
 		return nil, err
 	}
-	tx = tx.Begin()
-	if isDbRoleTenantScoped {
-		// Set org. ID
-		stmt := getSetConfigStmt(DbConfigOrgId, orgId)
-		if tx = tx.Exec(stmt); tx.Error != nil {
-			err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
-			db.logger.Errorln(err)
-			return nil, err
-		}
+
+	tx, err = db.ConfigureTxWithTenancyScope(tenancyInfo)
+	if err != nil {
+		return nil, err
 	}
+
 	tx = tx.Table(tableName)
 	if tx.Error != nil {
 		err = ErrStartingTx.Wrap(tx.Error).WithMap(map[ErrorContextKey]string{
-			"db_role":    string(dbRole),
+			"db_role":    string(tenancyInfo.DbRole),
 			"table_name": tableName,
 			"authorizer": TypeName(db.authorizer),
 		})
@@ -131,39 +122,71 @@ func (db *relationalDb) GetTransaction(ctx context.Context, records ...Record) (
 		tableNames = append(tableNames, GetTableName(record))
 	}
 
-	err, orgId, dbRole, isDbRoleTenantScoped := db.getTenantInfoFromCtx(ctx, tableNames...)
+	err, tenancyInfo := db.getTenantInfoFromCtx(ctx, tableNames...)
 	if err != nil {
 		return nil, err
 	}
 
-	// If the DB role is tenant-specific (TENANT_READER or TENANT_WRITER) and the table is multi-tenant,
-	// make sure that the record being inserted/modified/updated/deleted/queried belongs to the user's org.
-	// If operation is SELECT but no specific tenant's data is being queried (e.g., FindAll() was called),
-	// allow the operation to proceed.
-	for _, record := range records {
-		if dbRole.IsDbRoleTenantScoped() && IsMultiTenanted(record, GetTableName(record)) {
-			orgIdCol, _ := GetOrgId(record)
-			if orgIdCol != "" && orgIdCol != orgId {
-				err = ErrOperationNotAllowed.WithValue("tenant", orgId).WithValue("orgIdCol", orgIdCol)
-				db.logger.Error(err)
-				return nil, err
-			}
+	for i, record := range records {
+		tableName := tableNames[i]
+		err := db.ValidateTenancyScope(tenancyInfo, record, tableName)
+		if err != nil {
+			return nil, err
 		}
 	}
+	return db.ConfigureTxWithTenancyScope(tenancyInfo)
+}
 
-	tx, err = db.GetDBConn(dbRole)
+// If the DB role is tenant-specific (TENANT_READER or TENANT_WRITER) and the table is multi-tenant,
+// make sure that the record being inserted/modified/updated/deleted/queried belongs to the user's org.
+// If operation is SELECT but no specific tenant's data is being queried (e.g., FindAll() was called),
+// allow the operation to proceed.
+// If the table is multi-instanced, the record is expected to have the InstanceId properly configured, based on
+// context.
+func (db *relationalDb) ValidateTenancyScope(tenancyInfo TenancyInfo, record Record, tableName string) error {
+	if tenancyInfo.DbRole.IsDbRoleTenantScoped() && IsMultiTenanted(record, tableName) {
+		orgIdCol, _ := GetOrgId(record)
+		if orgIdCol != "" && orgIdCol != tenancyInfo.OrgId {
+			err := ErrOperationNotAllowed.WithValue("tenant", tenancyInfo.OrgId).WithValue("orgIdCol", orgIdCol)
+			db.logger.Error(err)
+			return err
+		}
+	}
+	if IsMultiInstanced(record, tableName, db.instancer != nil) {
+		instanceIdCol, _ := GetInstanceId(record)
+		if instanceIdCol != "" && instanceIdCol != tenancyInfo.InstanceId {
+			err := ErrOperationNotAllowed.WithValue("instance", tenancyInfo.InstanceId).WithValue("instanceIdCol", instanceIdCol)
+			db.logger.Error(err)
+			return err
+		}
+	}
+	return nil
+}
+
+func (db *relationalDb) ConfigureTxWithTenancyScope(tenancyInfo TenancyInfo) (*gorm.DB, error) {
+	tx, err := db.GetDBConn(tenancyInfo.DbRole)
 	if err != nil {
 		return nil, err
 	}
 	tx = tx.Begin()
-	if isDbRoleTenantScoped {
+	if tenancyInfo.DbRole.IsDbRoleTenantScoped() {
 		// Set org. ID
-		stmt := getSetConfigStmt(DbConfigOrgId, orgId)
+		stmt := getSetConfigStmt(DbConfigOrgId, tenancyInfo.OrgId)
 		if tx = tx.Exec(stmt); tx.Error != nil {
-			err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
-			db.logger.Errorln(err)
+			db.logger.Errorf("%+v", tx)
+			err := ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
 			return nil, err
 		}
+	} else {
+		TRACE("Skipping tenant scoping for %+v", tenancyInfo)
+	}
+
+	// Set config view scoped to InstanceId
+	stmt := getSetConfigStmt(DbConfigInstanceId, tenancyInfo.InstanceId)
+	if tx = tx.Exec(stmt); tx.Error != nil {
+		db.logger.Errorf("%+v", tx)
+		err := ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
+		return nil, err
 	}
 	return tx, nil
 }
@@ -464,8 +487,8 @@ func (db *relationalDb) RegisterHelper(_ context.Context, roleMapping map[string
 		}
 	}
 
-	// Enable row-level security in a multi-tenant table
-	if IsMultiTenanted(record, tableName) {
+	// Enable row-level security in a multi-tenant or multi-instanced table
+	if IsRowLevelSecurityRequired(record, tableName, db.instancer != nil) {
 		stmt := getEnableRLSStmt(tableName, record)
 		tx, err = db.GetDBConn(dbrole.MAIN)
 		if err != nil {
@@ -482,9 +505,9 @@ func (db *relationalDb) RegisterHelper(_ context.Context, roleMapping map[string
 	}
 
 	// Create users, grant privileges for current table, setup RLS-policies (if multi-tenant)
-	users := getDbUsers(tableName)
-	for _, dbUserSpecs := range users {
-		if err = db.createDbUser(dbUserSpecs, tableName, record); err != nil {
+	users := getDbUsers(tableName, IsMultiTenanted(record, tableName), IsMultiInstanced(record, tableName, db.instancer != nil))
+	for _, dbUserSpec := range users {
+		if err = db.grantPrivileges(dbUserSpec, tableName, record); err != nil {
 			err = ErrRegisteringStruct.Wrap(err).WithMap(map[ErrorContextKey]string{
 				TABLE_NAME: tableName,
 			})
@@ -520,34 +543,37 @@ func (db *relationalDb) enforceRevisioning(tableName string) (err error) {
 	}
 	stmt = getCreateTriggerStmt(tableName, functionName)
 	if tx := tx.Exec(stmt); tx.Error != nil {
-		err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
-		db.logger.Error(err)
-		return err
+		if !strings.Contains(tx.Error.Error(), "duplicate key value") {
+			err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
+			db.logger.Error(err)
+			return err
+		}
 	}
 
 	return nil
 }
 
-// Creates a Postgres user (which is the same as role in Postgres). Grants certain privileges to perform certain operations
-// to the user (e.g., SELECT only; SELECT, INSERT, UPDATE, DELETE). Creates RLS-policy if the table is multi-tenant.
-func (db *relationalDb) createDbUser(dbUserSpecs dbUserSpecs, tableName string, record Record) (err error) {
+// Grants certain privileges to perform certain operations to the user (e.g., SELECT only; SELECT, INSERT, UPDATE, DELETE).
+// Creates RLS-policy if the table is multi-tenant or multi-instanced.
+func (db *relationalDb) grantPrivileges(dbUser dbUserSpec, tableName string, record Record) (err error) {
 	tx, err := db.GetDBConn(dbrole.MAIN)
 	if err != nil {
 		return err
 	}
-	stmt := getGrantPrivilegesStmt(tableName, string(dbUserSpecs.username), dbUserSpecs.commands)
+	stmt := getGrantPrivilegesStmt(tableName, string(dbUser.username), dbUser.commands)
 	if tx := tx.Exec(stmt); tx.Error != nil {
 		err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
 		db.logger.Error(err)
 		return err
 	}
 
-	if IsMultiTenanted(record, tableName) {
+	// Enable row-level security in a multi-tenant or multi-instanced table
+	if IsRowLevelSecurityRequired(record, tableName, db.instancer != nil) {
 		tx, err = db.GetDBConn(dbrole.MAIN)
 		if err != nil {
 			return err
 		}
-		stmt = getCreatePolicyStmt(tableName, record, dbUserSpecs)
+		stmt = getCreatePolicyStmt(tableName, record, dbUser)
 		if tx := tx.Exec(stmt); tx.Error != nil {
 			err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
 			db.logger.Error(err)
@@ -562,30 +588,38 @@ func (db *relationalDb) GetAuthorizer() authorizer.Authorizer {
 	return db.authorizer
 }
 
+func (db *relationalDb) GetInstancer() authorizer.Instancer {
+	return db.instancer
+}
+
 // Uses an authorizer to get user's org. ID and a matching DB role.
 // With the default MetadataBasedAuthorizer, does the following:
 // Gets user's org ID and a DB role that matches one of its CSP roles.
 // Returns an error if there are no role mappings for the given table, if user's org. ID cannot be retrieved from CSP,
 // or if there is no matching DB role for any one of the user's CSP roles.
-func (db *relationalDb) getTenantInfoFromCtx(ctx context.Context, tableNames ...string) (err error, orgId string, dbRole dbrole.DbRole, isDbRoleTenantScoped bool) {
+func (db *relationalDb) getTenantInfoFromCtx(ctx context.Context, tableNames ...string) (err error, tenancyInfo TenancyInfo) {
 	// Get the matching DB role
-	dbRole, err = db.authorizer.GetMatchingDbRole(ctx, tableNames...)
+	tenancyInfo.DbRole, err = db.authorizer.GetMatchingDbRole(ctx, tableNames...)
 	if err != nil {
-		return err, "", "", false
+		return err, tenancyInfo
 	}
 
-	isDbRoleTenantScoped = dbRole.IsDbRoleTenantScoped()
-	orgId, err = db.authorizer.GetOrgFromContext(ctx)
-	if !isDbRoleTenantScoped && errors.Is(err, ErrMissingOrgId) {
+	tenancyInfo.OrgId, err = db.authorizer.GetOrgFromContext(ctx)
+	if !tenancyInfo.DbRole.IsDbRoleTenantScoped() && errors.Is(err, ErrMissingOrgId) {
 		err = nil
 	}
 	if err != nil {
-		return err, "", "", false
+		return err, tenancyInfo
 	}
-
-	db.logger.Infof("Tenant Context: orgId=%s, dbRole=%s, isDbRoleTenantScoped=%v",
-		orgId, dbRole, isDbRoleTenantScoped)
-	return err, orgId, dbRole, isDbRoleTenantScoped
+	if db.instancer != nil {
+		tenancyInfo.InstanceId, err = db.instancer.GetInstanceId(ctx)
+		if err != nil {
+			TRACE("Skipping instance id for %+v", ctx)
+			err = nil
+		}
+	}
+	db.logger.Debugf("Tenancy Info from Context: %+v", tenancyInfo)
+	return err, tenancyInfo
 }
 
 func (db *relationalDb) GetDBConn(dbRole dbrole.DbRole) (*gorm.DB, error) {
@@ -596,6 +630,7 @@ func (db *relationalDb) GetDBConn(dbRole dbrole.DbRole) (*gorm.DB, error) {
 		}
 	}
 	if conn, ok := db.gormDBMap[dbRole]; ok {
+		TRACE("Returning DB connection for %s", dbRole)
 		return conn, nil
 	}
 	return nil, ErrConnectingToDb.WithValue(DB_ROLE, string(dbRole))

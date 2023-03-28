@@ -172,7 +172,7 @@ var (
 	ErrRevisionConflict    = ErrBaseDb.With("Blocking update due to outdated revision")
 	ErrMarshalling         = ErrBaseDb.With("Cannot marshal proto message to binary")
 	ErrUnmarshalling       = ErrBaseDb.With("Cannot unmarshal binary to proto message")
-	ErrOperationNotAllowed = ErrBaseDb.With("Not authorized to perform the operation on other tenant's data")
+	ErrOperationNotAllowed = ErrBaseDb.With("Not authorized to perform the operation on other's data")
 	ErrFetchingMetadata    = ErrBaseDb.With("Error fetching metadata from GRPC context")
 	ErrTableDoesNotExist   = ErrBaseDb.With("Table does not exist")
 	ErrRecordNotFound      = ErrBaseDb.With("Record not found")

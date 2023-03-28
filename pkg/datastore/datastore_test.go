@@ -32,6 +32,7 @@ import (
 	"github.com/bxcodec/faker/v4"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/datastore"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
 	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/errors"
@@ -520,7 +521,7 @@ func TestWithMissingEnvVar(t *testing.T) {
 	} {
 		defer os.Setenv(envVar, os.Getenv(envVar))
 		os.Unsetenv(envVar)
-		_, err := datastore.FromEnv(LOG, TestMetadataAuthorizer)
+		_, err := datastore.FromEnv(LOG, TestMetadataAuthorizer, authorizer.SimpleInstancer{})
 		assert.ErrorIs(err, ErrMissingEnvVar)
 	}
 }
@@ -534,7 +535,7 @@ func TestWithEmptyEnvVar(t *testing.T) {
 	} {
 		defer os.Setenv(envVar, os.Getenv(envVar))
 		os.Setenv(envVar, "")
-		_, err := datastore.FromEnv(LOG, TestMetadataAuthorizer)
+		_, err := datastore.FromEnv(LOG, TestMetadataAuthorizer, authorizer.SimpleInstancer{})
 		assert.ErrorIs(err, ErrMissingEnvVar)
 	}
 }
@@ -548,7 +549,7 @@ func TestWithBlankEnvVar(t *testing.T) {
 	} {
 		defer os.Setenv(envVar, os.Getenv(envVar))
 		os.Setenv(envVar, "    ")
-		_, err := datastore.FromEnv(LOG, TestMetadataAuthorizer)
+		_, err := datastore.FromEnv(LOG, TestMetadataAuthorizer, authorizer.SimpleInstancer{})
 		assert.ErrorIs(err, ErrMissingEnvVar)
 	}
 }
@@ -589,73 +590,90 @@ func TestRevision(t *testing.T) {
 
 	err := ds.Register(CokeAdminCtx, roleMapping, Group{})
 	assert.NoError(err)
-	myGroup := Group{Id: "withRevisionId-12345", Name: "withRevisionName"}
+	myGroup := Group{Id: "withRevisionId-12345", Name: "withRevisionName", InstanceId: AMERICAS}
 
 	// FIXME Initial revision should be 1
 	const initialRevision int = 0
 
-	_, err = ds.Insert(CokeAdminCtx, &myGroup)
+	_, err = ds.Insert(AmericasCokeAdminCtx, &myGroup)
 	assert.NoError(err)
 
-	actualQueryResult, expectedQueryResult := Group{Id: myGroup.Id}, Group{Id: "withRevisionId-12345", Name: "withRevisionName", Revision: initialRevision}
-	err = ds.Find(CokeAdminCtx, &actualQueryResult)
+	actualQueryResult, expectedQueryResult := Group{Id: myGroup.Id}, Group{Id: "withRevisionId-12345", Name: "withRevisionName", Revision: initialRevision, InstanceId: AMERICAS}
+	err = ds.Find(AmericasCokeAdminCtx, &actualQueryResult)
 	assert.NoError(err)
 	assert.Equal(expectedQueryResult, actualQueryResult)
 
+	actualQueryResult, expectedQueryResult = Group{Id: myGroup.Id}, Group{Id: "withRevisionId-12345", Name: "withRevisionName", Revision: initialRevision, InstanceId: AMERICAS}
+	err = ds.Find(EuropeCokeAdminCtx, &actualQueryResult)
+	assert.NotEqual(expectedQueryResult, actualQueryResult)
+	assert.ErrorIs(err, ErrRecordNotFound)
+
 	// update should  succeed when revision is the same as the value in the db
-	updatedGroup := Group{Id: myGroup.Id, Name: "updatedGroup", Revision: initialRevision}
-	rowsAffected, err := ds.Update(CokeAdminCtx, &updatedGroup)
+	updatedGroup := Group{Id: myGroup.Id, Name: "updatedGroup", Revision: initialRevision, InstanceId: AMERICAS}
+	rowsAffected, err := ds.Update(AmericasCokeAdminCtx, &updatedGroup)
 	assert.NoError(err)
 	assert.EqualValues(1, rowsAffected)
 	actualQueryResult = Group{Id: myGroup.Id}
-	err = ds.Find(CokeAdminCtx, &actualQueryResult)
+	err = ds.Find(AmericasCokeAdminCtx, &actualQueryResult)
 	assert.NoError(err)
 	assert.Equal(initialRevision+1, actualQueryResult.Revision, "Expected revision to be incremented by 1 after update")
 	assert.Equal(updatedGroup.Name, actualQueryResult.Name)
 
+	// update operation should not succeed if the instanceId dont match with context
+	rowsAffected, err = ds.Update(EuropeCokeAdminCtx, &updatedGroup)
+	assert.ErrorIs(err, ErrOperationNotAllowed)
+	assert.EqualValues(0, rowsAffected)
+	rowsAffected, err = ds.Update(EuropeCokeAuditorCtx, &updatedGroup)
+	assert.ErrorIs(err, ErrOperationNotAllowed)
+	assert.EqualValues(0, rowsAffected)
+
 	// upsert should  succeed when revision is the same as the value in the db
-	updatedGroup = Group{Id: myGroup.Id, Name: "updatedGroup2", Revision: actualQueryResult.Revision}
-	rowsAffected, err = ds.Upsert(CokeAdminCtx, &updatedGroup)
+	updatedGroup = Group{Id: myGroup.Id, Name: "updatedGroup2", Revision: actualQueryResult.Revision, InstanceId: AMERICAS}
+	rowsAffected, err = ds.Upsert(AmericasCokeAdminCtx, &updatedGroup)
 	assert.NoError(err)
 	assert.EqualValues(1, rowsAffected)
 	actualQueryResult = Group{Id: myGroup.Id}
-	err = ds.Find(CokeAdminCtx, &actualQueryResult)
+	err = ds.Find(AmericasCokeAdminCtx, &actualQueryResult)
 	assert.NoError(err)
 	assert.Equal(initialRevision+2, actualQueryResult.Revision, "Expected revision to be incremented by 1 after upsert")
 	assert.Equal(updatedGroup.Name, actualQueryResult.Name)
 
 	// update should fail when revision is not equal to the value in the db
-	updatedGroup = Group{Id: myGroup.Id, Name: "updatedGroup3", Revision: initialRevision + 100}
-	rowsAffected, err = ds.Update(CokeAdminCtx, &updatedGroup)
+	updatedGroup = Group{Id: myGroup.Id, Name: "updatedGroup3", Revision: initialRevision + 100, InstanceId: AMERICAS}
+	rowsAffected, err = ds.Update(AmericasCokeAdminCtx, &updatedGroup)
 	assert.ErrorIs(err, ErrRevisionConflict)
 	assert.EqualValues(0, rowsAffected)
 	actualQueryResult = Group{Id: myGroup.Id}
-	err = ds.Find(CokeAdminCtx, &actualQueryResult)
+	err = ds.Find(AmericasCokeAdminCtx, &actualQueryResult)
 	assert.NoError(err)
 	assert.NotEqual(updatedGroup.Revision+1, actualQueryResult.Revision)
 	assert.NotEqual(updatedGroup.Name, actualQueryResult.Name)
 
 	// upsert should fail when revision is not equal to the value in the db
-	updatedGroup = Group{Id: myGroup.Id, Name: "updatedGroup4", Revision: initialRevision + 100}
-	_, err = ds.Upsert(CokeAdminCtx, &updatedGroup)
+	updatedGroup = Group{Id: myGroup.Id, Name: "updatedGroup4", Revision: initialRevision + 100, InstanceId: AMERICAS}
+	_, err = ds.Upsert(AmericasCokeAdminCtx, &updatedGroup)
 	assert.ErrorIs(err, ErrRevisionConflict)
 	actualQueryResult = Group{Id: myGroup.Id}
-	err = ds.Find(CokeAdminCtx, &actualQueryResult)
+	err = ds.Find(AmericasCokeAdminCtx, &actualQueryResult)
 	assert.NoError(err)
 	assert.NotEqual(updatedGroup.Revision+1, actualQueryResult.Revision)
 	assert.NotEqual(updatedGroup.Name, actualQueryResult.Name)
 
 	// upsert should fail when revision is less than the value in the db
-	updatedGroup = Group{Id: myGroup.Id, Name: "updatedGroup4", Revision: 1}
-	rowsAffected, err = ds.Upsert(CokeAdminCtx, &updatedGroup)
+	updatedGroup = Group{Id: myGroup.Id, Name: "updatedGroup4", Revision: 1, InstanceId: AMERICAS}
+	rowsAffected, err = ds.Upsert(AmericasCokeAdminCtx, &updatedGroup)
 	assert.ErrorIs(err, ErrRevisionConflict)
 	assert.EqualValues(0, rowsAffected)
 
-	rowsAffected, err = ds.Delete(CokeAuditorCtx, &updatedGroup)
+	rowsAffected, err = ds.Delete(AmericasCokeAuditorCtx, &updatedGroup)
 	assert.ErrorIs(err, ErrExecutingSqlStmt)
 	assert.EqualValues(0, rowsAffected)
 
-	rowsAffected, err = ds.Delete(CokeAdminCtx, &updatedGroup)
+	rowsAffected, err = ds.Delete(EuropeCokeAuditorCtx, &updatedGroup)
+	assert.ErrorIs(err, ErrOperationNotAllowed)
+	assert.EqualValues(0, rowsAffected)
+
+	rowsAffected, err = ds.Delete(AmericasCokeAdminCtx, &updatedGroup)
 	assert.NoError(err)
 	assert.EqualValues(1, rowsAffected)
 }

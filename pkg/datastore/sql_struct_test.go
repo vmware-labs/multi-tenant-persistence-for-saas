@@ -126,36 +126,80 @@ func TestSchemaParseFeatures(t *testing.T) {
 		Revision   string `gorm:"-"`
 	}
 
-	// Features by field names
+	// Features using field names
 	type S3 struct {
 		Id         string
 		Name       string
 		OrgId      string
 		InstanceId string
-		Revision   string
+		Revision   int64
 	}
 
-	// Features by golang tags
+	// Features using golang tags
 	type S4 struct {
 		Id            string
 		Name          string
 		TenantId      string `gorm:"primaryKey;column:org_id"`
-		DeploymentId  string `gorm:"column:instance_id"`
-		UpdateVersion string `gorm:"column:revision"`
+		DeploymentId  string `gorm:"primaryKey;column:instance_id"`
+		UpdateVersion int64  `gorm:"column:revision"`
+	}
+
+	// Only Multi-tenancy using golang tags
+	type S5 struct {
+		Id         string
+		Name       string
+		TenantId   string `gorm:"primaryKey;column:org_id"`
+		InstanceId string `gorm:"-"`
+		Revision   int64
+	}
+
+	// Only Multi-instances using field names
+	type S6 struct {
+		Id         string
+		Name       string
+		TenantId   string `gorm:"-"`
+		InstanceId string
 	}
 
 	assert.False(datastore.IsMultiTenanted(S1{}, "S1"))
 	assert.False(datastore.IsMultiTenanted(S2{}, "S2"))
 	assert.True(datastore.IsMultiTenanted(S3{}, "S3"))
 	assert.True(datastore.IsMultiTenanted(S4{}, "S4"))
+	assert.True(datastore.IsMultiTenanted(S5{}, "S5"))
+	assert.False(datastore.IsMultiTenanted(S6{}, "S6"))
 
 	assert.False(datastore.IsRevisioned(S1{}, "S1"))
 	assert.False(datastore.IsRevisioned(S2{}, "S2"))
 	assert.True(datastore.IsRevisioned(S3{}, "S3"))
 	assert.True(datastore.IsRevisioned(S4{}, "S4"))
+	assert.True(datastore.IsRevisioned(S5{}, "S5"))
+	assert.False(datastore.IsRevisioned(S6{}, "S6"))
 
-	assert.False(datastore.IsMultiInstanced(S1{}, "S1"))
-	assert.False(datastore.IsMultiInstanced(S2{}, "S2"))
-	assert.True(datastore.IsMultiInstanced(S3{}, "S3"))
-	assert.True(datastore.IsMultiInstanced(S4{}, "S4"))
+	assert.False(datastore.IsMultiInstanced(S1{}, "S1", true))
+	assert.False(datastore.IsMultiInstanced(S2{}, "S2", true))
+	assert.True(datastore.IsMultiInstanced(S3{}, "S3", true))
+	assert.True(datastore.IsMultiInstanced(S4{}, "S4", true))
+	assert.False(datastore.IsMultiInstanced(S5{}, "S5", true))
+	assert.True(datastore.IsMultiInstanced(S6{}, "S6", true))
+
+	assert.False(datastore.IsMultiInstanced(S1{}, "S1", false))
+	assert.False(datastore.IsMultiInstanced(S2{}, "S2", false))
+	assert.False(datastore.IsMultiInstanced(S3{}, "S3", false))
+	assert.False(datastore.IsMultiInstanced(S4{}, "S4", false))
+	assert.False(datastore.IsMultiInstanced(S5{}, "S5", false))
+	assert.False(datastore.IsMultiInstanced(S6{}, "S6", false))
+
+	assert.False(datastore.IsRowLevelSecurityRequired(S1{}, "S1", true))
+	assert.False(datastore.IsRowLevelSecurityRequired(S2{}, "S2", true))
+	assert.True(datastore.IsRowLevelSecurityRequired(S3{}, "S3", true))
+	assert.True(datastore.IsRowLevelSecurityRequired(S4{}, "S4", true))
+	assert.True(datastore.IsRowLevelSecurityRequired(S5{}, "S5", true))
+	assert.True(datastore.IsRowLevelSecurityRequired(S6{}, "S6", true))
+
+	assert.False(datastore.IsRowLevelSecurityRequired(S1{}, "S1", false))
+	assert.False(datastore.IsRowLevelSecurityRequired(S2{}, "S2", false))
+	assert.True(datastore.IsRowLevelSecurityRequired(S3{}, "S3", false))
+	assert.True(datastore.IsRowLevelSecurityRequired(S4{}, "S4", false))
+	assert.True(datastore.IsRowLevelSecurityRequired(S5{}, "S5", false))
+	assert.False(datastore.IsRowLevelSecurityRequired(S6{}, "S6", false))
 }

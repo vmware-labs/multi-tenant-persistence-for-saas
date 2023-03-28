@@ -1,4 +1,5 @@
 # multi-tenant-persistence-for-saas
+
 [![Go Report Card](https://goreportcard.com/badge/github.com/vmware-labs/multi-tenant-persistence-for-saas)](https://goreportcard.com/report/github.com/vmware-labs/multi-tenant-persistence-for-saas)
 [![GitHub Actions](https://github.com/vmware-labs/multi-tenant-persistence-for-saas/actions/workflows/go.yml/badge.svg)](https://github.com/vmware-labs/multi-tenant-persistence-for-saas/actions?query=branch%3Amaster)
 [![Go Reference](https://pkg.go.dev/badge/github.com/vmware-labs/multi-tenant-persistence-for-saas/)](https://pkg.go.dev/github.com/vmware-labs/multi-tenant-persistence-for-saas)
@@ -23,30 +24,47 @@ information stored in a Postgres database:
 
 ```mermaid
 sequenceDiagram
-    actor C as Coke User
-    actor P as Pepsi User
+    actor C1 as Coke User (Americas)
+    actor C2 as Coke User (Europe)
+    actor P as Pepsi User (Americas)
     participant M as Multitenant Persistence
-    participant A as Authorizer
+    participant A as Authorizer(+Instancer)
     participant DB as Postgres
 
     rect rgb(200, 225, 250)
-    C ->>+ M: Find VM1
+    C1 ->>+ M: Find VM1
     M ->>+ A: GetOrgID
     A -->>- M: Coke
-    M ->>+ DB: set_config(org_id, Coke)
+    M ->>+ A: GetInstanceID
+    A -->>- M: Americas
+    M ->>+ DB: set_config(org_id=Coke, instance_id=Americas)
     M ->>+ DB: SELECT * FROM VM WHERE ID=VM1
-    DB -->>- M: | CokeWebServer1 | ID=VM1 |
-    M -->>- C: Return {Name=CokeWebServer1, ID=VM1}
+    DB -->>- M: | CokeWebServer1 | ID=VM1 | us-west-1|
+    M -->>- C1: Return {Name=CokeWebServer1, region=us-west-1, ID=VM1}
+    end
+
+    rect rgb(225, 250, 250)
+    C2 ->>+ M: Find VM1
+    M ->>+ A: GetOrgID
+    A -->>- M: Coke
+    M ->>+ A: GetInstanceID
+    A -->>- M: Europe
+    M ->>+ DB: set_config(org_id=Coke, instance_id=Europe)
+    M ->>+ DB: SELECT * FROM VM WHERE ID=VM1
+    DB -->>- M: | CokeWebServer1 | ID=VM1 | eu-central-1 |
+    M -->>- C2: Return {Name=CokeWebServer1, region=eu-central-1, ID=VM1}
     end
 
     rect rgb(200, 250, 225)
     P ->>+ M: Find VM1
     M ->>+ A: GetOrgID
     A -->>- M: Pepsi
-    M ->>+ DB: set_config(org_id, Pepsi)
+    M ->>+ A: GetInstanceID
+    A -->>- M: Americas
+    M ->>+ DB: set_config(org_id=Pepsi, instance_id=Americas)
     M ->>+ DB: SELECT * FROM VM WHERE ID=VM1
-    DB -->>- M: | PepsiWebServer1 | ID=VM1 |
-    M -->>- P: Return {Name=PepsiWebServer1, ID=VM1}
+    DB -->>- M: | PepsiWebServer1 | ID=VM1 | us-west-2 |
+    M -->>- P: Return {Name=PepsiWebServer1, region=us-west-2, ID=VM1}
     end
 ```
 
@@ -56,15 +74,28 @@ Currently, following features are supported:
 
 - **CRUD operations** on persisted objects, where data is persisted in Postgres
   database
-- **Role-based access control (RBAC)**.
-- **Metadata support** like CreatedAt, UpdatedAt, DeletedAt (using gorm.Model)
-- **Versioning**. If a record persisted in data store has a field named
-  _revision_, versioning (revisioning) will be supported on that table. Among
-  multiple concurrent updates, only one will succeed.
-- **Multi-tenancy**. DAL uses row-level security (RLS) feature of Postgres and
-  a pluggable `Authorizer` interface to support multi-tenancy. User's with
-  tenant-specific roles (`TENANT_WRITER`, `TENANT_READER`) will be able to
-  access only their own tenant's data.
+
+- **Multi-tenancy** persistence is supported with `org_id` as the column used
+ .for accessing data for different tenants using row-level security (RLS)
+  feature of Postgres. A pluggable `Authorizer` interface to support multi-tenancy.
+  User's with tenant-specific roles (`TENANT_WRITER`, `TENANT_READER`) will be
+  able to access only their own tenant's data.
+
+- **Role-based access control (RBAC)** based on the role mappings from the
+ .user to DBRole Mappings.
+
+- **Metadata support** like CreatedAt, UpdatedAt, DeletedAt (using `gorm.Model`)
+
+- **Revisioning** is supported if a record being persistent has a field named
+ .`revision`. Among concurrent updates on same revision of the record only
+ .one of the operations would succeed.
+
+- **Multi-instance** persistence is supported with `instance_id` as the column used
+  for accessing data for different deployment instances using row-level security
+  (RLS) feature of Postgres. `Instancer` interface is used to support multi-instances.
+ .If instancer is not configured `instance_id` column doesnt have any special meaning
+ .and treated as normal attribute.
+
 
 
 ## Documentation
@@ -72,6 +103,10 @@ Currently, following features are supported:
 Following interfaces are exposed by the Golang library to be consumed by the user of this library,
 
 ### [Authorizer](docs/DOCUMENTATION.md#authorizer)
+
+#### [Tenancer](docs/DOCUMENTATION.md#tenancer)
+
+#### [Instancer](docs/DOCUMENTATION.md#instancer)
 
 ### [DataStore](docs/DOCUMENTATION.md#datastore)
 
@@ -81,9 +116,7 @@ Following interfaces are exposed by the Golang library to be consumed by the use
 
 ## Future Support
 
-- Some of the topics that require further discussion are the following:
-    - Do we want to provide functionality for microservices to subscribe for updates in certain tables?
-    - Do we need to provide pagination or streaming support using channels?
+- Do we want to provide functionality for microservices to subscribe for updates in certain tables?
 
 ## Contributing
 

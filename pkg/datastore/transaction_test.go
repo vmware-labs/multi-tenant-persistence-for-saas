@@ -38,9 +38,11 @@ func testSingleTableTransactions(t *testing.T) {
 	g2 := &Group{}
 	_ = faker.FakeData(g1)
 	_ = faker.FakeData(g2)
+	g1.InstanceId = AMERICAS
+	g2.InstanceId = AMERICAS
 
 	t.Log("Getting DBTransaction for Groups")
-	tx, err := TestDataStore.GetTransaction(ServiceAdminCtx, g1)
+	tx, err := TestDataStore.GetTransaction(AmericasCokeAdminCtx, g1)
 	assert.NoError(err)
 	t.Log("Creating g1 and g2 in single transaction")
 	err = tx.Transaction(func(tx *gorm.DB) error {
@@ -57,7 +59,7 @@ func testSingleTableTransactions(t *testing.T) {
 	assert.NoError(err)
 	assert.NoError(tx.Error)
 
-	tx, err = TestDataStore.GetTransaction(ServiceAuditorCtx, g1)
+	tx, err = TestDataStore.GetTransaction(AmericasCokeAdminCtx, g1)
 	assert.NoError(err)
 	t.Log("Listing all groups")
 	groups := make([]Group, 0)
@@ -74,7 +76,7 @@ func testSingleTableTransactions(t *testing.T) {
 	assert.Equal(2, len(groups))
 
 	t.Log("Getting DBTransaction for Groups")
-	tx, err = TestDataStore.GetTransaction(ServiceAuditorCtx, g1)
+	tx, err = TestDataStore.GetTransaction(AmericasCokeAuditorCtx, g1)
 	assert.NoError(err)
 
 	t.Log("Finding g1 and g2 in single transaction")
@@ -98,7 +100,7 @@ func testSingleTableTransactions(t *testing.T) {
 	t.Log(g1, g2, f1, f2)
 
 	t.Log("Deleting g1 and g2 in single transaction")
-	tx, err = TestDataStore.GetTransaction(ServiceAdminCtx, g1)
+	tx, err = TestDataStore.GetTransaction(AmericasCokeAdminCtx, g1)
 	assert.NoError(err)
 	err = tx.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Delete(g1).Error; err != nil {
@@ -127,7 +129,7 @@ func testMultiTableTransactions(t *testing.T) {
 	a1.TenantId = COKE
 
 	t.Log("Getting DBTransaction for creating App and AppUser")
-	tx, err := TestDataStore.GetTransaction(CokeAdminCtx, a1, a2)
+	tx, err := TestDataStore.GetTransaction(AmericasCokeAdminCtx, a1, a2)
 	assert.NoError(err)
 	t.Log("Creating App and AppUser in single transaction")
 	err = tx.Transaction(func(tx *gorm.DB) error {
@@ -144,7 +146,7 @@ func testMultiTableTransactions(t *testing.T) {
 	assert.NoError(err)
 	assert.NoError(tx.Error)
 
-	tx, err = TestDataStore.GetTransaction(CokeAuditorCtx, a1, a2)
+	tx, err = TestDataStore.GetTransaction(AmericasCokeAuditorCtx, a1, a2)
 	assert.NoError(err)
 	t.Log("Finding App and Appuser in single transaction")
 	f1, f2 := &App{Id: a1.Id, TenantId: a1.TenantId}, &AppUser{Id: a2.Id}
@@ -194,13 +196,13 @@ func testMultiProtoTransactions(t *testing.T) {
 	a2 := &App{}
 	_ = faker.FakeData(c1)
 	_ = faker.FakeData(a2)
-	a1, err := TestProtoStore.MsgToPersist(CokeAdminCtx, "a1", c1, protostore.Metadata{})
+	a1, err := TestProtoStore.MsgToPersist(AmericasCokeAdminCtx, "a1", c1, protostore.Metadata{})
 	assert.NoError(err)
 	a2.TenantId = COKE
 	t1 := datastore.GetTableName(a1)
 
 	t.Log("Getting DBTransaction for creating pb.Disk and App")
-	tx, err := TestDataStore.GetTransaction(CokeAdminCtx, a1, a2)
+	tx, err := TestDataStore.GetTransaction(AmericasCokeAdminCtx, a1, a2)
 	assert.NoError(err)
 	t.Log("Creating pb.Disk and App in single transaction")
 	err = tx.Transaction(func(tx *gorm.DB) error {
@@ -219,10 +221,10 @@ func testMultiProtoTransactions(t *testing.T) {
 	assert.NoError(err)
 	assert.NoError(tx.Error)
 
-	tx, err = TestDataStore.GetTransaction(CokeAuditorCtx, a1, a2)
+	tx, err = TestDataStore.GetTransaction(AmericasCokeAuditorCtx, a1, a2)
 	assert.NoError(err)
 	t.Log("Finding pb.Disk and App in single transaction")
-	f1, err := TestProtoStore.MsgToFilter(CokeAuditorCtx, "a1", c1)
+	f1, err := TestProtoStore.MsgToFilter(AmericasCokeAuditorCtx, "a1", c1)
 	assert.NoError(err)
 	f2 := &App{Id: a2.Id, TenantId: a2.TenantId}
 	err = tx.Transaction(func(tx *gorm.DB) error {
@@ -247,7 +249,7 @@ func testMultiProtoTransactions(t *testing.T) {
 	t.Log(f1, f2)
 
 	t.Log("Deleting pb.Disk and App in single transaction")
-	tx, err = TestDataStore.GetTransaction(ServiceAdminCtx, a1)
+	tx, err = TestDataStore.GetTransaction(AmericasCokeAdminCtx, a1)
 	assert.NoError(err)
 	err = tx.Transaction(func(tx *gorm.DB) error {
 		t.Logf("Deleting %+v", a1)
@@ -267,9 +269,9 @@ func testMultiProtoTransactions(t *testing.T) {
 	assert.NoError(tx.Error)
 
 	t.Log("Finding pb.Disk and App after delete should return error")
-	tx, err = TestDataStore.GetTransaction(ServiceAdminCtx, a1)
+	tx, err = TestDataStore.GetTransaction(AmericasCokeAdminCtx, a1)
 	assert.NoError(err)
-	f1, err = TestProtoStore.MsgToFilter(CokeAuditorCtx, "a1", c1)
+	f1, err = TestProtoStore.MsgToFilter(AmericasCokeAuditorCtx, "a1", c1)
 	assert.NoError(err)
 	f2 = &App{Id: a2.Id, TenantId: a2.TenantId}
 	err = tx.Transaction(func(tx *gorm.DB) error {
