@@ -102,15 +102,15 @@ Currently, following features are supported:
 
 Following interfaces are exposed by the Golang library to be consumed by the user of this library,
 
-### [Authorizer](docs/DOCUMENTATION.md#authorizer)
+### [Authorizer](docs/DOCUMENTATION.md#type-authorizer)
 
-#### [Tenancer](docs/DOCUMENTATION.md#tenancer)
+#### [Tenancer](docs/DOCUMENTATION.md#type-tenancer)
 
-#### [Instancer](docs/DOCUMENTATION.md#instancer)
+#### [Instancer](docs/DOCUMENTATION.md#type-instancer)
 
-### [DataStore](docs/DOCUMENTATION.md#datastore)
+### [DataStore](docs/DOCUMENTATION.md#type-datastore)
 
-### [ProtoStore](docs/DOCUMENTATION.md#protostore)
+### [ProtoStore](docs/DOCUMENTATION.md#type-protostore)
 
 ## Getting Started
 
