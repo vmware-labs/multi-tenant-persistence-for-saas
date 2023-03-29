@@ -23,7 +23,7 @@ func (p xUser) String() string {
 	return fmt.Sprintf("%s: %d", p.Name, p.Age)
 }
 
-func Example_dataStoreNoInstancer() {
+func ExampleDataStore_noInstancer() {
 	rand.Seed(time.Now().UnixNano())
 	uId := fmt.Sprintf("P%d", rand.Intn(1_000_0000))
 	p1 := &xUser{uId, "Bob", 31, "Dev"}
