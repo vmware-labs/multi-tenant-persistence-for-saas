@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/datastore"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
@@ -23,7 +25,8 @@ func (p xUser) String() string {
 	return fmt.Sprintf("%s: %d", p.Name, p.Age)
 }
 
-func ExampleDataStore_noInstancer() {
+func TestDataStoreWithoutInstancer(t *testing.T) {
+	assert := assert.New(t)
 	rand.Seed(time.Now().UnixNano())
 	uId := fmt.Sprintf("P%d", rand.Intn(1_000_0000))
 	p1 := &xUser{uId, "Bob", 31, "Dev"}
@@ -42,60 +45,63 @@ func ExampleDataStore_noInstancer() {
 		SERVICE_ADMIN:   dbrole.WRITER,
 	}
 
-	if err := ds.Register(DevInstanceCtx, roleMapping, &xUser{}); err != nil {
+	if err := ds.Register(DevInstanceCtx, roleMapping, p1); err != nil {
 		log.Fatalf("Failed to create DB tables: %+v", err)
 	}
 
-	// Insert with appropriate Dev Instance Ctx
+	// Insert with Dev Instance Ctx
 	rowsAffected, err := ds.Insert(DevInstanceCtx, p1)
-	fmt.Println(rowsAffected, err)
+	assert.EqualValues(1, rowsAffected)
+	assert.NoError(err)
 
-	// Insert with appropriate Prod Instance Ctx
+	// Insert with Prod Instance Ctx will fail for same Id
 	rowsAffected, err = ds.Insert(ProdInstanceCtx, p2)
-	fmt.Println(rowsAffected, err)
+	assert.EqualValues(0, rowsAffected)
+	assert.Contains(err.Error(), "x_users_pkey")
+	assert.Contains(err.Error(), datastore.ERROR_DUPLICATE_KEY)
 
-	// Insert with appropriate Dev Instance Ctx
+	// Insert with Dev Instance Ctx and new Id
 	rowsAffected, err = ds.Insert(DevInstanceCtx, p3)
-	fmt.Println(rowsAffected, err)
+	assert.EqualValues(1, rowsAffected)
+	assert.NoError(err)
 
+	// Find using Dev Instance Ctx
 	q1 := &xUser{Id: uId}
 	err = ds.Find(DevInstanceCtx, q1)
-	fmt.Println(q1, err)
-
+	assert.Equal("Bob", q1.Name)
+	assert.NoError(err)
+	// Find using some other Prod Instance Ctx
 	q2 := &xUser{Id: uId}
 	err = ds.Find(ProdInstanceCtx, q2)
-	fmt.Println(q2, err)
+	assert.Equal("Bob", q2.Name)
+	assert.NoError(err)
 
-	// Find using valid Dev Instance Ctx
+	// Find using Dev Instance Ctx
 	q3 := &xUser{Id: "P3"}
 	err = ds.Find(DevInstanceCtx, q3)
-	fmt.Println(q3, err)
-
-	// Find using invalid Prod Instance Ctx
+	assert.Equal("Pat", q3.Name)
+	assert.NoError(err)
+	// Find using some other Prod Instance Ctx
 	q4 := &xUser{Id: "P3"}
 	err = ds.Find(ProdInstanceCtx, q4)
-	fmt.Println(q4, err)
+	assert.Equal("Pat", q4.Name)
+	assert.NoError(err)
 
-	rowsAffected, err = ds.Delete(DevInstanceCtx, q1)
-	fmt.Println(rowsAffected, err)
+	// Delete using some other ProdInstanceCtx
 	rowsAffected, err = ds.Delete(ProdInstanceCtx, q2)
-	fmt.Println(rowsAffected, err)
+	assert.EqualValues(1, rowsAffected)
+	assert.NoError(err)
+	// Delete using Dev Instance Ctx
+	rowsAffected, err = ds.Delete(DevInstanceCtx, q1)
+	assert.EqualValues(0, rowsAffected)
+	assert.NoError(err)
+
 	// Delete using valid Dev Instance Ctx
 	rowsAffected, err = ds.Delete(DevInstanceCtx, q3)
-	fmt.Println(rowsAffected, err)
-	// Delete  using invalid Prod Instance Ctx
+	assert.EqualValues(1, rowsAffected)
+	assert.NoError(err)
+	// Delete same using some other Prod Instance Ctx
 	rowsAffected, err = ds.Delete(ProdInstanceCtx, q4)
-	fmt.Println(rowsAffected, err)
-	// Output:
-	// 1 <nil>
-	// 0 SQL statement could not be executed: ERROR: duplicate key value violates unique constraint "x_users_pkey" (SQLSTATE 23505); commit unexpectedly resulted in rollback
-	// 1 <nil>
-	// Bob: 31 <nil>
-	// Bob: 31 <nil>
-	// Pat: 39 <nil>
-	// Pat: 39 <nil>
-	// 1 <nil>
-	// 0 <nil>
-	// 1 <nil>
-	// 0 <nil>
+	assert.EqualValues(0, rowsAffected)
+	assert.NoError(err)
 }
