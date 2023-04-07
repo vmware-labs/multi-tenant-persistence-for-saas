@@ -453,15 +453,6 @@ func (db *relationalDb) Register(ctx context.Context, roleMapping map[string]dbr
 	return nil
 }
 
-// Create a DB table for the given struct. Enables RLS in it if it is multi-tenant.
-// Generates Postgres roles and policies based on the provided role mapping and applies them
-// to the created DB table.
-// roleMapping - maps service roles to DB roles to be used for the generated DB table
-// There are 4 possible DB roles to choose from:
-// - READER, which gives read access to all the records in the table
-// - WRITER, which gives read & write access to all the records in the table
-// - TENANT_READER, which gives read access to current tenant's records
-// - TENANT_WRITER, which gives read & write access to current tenant's records.
 func (db *relationalDb) RegisterHelper(_ context.Context, roleMapping map[string]dbrole.DbRole, tableName string, record Record) (err error) {
 	if roleMapping == nil {
 		roleMapping = make(map[string]dbrole.DbRole)

@@ -100,23 +100,11 @@ Currently, following features are supported:
 
 ## Documentation
 
-Following interfaces are exposed by the Golang library to be consumed by the user of this library,
-
-### [Authorizer](docs/DOCUMENTATION.md#type-authorizer)
-
-#### [Tenancer](docs/DOCUMENTATION.md#type-tenancer)
-
-#### [Instancer](docs/DOCUMENTATION.md#type-instancer)
-
-### [DataStore](docs/DOCUMENTATION.md#type-datastore)
-
-### [ProtoStore](docs/DOCUMENTATION.md#type-protostore)
-
-## Getting Started
+Refer to [DOCUMENTATION.md](docs/DOCUMENTATION.md) for the interfaces exposed like `Datastore`, `Authorizer`, `Protostore`
 
 ## Future Support
 
-- Do we want to provide functionality for microservices to subscribe for updates in certain tables?
+- Support for services to subscribe for updates to tables.
 
 ## Contributing
 
