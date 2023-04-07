@@ -9,7 +9,6 @@ import (
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/datastore"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
-	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/test"
 )
 
 type Person struct {
@@ -30,11 +29,14 @@ func ExampleDataStore_multiInstance() {
 	p2 := &Person{uId, "John", 36, "Prod"}
 	p3 := &Person{"P3", "Pat", 39, "Dev"}
 
+	SERVICE_ADMIN := "service_admin"
+	SERVICE_AUDITOR := "service_auditor"
 	mdAuthorizer := authorizer.MetadataBasedAuthorizer{}
+	ServiceAdminCtx := mdAuthorizer.GetAuthContext("", SERVICE_ADMIN)
 	instancer := authorizer.SimpleInstancer{}
 
-	DevInstanceCtx := TestInstancer.WithInstanceId(ServiceAdminCtx, "Dev")
-	ProdInstanceCtx := TestInstancer.WithInstanceId(ServiceAdminCtx, "Prod")
+	DevInstanceCtx := instancer.WithInstanceId(ServiceAdminCtx, "Dev")
+	ProdInstanceCtx := instancer.WithInstanceId(ServiceAdminCtx, "Prod")
 
 	ds, _ := datastore.FromEnv(datastore.GetCompLogger(), mdAuthorizer, instancer)
 	roleMapping := map[string]dbrole.DbRole{
