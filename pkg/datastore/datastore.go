@@ -32,8 +32,9 @@ for reference https://gorm.io/docs/models.html
   - For revision support to block concurrent updates, add `gorm:"column:revision"` as tag
   - For multi-instance support, add `gorm:"column:instance_id"` as tag
 
-DataStore interface exposes basic methods like Find/FindAll/Upsert/Delete, for richer queries
-and transaction based filtering and pagination please use GetTransaction() method.
+DataStore interface exposes basic methods like Find/FindAll/Upsert/Delete. For richer queries
+and performing a set of operations within a transaction, please, use GetTransaction() method.
+For more info, refer to Gorm's transactions page: https://gorm.io/docs/transactions.html
 */
 package datastore
 
@@ -55,6 +56,15 @@ type DataStore interface {
 	Upsert(ctx context.Context, record Record) (int64, error)
 	GetTransaction(ctx context.Context, record ...Record) (tx *gorm.DB, err error)
 
+	// Create a DB table for the given struct. Enables RLS in it if it is multi-tenant.
+	// Generates Postgres roles and policies based on the provided role mapping and applies them
+	// to the created DB table.
+	// roleMapping - maps service roles to DB roles to be used for the generated DB table
+	// There are 4 possible DB roles to choose from:
+	// - READER, which gives read access to all the records in the table
+	// - WRITER, which gives read & write access to all the records in the table
+	// - TENANT_READER, which gives read access to current tenant's records
+	// - TENANT_WRITER, which gives read & write access to current tenant's records.
 	Register(ctx context.Context, roleMapping map[string]dbrole.DbRole, records ...Record) error
 	Reset()
 

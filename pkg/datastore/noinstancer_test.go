@@ -1,6 +1,7 @@
 package datastore_test
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"math/rand"
@@ -45,7 +46,7 @@ func TestDataStoreWithoutInstancer(t *testing.T) {
 		SERVICE_ADMIN:   dbrole.WRITER,
 	}
 
-	if err := ds.Register(DevInstanceCtx, roleMapping, p1); err != nil {
+	if err := ds.Register(context.TODO(), roleMapping, &xUser{}); err != nil {
 		log.Fatalf("Failed to create DB tables: %+v", err)
 	}
 

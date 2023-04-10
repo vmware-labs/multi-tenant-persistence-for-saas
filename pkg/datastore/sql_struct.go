@@ -229,7 +229,7 @@ func schemaParse(x interface{}) (*schema.Schema, error) {
 	TRACE("Parsing schema for %s, %+v", TypeName(x), x)
 	s, err := schema.Parse(x, &sync.Map{}, schema.NamingStrategy{})
 	if err != nil {
-		TRACE("Unable to parse schema: %s, %+v, %e", TypeName(x), x, err)
+		TRACE("Unable to parse schema: %s, %+v, %+v", TypeName(x), x, err)
 	}
 	return s, err
 }
