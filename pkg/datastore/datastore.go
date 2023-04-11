@@ -51,6 +51,7 @@ type DataStore interface {
 	FindAll(ctx context.Context, records interface{}, pagination *Pagination) error
 	FindWithFilter(ctx context.Context, filter Record, records interface{}, pagination *Pagination) error
 	Insert(ctx context.Context, record Record) (int64, error)
+	SoftDelete(ctx context.Context, record Record) (int64, error)
 	Delete(ctx context.Context, record Record) (int64, error)
 	Update(ctx context.Context, record Record) (int64, error)
 	Upsert(ctx context.Context, record Record) (int64, error)

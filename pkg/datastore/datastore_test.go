@@ -680,6 +680,7 @@ func TestRevision(t *testing.T) {
 
 func TestTransactions(t *testing.T) {
 	assert := assert.New(t)
+	_, _, _ = SetupDbTables(ds)
 
 	roleMapping := map[string]dbrole.DbRole{
 		TENANT_AUDITOR:  dbrole.TENANT_READER,
@@ -687,7 +688,6 @@ func TestTransactions(t *testing.T) {
 		SERVICE_AUDITOR: dbrole.READER,
 		SERVICE_ADMIN:   dbrole.WRITER,
 	}
-
 	err := ps.Register(context.TODO(), roleMapping, &pb.Disk{})
 	assert.NoError(err)
 

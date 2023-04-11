@@ -20,6 +20,8 @@
 // around [pkg.datastore.DataStore] interface and is used specifically to persist Protobuf messages.
 // Just as with [pkg.datastore.DataStore], Protobuf messages can be persisted with revisioning and
 // multi-tenancy support along with `CreatedAt` and `UpdatedAt` timestamps.
+// Tombstone Delete or soft deletes are supported with `DeletedAt` struct field.
+// Use Delete to remove any records that are soft deleted but still in database
 package protostore
 
 import (
@@ -35,6 +37,7 @@ import (
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
 	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/errors"
 	"google.golang.org/protobuf/proto"
+	"gorm.io/gorm"
 )
 
 type ProtoStore interface {
@@ -45,6 +48,7 @@ type ProtoStore interface {
 	FindById(ctx context.Context, id string, msg proto.Message, metadata *Metadata) error
 	FindAll(ctx context.Context, msgs interface{}, pagination *datastore.Pagination) (metadataMap map[string]Metadata, err error)
 	FindAllAsMap(ctx context.Context, msgsMap interface{}, pagination *datastore.Pagination) (metadataMap map[string]Metadata, err error)
+	SoftDeleteById(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, err error)
 	DeleteById(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, err error)
 
 	InsertWithMetadata(ctx context.Context, id string, msg proto.Message, metadata Metadata) (rowsAffected int64, md Metadata, err error)
@@ -67,6 +71,7 @@ type Metadata struct {
 	Revision  int64
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	DeletedAt gorm.DeletedAt
 }
 
 type ProtoStoreMsg struct {
@@ -78,6 +83,7 @@ type ProtoStoreMsg struct {
 	InstanceId string `gorm:"primaryKey"`
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
+	DeletedAt  gorm.DeletedAt
 	XTableName string `gorm:"-"`
 }
 
@@ -108,6 +114,7 @@ func MetadataFrom(protoStoreMsg ProtoStoreMsg) Metadata {
 		Revision:  protoStoreMsg.Revision,
 		CreatedAt: protoStoreMsg.CreatedAt,
 		UpdatedAt: protoStoreMsg.UpdatedAt,
+		DeletedAt: protoStoreMsg.DeletedAt,
 	}
 }
 
@@ -140,7 +147,7 @@ func (p ProtobufDataStore) Register(ctx context.Context, roleMapping map[string]
 	return nil
 }
 
-// @DEPRECATD See [InsertWithMetadata].
+// @DEPRECATED See [InsertWithMetadata].
 func (p ProtobufDataStore) Insert(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, md Metadata, err error) {
 	return p.InsertWithMetadata(ctx, id, msg, Metadata{})
 }
@@ -385,6 +392,14 @@ func (p ProtobufDataStore) FindAll(ctx context.Context, msgs interface{}, pagina
 
 	reflect.ValueOf(msgs).Elem().Set(output)
 	return metadataMap, nil
+}
+
+func (p ProtobufDataStore) SoftDeleteById(ctx context.Context, id string, msg proto.Message) (int64, error) {
+	protoStoreMsg, err := p.MsgToFilter(ctx, id, msg)
+	if err != nil {
+		return 0, err
+	}
+	return p.ds.SoftDelete(ctx, protoStoreMsg)
 }
 
 func (p ProtobufDataStore) DeleteById(ctx context.Context, id string, msg proto.Message) (int64, error) {
