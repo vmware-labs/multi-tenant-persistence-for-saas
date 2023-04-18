@@ -16,26 +16,24 @@
 // specific language governing permissions and limitations
 // under the License.
 
-/*
-Import the package and use `DataStore` interface to interact with the data access
-layer. If you want DAL to use a Postgres database, ensure you have the following
-environment variables set to relevant values: `DB_ADMIN_USERNAME`, `DB_PORT`,
-`DB_NAME`, `DB_ADMIN_PASSWORD`, `DB_HOST`, `SSL_MODE`. You can also set
-`LOG_LEVEL` environment variable to debug/trace, if you want logging at a
-specific level (default is `Info`)
-
-Define structs that will be persisted using datastore similar to any gorm Models,
-for reference https://gorm.io/docs/models.html
-
-  - At least one field must be a primary key with `gorm:"primaryKey"` tag
-  - For multi-tenancy support, add `gorm:"column:org_id"` as tag to a filed
-  - For revision support to block concurrent updates, add `gorm:"column:revision"` as tag
-  - For multi-instance support, add `gorm:"column:instance_id"` as tag
-
-DataStore interface exposes basic methods like Find/FindAll/Upsert/Delete. For richer queries
-and performing a set of operations within a transaction, please, use GetTransaction() method.
-For more info, refer to Gorm's transactions page: https://gorm.io/docs/transactions.html
-*/
+// Import the package and use [DataStore] interface to interact with the data access
+// layer. If you want DAL to use a Postgres database, ensure you have the following
+// environment variables set to relevant values: [DB_ADMIN_USERNAME], [DB_PORT],
+// [DB_NAME], [DB_ADMIN_PASSWORD], [DB_HOST], [SSL_MODE]. You can also set
+// [LOG_LEVEL] environment variable to debug/trace, if you want logging at a
+// specific level (default is [Info])
+//
+// Define structs that will be persisted using datastore similar to any gorm Models,
+// for reference https://gorm.io/docs/models.html
+//
+//   - At least one field must be a primary key with `gorm:"primaryKey"` tag
+//   - For multi-tenancy support, add `gorm:"column:org_id"` as tag to a filed
+//   - For revision support to block concurrent updates, add `gorm:"column:revision"` as tag
+//   - For multi-instance support, add `gorm:"column:instance_id"` as tag
+//
+// DataStore interface exposes basic methods like Find/FindAll/Upsert/Delete. For richer queries
+// and performing a set of operations within a transaction, please, use GetTransaction() method.
+// For more info, refer to Gorm's transactions page: https://gorm.io/docs/transactions.html
 package datastore
 
 import (

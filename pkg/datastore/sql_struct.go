@@ -245,9 +245,9 @@ func GetTableName(x interface{}) (tableName string) {
 			tableNameMap[typ] = s.Table
 		}
 		tableName = tableNameMap[typ]
+		TRACE("TableName is %s for %s(%+v)\n", tableName, typ, x)
 	}
-	TRACE("TableName Map is %+v\n", tableNameMap)
-	TRACE("TableName is %s for %+v\n", tableName, x)
+	TRACE("TableNameMap is %+v\n", tableNameMap)
 	return tableName
 }
 
