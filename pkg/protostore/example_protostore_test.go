@@ -27,7 +27,7 @@ func ExampleProtoStore() {
 	_ = myProtostore.Register(context.TODO(), roleMappingForMemory, &pb.Memory{})
 
 	// Store protobuf message using Upsert
-	id := "001"
+	id := "0001"
 	memory := &pb.Memory{
 		Brand: "Samsung",
 		Size:  32,
@@ -52,13 +52,19 @@ func ExampleProtoStore() {
 	metadataMap, err := myProtostore.FindAll(ctx, &queryResults, datastore.NoPagination())
 	fmt.Println("FindAll::", "revision:", metadataMap[id].Revision, "rowsFound:", len(queryResults), "err:", err)
 
-	// Delete the protobuf
+	// Delete the protobuf (soft delete)
+	rowsAffected, err = myProtostore.SoftDeleteById(ctx, id, &pb.Memory{})
+	fmt.Println("SoftDeleteById::", "rowsAffected:", rowsAffected, "err:", err)
+
+	// Delete the protobuf (full delete)
 	rowsAffected, err = myProtostore.DeleteById(ctx, id, &pb.Memory{})
 	fmt.Println("DeleteById::", "rowsAffected:", rowsAffected, "err:", err)
+
 	// Output:
 	// After Upsert:: revision: 1 rowsAffected: 1 err: <nil>
 	// FindById:: revision: 1 rowsAffected: 1 err: <nil>
 	// After UpdateWithMetadata:: revision: 2 rowsAffected: 1 err: <nil>
 	// FindAll:: revision: 2 rowsFound: 1 err: <nil>
+	// SoftDeleteById:: rowsAffected: 1 err: <nil>
 	// DeleteById:: rowsAffected: 1 err: <nil>
 }

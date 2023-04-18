@@ -268,7 +268,7 @@ func testMultiProtoTransactions(t *testing.T) {
 	assert.NoError(err)
 	assert.NoError(tx.Error)
 
-	t.Log("Finding pb.Disk and App after delete should return error")
+	t.Log("Finding pb.Disk and App after delete should not return anything")
 	tx, err = TestDataStore.GetTransaction(AmericasCokeAdminCtx, a1)
 	assert.NoError(err)
 	f1, err = TestProtoStore.MsgToFilter(AmericasCokeAuditorCtx, "a1", c1)
@@ -284,7 +284,47 @@ func testMultiProtoTransactions(t *testing.T) {
 		assert.EqualValues(0, y.RowsAffected, y)
 		return nil
 	})
-	t.Log("Verifying pb.Disk and App are properly retrieved")
 	tx.Commit()
 	assert.NoError(err)
+	t.Log("Verifying pb.Disk and App cannot be retrieved after delete")
+
+	t.Log("Verifying pb.Disk can be retrieved after soft delete ...")
+	tx, err = TestDataStore.GetTransaction(AmericasCokeAdminCtx, a1)
+	assert.NoError(err)
+	f1, err = TestProtoStore.MsgToFilter(AmericasCokeAuditorCtx, "a1", c1)
+	assert.NoError(err)
+	f2 = &App{Id: a2.Id, TenantId: a2.TenantId}
+	err = tx.Transaction(func(tx *gorm.DB) error {
+		t.Logf("Finding %+v after soft-delete", f1)
+		x := tx.Table(t1).Unscoped().First(f1)
+		assert.EqualValues(1, x.RowsAffected, x)
+
+		t.Logf("Finding %+v", f2)
+		y := tx.Unscoped().First(f2)
+		assert.EqualValues(0, y.RowsAffected, y)
+		return nil
+	})
+	tx.Commit()
+	assert.NoError(err)
+	t.Log("Verifying pb.Disk can be retrieved after soft delete succeeded")
+
+	t.Log("Purging pb.Disk after soft delete ...")
+	tx, err = TestDataStore.GetTransaction(AmericasCokeAdminCtx, a1)
+	assert.NoError(err)
+	f1, err = TestProtoStore.MsgToFilter(AmericasCokeAuditorCtx, "a1", c1)
+	assert.NoError(err)
+	f2 = &App{Id: a2.Id, TenantId: a2.TenantId}
+	err = tx.Transaction(func(tx *gorm.DB) error {
+		t.Logf("Purging %+v after soft-delete", f1)
+		x := tx.Table(t1).Unscoped().Delete(f1)
+		assert.EqualValues(1, x.RowsAffected, x)
+
+		t.Logf("Deleting %+v", f2)
+		y := tx.Unscoped().Delete(f2)
+		assert.EqualValues(0, y.RowsAffected, y)
+		return nil
+	})
+	tx.Commit()
+	assert.NoError(err)
+	t.Log("Purging pb.Disk after soft delete succeeded")
 }

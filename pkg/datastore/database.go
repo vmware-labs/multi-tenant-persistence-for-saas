@@ -315,10 +315,55 @@ func (db *relationalDb) InsertInTable(ctx context.Context, tableName string, rec
 }
 
 /*
-Deletes a record from a DB table.
+Deletes a record from a DB table, soft deletes if `DeletedAt` attribute is present.
+*/
+func (db *relationalDb) SoftDelete(ctx context.Context, record Record) (rowsAffected int64, err error) {
+	return db.SoftDeleteInTable(ctx, GetTableName(record), record)
+}
+
+/*
+Deletes a record from a DB table. (to be used after soft-delete for structs with `DeletedAt` field).
 */
 func (db *relationalDb) Delete(ctx context.Context, record Record) (rowsAffected int64, err error) {
 	return db.DeleteInTable(ctx, GetTableName(record), record)
+}
+
+/*
+Deletes a record from DB table tableName, soft deletes if `DeletedAt` attribute is present.
+*/
+func (db *relationalDb) SoftDeleteInTable(ctx context.Context, tableName string, record Record) (rowsAffected int64, err error) {
+	return db.delete(ctx, tableName, record, true)
+}
+
+/*
+Deletes a record from DB table tableName. (to be used after soft-delete for structs with 'DeletedAt` fields).
+*/
+func (db *relationalDb) DeleteInTable(ctx context.Context, tableName string, record Record) (rowsAffected int64, err error) {
+	return db.delete(ctx, tableName, record, false)
+}
+
+func (db *relationalDb) delete(ctx context.Context, tableName string, record Record, softDelete bool) (rowsAffected int64, err error) {
+	tx, err := db.GetDBTransaction(ctx, tableName, record)
+	if err != nil {
+		return 0, err
+	}
+
+	if softDelete {
+		if err = tx.Delete(record).Error; err != nil {
+			db.logger.Errorln(err)
+			return 0, ErrExecutingSqlStmt.Wrap(err)
+		}
+	} else {
+		if err = tx.Unscoped().Delete(record).Error; err != nil {
+			db.logger.Errorln(err)
+			return 0, ErrExecutingSqlStmt.Wrap(err)
+		}
+	}
+	if err = tx.Commit().Error; err != nil {
+		db.logger.Errorln(err)
+		return 0, ErrExecutingSqlStmt.Wrap(err)
+	}
+	return tx.RowsAffected, nil
 }
 
 /*
@@ -360,26 +405,6 @@ func (db *relationalDb) TruncateCascade(cascade bool, tableNames ...string) (err
 	}
 
 	return nil
-}
-
-/*
-Deletes a record from DB table tableName.
-*/
-func (db *relationalDb) DeleteInTable(ctx context.Context, tableName string, record Record) (rowsAffected int64, err error) {
-	tx, err := db.GetDBTransaction(ctx, tableName, record)
-	if err != nil {
-		return 0, err
-	}
-
-	// Execute query
-	tx.Delete(record)
-	tx.Commit()
-	if tx.Error != nil {
-		err = ErrExecutingSqlStmt.Wrap(tx.Error)
-		db.logger.Errorln(err)
-		return 0, err
-	}
-	return tx.RowsAffected, nil
 }
 
 /*
