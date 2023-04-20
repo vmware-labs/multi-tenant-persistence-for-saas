@@ -97,7 +97,7 @@ func ExampleDataStore_multiTenancy() {
 	// [Coke/P1337] Bob: 31 <nil>
 	// [Pepsi/P1337] John: 36 <nil>
 	// [Coke/P3] Pat: 39 <nil>
-	// Record not found: Unable to locate a record: [/P3] : 0
+	// Unable to locate record: record not found[ record=[/P3] : 0,]
 	// 1 <nil>
 	// 1 <nil>
 	// 0 <nil>

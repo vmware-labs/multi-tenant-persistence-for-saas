@@ -36,8 +36,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-var p = TestProtoStore
-
 type MemorySlice []pb.Memory
 
 func (s MemorySlice) Len() int {
@@ -147,9 +145,10 @@ func TestProtoConversion(t *testing.T) {
 	assert.Equal(msg3.String(), msg4.String())
 }
 
-func setupDbContext(t *testing.T) {
+func setupDbContext(t *testing.T, dbName string) protostore.ProtoStore {
 	t.Helper()
 	assert := assert.New(t)
+	_, p := SetupDataStore(dbName)
 	protoMsgs := []proto.Message{
 		&pb.CPU{},
 		&pb.Memory{},
@@ -167,18 +166,19 @@ func setupDbContext(t *testing.T) {
 	}
 	err := p.Register(context.TODO(), roleMapping, protoMsgs...)
 	assert.NoError(err)
+	return p
 }
 
 func TestProtoStoreInDbFindWithInvalidParams(t *testing.T) {
-	setupDbContext(t)
-	testProtoStoreFindWithInvalidParams(t, AmericasPepsiAdminCtx)
+	p := setupDbContext(t, "TestProtoStoreInDbFindWithInvalidParams")
+	testProtoStoreFindWithInvalidParams(t, p, AmericasPepsiAdminCtx)
 }
 
 /*
 Checks that ProtobufDataStore.FindAll and ProtobufDataStore.FindAllAsMap reject requests containing invalid arguments
 where query results are supposed to be stored and do not reject those that contain valid arguments.
 */
-func testProtoStoreFindWithInvalidParams(t *testing.T, ctx context.Context) {
+func testProtoStoreFindWithInvalidParams(t *testing.T, p protostore.ProtoStore, ctx context.Context) {
 	t.Helper()
 	assert := assert.New(t)
 
@@ -239,19 +239,15 @@ func testProtoStoreFindWithInvalidParams(t *testing.T, ctx context.Context) {
 	}
 }
 
-func TestProtoStoreInDbFindAll(t *testing.T) {
-	setupDbContext(t)
-	testProtoStoreFindAll(t, AmericasPepsiAdminCtx)
-}
-
 /*
 Checks if DIFFERENT types of Protobuf messages can be persisted with the same IDs.
 Checks if FindAll() works (both when query results are stored in a ptr to a slice of structs and
 when query results are stored in a ptr to a slice of ptrs to structs ).
 */
-func testProtoStoreFindAll(t *testing.T, ctx context.Context) {
-	t.Helper()
+func TestProtoStoreInDbFindAll(t *testing.T) {
 	assert := assert.New(t)
+	p := setupDbContext(t, "TestProtoStoreInDbFindAll")
+	ctx := AmericasPepsiAdminCtx
 
 	// Prepare data for test cases
 	memMsg1, memMsg2, cpuMsg1, cpuMsg2 := pb.Memory{}, pb.Memory{}, pb.CPU{}, pb.CPU{}
@@ -498,14 +494,14 @@ func testProtoStoreFindAll(t *testing.T, ctx context.Context) {
 }
 
 func TestProtoStoreInDbCrud(t *testing.T) {
-	setupDbContext(t)
-	testProtoStoreCrud(t, AmericasPepsiAdminCtx, false)
+	p := setupDbContext(t, "TestProtoStoreInDbCrud")
+	testProtoStoreCrud(t, p, AmericasPepsiAdminCtx, false)
 }
 
 // Same as TestProtoStoreInDbCrud, but uses Upsert instead of Insert or Update.
 func TestProtoStoreInDbCrudUpsert(t *testing.T) {
-	setupDbContext(t)
-	testProtoStoreCrud(t, AmericasPepsiAdminCtx, true)
+	p := setupDbContext(t, "TestProtoStoreInDbCrudUpsert")
+	testProtoStoreCrud(t, p, AmericasPepsiAdminCtx, true)
 }
 
 /*
@@ -513,7 +509,7 @@ Performs CRUD-operations with ProtoStore.
 If useUpsert is true, will use Upsert instead of Insert and Update.
 Otherwise, Insert and Update will be used.
 */
-func testProtoStoreCrud(t *testing.T, ctx context.Context, useUpsert bool) {
+func testProtoStoreCrud(t *testing.T, p protostore.ProtoStore, ctx context.Context, useUpsert bool) {
 	t.Helper()
 	assert := assert.New(t)
 	var err error
@@ -676,6 +672,7 @@ Checks if a Protobuf message inserted by a user from Pepsi is visible to the use
 */
 func TestProtoStoreInDbMultitenancy(t *testing.T) {
 	assert := assert.New(t)
+	p := setupDbContext(t, "TestProtoStoreInDbMultitenancy")
 
 	cpuMsg1 := pb.CPU{}
 	_ = faker.FakeData(&cpuMsg1)
@@ -695,9 +692,9 @@ func BenchmarkCrudProtoStoreInDb(b *testing.B) {
 	log.SetLevel(log.FatalLevel)
 	log.SetOutput(io.Discard)
 	var t testing.T
-	setupDbContext(&t)
+	p := setupDbContext(&t, "BenchmarkCrudProtoStoreInDb")
 	for n := 0; n < b.N; n++ {
-		testProtoStoreCrud(&t, AmericasCokeAdminCtx, false)
-		testProtoStoreCrud(&t, AmericasCokeAdminCtx, true)
+		testProtoStoreCrud(&t, p, AmericasCokeAdminCtx, false)
+		testProtoStoreCrud(&t, p, AmericasCokeAdminCtx, true)
 	}
 }

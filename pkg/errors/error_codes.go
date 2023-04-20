@@ -175,7 +175,7 @@ var (
 	ErrOperationNotAllowed = ErrBaseDb.With("Not authorized to perform the operation on other's data")
 	ErrFetchingMetadata    = ErrBaseDb.With("Error fetching metadata from GRPC context")
 	ErrTableDoesNotExist   = ErrBaseDb.With("Table does not exist")
-	ErrRecordNotFound      = ErrBaseDb.With("Record not found")
+	ErrRecordNotFound      = ErrBaseDb.With("Unable to locate record")
 	ErrNotPtrToStruct      = ErrBaseDb.With("PointerToStruct expected, invalid type provided")
 
 	ErrAuthContext       = ErrBaseDb.With("Error extracting authContext from context")

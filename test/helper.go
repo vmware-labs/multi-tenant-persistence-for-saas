@@ -23,7 +23,23 @@ import (
 
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/datastore"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/protostore"
 )
+
+func SetupDataStore(dbName string) (datastore.DataStore, protostore.ProtoStore) {
+	cfg := datastore.ConfigFromEnv(dbName)
+	err := datastore.DBCreate(cfg)
+	if err != nil {
+		log.Fatalf("Failed to create database from cfg %+v", cfg)
+	}
+	log.Printf("Created/Exists database %s", dbName)
+	ds, err := datastore.FromConfig(datastore.GetCompLogger(), TestMetadataAuthorizer, TestInstancer, cfg)
+	if err != nil {
+		log.Fatalf("Failed to initialize datastore from cfg %+v", cfg)
+	}
+	ps := protostore.GetProtoStore(datastore.GetCompLogger(), ds)
+	return ds, ps
+}
 
 func DropAllTables(ds datastore.DataStore) {
 	if err := ds.TestHelper().DropTables(&App{}, &AppUser{}, &Group{}); err != nil {
