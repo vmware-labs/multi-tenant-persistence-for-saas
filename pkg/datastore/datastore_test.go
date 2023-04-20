@@ -40,17 +40,14 @@ import (
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/test/pb"
 )
 
-var (
-	LOG *logrus.Entry
-	ds  = TestDataStore
-	ps  = TestProtoStore
-)
+var LOG *logrus.Entry
 
 // TODO - add a test that would show that the DB users are not able to create, drop, or truncate tables
 
 func TestTruncate(t *testing.T) {
 	assert := assert.New(t)
 
+	ds, _ := SetupDataStore("TestTruncate")
 	_, _, _ = SetupDbTables(ds)
 
 	queryResults := make([]App, 0)
@@ -71,6 +68,7 @@ func TestTruncate(t *testing.T) {
 
 func TestTruncateNonExistent(t *testing.T) {
 	assert := assert.New(t)
+	ds, _ := SetupDataStore("TestTruncateNonExistent")
 	err := ds.TestHelper().Truncate("non_existent_table")
 	assert.NoError(err, "Expected no error when trying to truncate a non-existent table")
 }
@@ -78,6 +76,7 @@ func TestTruncateNonExistent(t *testing.T) {
 func TestFindInEmpty(t *testing.T) {
 	assert := assert.New(t)
 
+	ds, _ := SetupDataStore("TestFindInEmpty")
 	RecreateAllTables(ds)
 
 	{
@@ -102,10 +101,9 @@ func TestFindInEmpty(t *testing.T) {
 	}
 }
 
-func testCrud(t *testing.T, ctx context.Context, myCokeApp *App, user1, user2 *AppUser) {
+func testCrud(t *testing.T, ds datastore.DataStore, ctx context.Context, myCokeApp *App, user1, user2 *AppUser) {
 	t.Helper()
 	assert := assert.New(t)
-
 	var err error
 
 	// Querying of previously inserted records should succeed
@@ -164,7 +162,6 @@ func TestMain(m *testing.M) {
 	LOG = datastore.GetCompLogger()
 
 	code := m.Run()
-	DropAllTables(ds)
 	os.Exit(code)
 }
 
@@ -175,19 +172,22 @@ func BenchmarkCrud(b *testing.B) {
 	LOG = logger.WithField(datastore.COMP, datastore.SAAS_PERSISTENCE)
 
 	var t testing.T
+	ds, _ := SetupDataStore("BenchmarkCrud")
 	myCokeApp, user1, user2 := SetupDbTables(ds)
 	for n := 0; n < b.N; n++ {
-		testCrud(&t, CokeAdminCtx, myCokeApp, user1, user2)
+		testCrud(&t, ds, CokeAdminCtx, myCokeApp, user1, user2)
 	}
 }
 
 func TestCrud(t *testing.T) {
+	ds, _ := SetupDataStore("TestCrud")
 	myCokeApp, user1, user2 := SetupDbTables(ds)
-	testCrud(t, CokeAdminCtx, myCokeApp, user1, user2)
+	testCrud(t, ds, CokeAdminCtx, myCokeApp, user1, user2)
 }
 
 func TestFindAll(t *testing.T) {
 	assert := assert.New(t)
+	ds, _ := SetupDataStore("TestFindAll")
 	_, user1, user2 := SetupDbTables(ds)
 
 	// FindAll should return all (two) records
@@ -210,6 +210,7 @@ func myID(i int) string {
 
 func TestFindAllWithPagination(t *testing.T) {
 	assert := assert.New(t)
+	ds, _ := SetupDataStore("TestFindAllWithPagination")
 	RecreateAllTables(ds)
 
 	a1 := &App{}
@@ -251,6 +252,7 @@ func TestFindAllWithPagination(t *testing.T) {
 func TestFindWithCriteria(t *testing.T) {
 	t.Helper()
 	assert := assert.New(t)
+	ds, _ := SetupDataStore("TestFindWithCriteria")
 	_, user1, user2 := SetupDbTables(ds)
 
 	expected := []*AppUser{user1, user2}
@@ -275,6 +277,8 @@ func TestFindWithCriteria(t *testing.T) {
 
 func TestCrudWithMissingOrgId(t *testing.T) {
 	assert := assert.New(t)
+
+	ds, _ := SetupDataStore("TestCrudWithMissingOrgId")
 	RecreateAllTables(ds)
 	_, apps := make([]AppUser, 0), make([]App, 0)
 
@@ -308,9 +312,12 @@ func TestCrudWithMissingOrgId(t *testing.T) {
 	assert.NoError(err)
 }
 
-func testCrudWithInvalidParams(t *testing.T, ctx context.Context) {
+func TestCrudWithInvalidParams(t *testing.T) {
 	t.Helper()
 	assert := assert.New(t)
+	ds, _ := SetupDataStore("TestCrudWithInvalidParams")
+	RecreateAllTables(ds)
+	ctx := CokeAdminCtx
 
 	// Insert some data, to make sure that DAL methods fail not due to data missing in data store
 	rowsAffected, err := ds.Insert(ctx, &AppUser{Id: RANDOM_ID})
@@ -335,13 +342,8 @@ func testCrudWithInvalidParams(t *testing.T, ctx context.Context) {
 	// FIND BY ID
 	err = ds.Find(ctx, AppUser{}) // Passing a struct instead of a pointer to a struct
 	assert.ErrorIs(err, ErrNotPtrToStruct)
-}
 
-func TestCrudWithInvalidParams(t *testing.T) {
-	assert := assert.New(t)
-	testCrudWithInvalidParams(t, CokeAdminCtx)
-
-	_, err := ds.Insert(CokeAuditorCtx, &App{TenantId: COKE, Id: "foo"})
+	_, err = ds.Insert(CokeAuditorCtx, &App{TenantId: COKE, Id: "foo"})
 	assert.ErrorIs(err, ErrExecutingSqlStmt)
 
 	_, err = ds.Insert(PepsiAuditorCtx, &AppUser{Id: "foo"})
@@ -351,6 +353,7 @@ func TestCrudWithInvalidParams(t *testing.T) {
 func TestDALRegistration(t *testing.T) {
 	t.Helper()
 	assert := assert.New(t)
+	ds, _ := SetupDataStore("TestDALRegistration")
 
 	roleMapping := map[string]dbrole.DbRole{SERVICE_AUDITOR: dbrole.READER}
 	// When registering a struct with DAL, you should be able to pass it either by value or by reference
@@ -386,6 +389,7 @@ Checks if DAL is able to select the least restrictive available DB role to perfo
 func TestDeleteWithMultipleCSPRoles(t *testing.T) {
 	const APP_ADMIN = "app_admin"
 	assert := assert.New(t)
+	ds, _ := SetupDataStore("TestDeleteWithMultipleCSPRoles")
 
 	// Create context for custom admin who will have 2 service roles
 	customCtx := ds.GetAuthorizer().GetAuthContext(COKE, APP_ADMIN, SERVICE_ADMIN)
@@ -414,6 +418,7 @@ Tries to perform a query with a service role that has not been authorized to acc
 */
 func TestUnauthorizedAccess(t *testing.T) {
 	assert := assert.New(t)
+	ds, _ := SetupDataStore("TestUnauthorizedAccess")
 
 	myCokeApp, _, _ := SetupDbTables(ds)
 	ctx := ds.GetAuthorizer().GetAuthContext(COKE, "unauthorized service role")
@@ -428,6 +433,7 @@ Tries CRUD operations with Pepsi's org ID in the context, while the data in DB b
 func TestCrudWithMismatchingOrgId(t *testing.T) {
 	t.Helper()
 	assert := assert.New(t)
+	ds, _ := SetupDataStore("TestCrudWithMismatchingOrgId")
 	myCokeApp, _, _ := SetupDbTables(ds)
 	tenantStr := "tenant=Pepsi"
 	orgIdStr := "orgIdCol=Coke"
@@ -521,8 +527,7 @@ func TestWithMissingEnvVar(t *testing.T) {
 	} {
 		defer os.Setenv(envVar, os.Getenv(envVar))
 		os.Unsetenv(envVar)
-		_, err := datastore.FromEnv(LOG, TestMetadataAuthorizer, authorizer.SimpleInstancer{})
-		assert.ErrorIs(err, ErrMissingEnvVar)
+		assert.Panics(func() { _, _ = datastore.FromEnv(LOG, TestMetadataAuthorizer, authorizer.SimpleInstancer{}) })
 	}
 }
 
@@ -535,8 +540,7 @@ func TestWithEmptyEnvVar(t *testing.T) {
 	} {
 		defer os.Setenv(envVar, os.Getenv(envVar))
 		os.Setenv(envVar, "")
-		_, err := datastore.FromEnv(LOG, TestMetadataAuthorizer, authorizer.SimpleInstancer{})
-		assert.ErrorIs(err, ErrMissingEnvVar)
+		assert.Panics(func() { _, _ = datastore.FromEnv(LOG, TestMetadataAuthorizer, authorizer.SimpleInstancer{}) })
 	}
 }
 
@@ -549,8 +553,7 @@ func TestWithBlankEnvVar(t *testing.T) {
 	} {
 		defer os.Setenv(envVar, os.Getenv(envVar))
 		os.Setenv(envVar, "    ")
-		_, err := datastore.FromEnv(LOG, TestMetadataAuthorizer, authorizer.SimpleInstancer{})
-		assert.ErrorIs(err, ErrMissingEnvVar)
+		assert.Panics(func() { _, _ = datastore.FromEnv(LOG, TestMetadataAuthorizer, authorizer.SimpleInstancer{}) })
 	}
 }
 
@@ -577,6 +580,7 @@ Tests revision blocking updates that are outdated.
 */
 func TestRevision(t *testing.T) {
 	assert := assert.New(t)
+	ds, _ := SetupDataStore("TestRevision")
 
 	if err := ds.TestHelper().DropTables(&Group{}); err != nil {
 		assert.FailNow("Failed to drop DB tables for the following reason:\n" + err.Error())
@@ -680,8 +684,8 @@ func TestRevision(t *testing.T) {
 
 func TestTransactions(t *testing.T) {
 	assert := assert.New(t)
+	ds, ps := SetupDataStore("TestTransactions")
 	_, _, _ = SetupDbTables(ds)
-
 	roleMapping := map[string]dbrole.DbRole{
 		TENANT_AUDITOR:  dbrole.TENANT_READER,
 		TENANT_ADMIN:    dbrole.TENANT_WRITER,
@@ -691,7 +695,7 @@ func TestTransactions(t *testing.T) {
 	err := ps.Register(context.TODO(), roleMapping, &pb.Disk{})
 	assert.NoError(err)
 
-	testSingleTableTransactions(t)
-	testMultiTableTransactions(t)
-	testMultiProtoTransactions(t)
+	testSingleTableTransactions(t, ds, ps)
+	testMultiTableTransactions(t, ds, ps)
+	testMultiProtoTransactions(t, ds, ps)
 }

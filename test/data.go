@@ -22,8 +22,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/uuid"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
-	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/datastore"
-	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/protostore"
 )
 
 const (
@@ -60,9 +58,6 @@ var (
 	AmericasPepsiAdminCtx  = TestInstancer.WithInstanceId(PepsiAdminCtx, AMERICAS)
 	EuropeCokeAdminCtx     = TestInstancer.WithInstanceId(CokeAdminCtx, EUROPE)
 	EuropeCokeAuditorCtx   = TestInstancer.WithInstanceId(CokeAuditorCtx, EUROPE)
-
-	TestDataStore, _ = datastore.FromEnv(datastore.GetCompLogger(), TestMetadataAuthorizer, TestInstancer)
-	TestProtoStore   = protostore.GetProtoStore(datastore.GetCompLogger(), TestDataStore)
 )
 
 type AppUser struct {

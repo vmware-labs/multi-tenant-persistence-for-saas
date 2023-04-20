@@ -7,7 +7,7 @@
 // not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//  http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing,
 // software distributed under the License is distributed on an
@@ -55,7 +55,10 @@ type DBConfig struct {
 	sslMode  string
 }
 
-func FromEnv(l *logrus.Entry, authorizer authorizer.Authorizer, instancer authorizer.Instancer) (d DataStore, err error) {
+// Returns DBConfig constructed from the env variables.
+// If dbName is set, it is used instead of DB_NAME env variable.
+// All env variables are required and if not set, this method would panic.
+func ConfigFromEnv(dbName string) DBConfig {
 	// Ensure all the needed environment variables are present and non-empty
 	for _, envVar := range []string{
 		DB_HOST_ENV_VAR,
@@ -66,33 +69,35 @@ func FromEnv(l *logrus.Entry, authorizer authorizer.Authorizer, instancer author
 		SSL_MODE_ENV_VAR,
 	} {
 		if _, isPresent := os.LookupEnv(envVar); !isPresent {
-			err = ErrMissingEnvVar.WithValue(ENV_VAR, envVar)
-			l.Error(err)
-			return nil, err
+			panic(ErrMissingEnvVar.WithValue(ENV_VAR, envVar))
 		}
 
 		if envVarValue := strings.TrimSpace(os.Getenv(envVar)); len(envVarValue) == 0 {
-			err = ErrMissingEnvVar.WithValue(ENV_VAR, envVar).WithValue(VALUE, os.Getenv(envVar))
-			l.Error(err)
-			return nil, err
+			panic(ErrMissingEnvVar.WithValue(ENV_VAR, envVar).WithValue(VALUE, os.Getenv(envVar)))
 		}
 	}
 
 	var cfg DBConfig
+	var err error
 
 	cfg.host = strings.TrimSpace(os.Getenv(DB_HOST_ENV_VAR))
 	// Ensure port number is valid
 	if cfg.port, err = strconv.Atoi(strings.TrimSpace(os.Getenv(DB_PORT_ENV_VAR))); err != nil {
-		err = ErrInvalidPortNumber.Wrap(err).WithValue(ENV_VAR, DB_PORT_ENV_VAR).WithValue(VALUE, os.Getenv(DB_PORT_ENV_VAR))
-		l.Error(err)
-		return nil, err
+		panic(ErrInvalidPortNumber.Wrap(err).WithValue(ENV_VAR, DB_PORT_ENV_VAR).WithValue(VALUE, os.Getenv(DB_PORT_ENV_VAR)))
 	}
 	cfg.username = strings.TrimSpace(os.Getenv(DB_ADMIN_USERNAME_ENV_VAR))
 	cfg.password = strings.TrimSpace(os.Getenv(DB_ADMIN_PASSWORD_ENV_VAR))
-	cfg.dbName = strings.TrimSpace(os.Getenv(DB_NAME_ENV_VAR))
+	cfg.dbName = strings.ToLower(strings.TrimSpace(os.Getenv(DB_NAME_ENV_VAR)))
 	cfg.sslMode = strings.TrimSpace(os.Getenv(SSL_MODE_ENV_VAR))
 
-	return FromConfig(l, authorizer, instancer, cfg)
+	if dbName != "" {
+		cfg.dbName = strings.ToLower(dbName)
+	}
+	return cfg
+}
+
+func FromEnv(l *logrus.Entry, authorizer authorizer.Authorizer, instancer authorizer.Instancer) (d DataStore, err error) {
+	return FromConfig(l, authorizer, instancer, ConfigFromEnv(""))
 }
 
 func FromConfig(l *logrus.Entry, authorizer authorizer.Authorizer, instancer authorizer.Instancer, cfg DBConfig) (d DataStore, err error) {
@@ -206,4 +211,39 @@ func openDb(l logger.Interface, dbHost string, dbPort int, dbUsername, dbPasswor
 	}
 
 	return db, nil
+}
+
+// Create a Postgres DB using the provided config if it doesn't exist.
+func DBCreate(cfg DBConfig) error {
+	if DBExists(cfg) {
+		return nil
+	}
+	dataSourceName := fmt.Sprintf("host=%s port=%d user=%s password=%s sslmode=%s",
+		cfg.host, cfg.port, cfg.username, cfg.password, cfg.sslMode)
+	db, err := gorm.Open(postgres.Open(dataSourceName), &gorm.Config{})
+	if err != nil {
+		return err
+	}
+
+	createDbCmd := fmt.Sprintf("CREATE DATABASE %s;", cfg.dbName)
+	if err := db.Exec(createDbCmd).Error; err != nil {
+		if strings.Contains(err.Error(), "SQLSTATE 42P04") {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
+// Checks if a Postgres DB exists and returns true.
+func DBExists(cfg DBConfig) bool {
+	dataSourceName := fmt.Sprintf("host=%s port=%d user=%s password=%s sslmode=%s",
+		cfg.host, cfg.port, cfg.username, cfg.password, cfg.sslMode)
+	db, err := gorm.Open(postgres.Open(dataSourceName), &gorm.Config{})
+	if err != nil {
+		return false
+	}
+
+	selectDb := fmt.Sprintf("SELECT datname FROM pg_database WHERE datname='%s';", cfg.dbName)
+	return db.Exec(selectDb).RowsAffected == 1
 }
