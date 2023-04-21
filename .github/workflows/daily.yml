@@ -21,11 +21,11 @@ jobs:
         with:
           go-version: '1.19'
           check-latest: true
-      - name: Run unit tests
+      - name: Run Build/Test/Benchmarks
         run: |
           mkdir -p $(go env GOPATH)
           mkdir -p $(go env GOCACHE)
-          sudo make all
+          sudo make install_tools ci benchmarks
       - name: Codecov
         uses: codecov/codecov-action@v3
         with:
