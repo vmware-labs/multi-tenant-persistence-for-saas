@@ -2,7 +2,13 @@
 name: Daily
 on:
   schedule:
-  - cron: "0 6 * * *"
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: 'Log level'
+        required: true
+        default: 'trace'
 
 jobs:
   test:
