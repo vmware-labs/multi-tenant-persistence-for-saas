@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 	"unsafe"
 )
 
@@ -43,33 +44,38 @@ const (
 	DB_ROLE           = ErrorContextKey("DbRole")
 )
 
-func contextToString(ctx interface{}) string {
-	ctxStr := ""
-	contextValues := reflect.ValueOf(ctx).Elem()
-	contextKeys := reflect.TypeOf(ctx).Elem()
+func contextToString(ctx context.Context) string {
+	contextType := reflect.TypeOf(ctx).Elem()
+	if contextType.Kind() != reflect.Struct {
+		return ""
+	}
 
-	if contextKeys.Kind() == reflect.Struct {
-		for i := 0; i < contextValues.NumField(); i++ {
-			reflectValue := contextValues.Field(i)
-			reflectValue = reflect.NewAt(reflectValue.Type(), unsafe.Pointer(reflectValue.UnsafeAddr())).Elem()
+	contextValue := reflect.ValueOf(ctx).Elem()
+	numFields := contextValue.NumField()
+	ctxStrings := make([]string, 0, numFields)
+	for i := 0; i < numFields; i++ {
+		reflectValue := contextValue.Field(i)
+		reflectValue = reflect.NewAt(reflectValue.Type(), unsafe.Pointer(reflectValue.UnsafeAddr())).Elem()
 
-			reflectField := contextKeys.Field(i)
-
-			if reflectField.Name == "Context" {
-				ctxStr += contextToString(reflectValue.Interface())
-			} else {
-				switch reflectField.Name {
-				case "key":
-					ctxStr += fmt.Sprintf(" %+v=", reflectValue.Interface())
-				case "val":
-					ctxStr += fmt.Sprintf("%+v,", reflectValue.Interface())
-				default:
-					ctxStr += fmt.Sprintf("%+v=%+v,", reflectField.Name, reflectValue.Interface())
-				}
+		reflectField := contextType.Field(i)
+		switch reflectField.Name {
+		case "Context":
+			innerCtxStr := contextToString(reflectValue.Interface().(context.Context))
+			if len(innerCtxStr) > 0 {
+				ctxStrings = append(ctxStrings, innerCtxStr+", ")
 			}
+		case "key":
+			keyStr := fmt.Sprintf("%+v=", reflectValue.Interface())
+			ctxStrings = append(ctxStrings, keyStr)
+		case "val":
+			valueStr := fmt.Sprintf("%+v", reflectValue.Interface())
+			ctxStrings = append(ctxStrings, valueStr)
+		default:
+			str := fmt.Sprintf("%+v=%+v,", reflectField.Name, reflectValue.Interface())
+			ctxStrings = append(ctxStrings, str)
 		}
 	}
-	return ctxStr
+	return strings.Join(ctxStrings, "")
 }
 
 type DbError struct {
@@ -79,14 +85,38 @@ type DbError struct {
 }
 
 func (e *DbError) Error() string {
-	str := e.msg
-	if e.err != nil {
-		str = str + ": " + e.err.Error()
-	}
+	var errStrBuilder strings.Builder
+
+	// Add error's own message
+	errStrBuilder.WriteString(e.msg)
+
+	// Add error's key-value pairs
 	if e.ctx != nil {
-		str = str + "[" + contextToString(e.ctx) + "]"
+		errStrBuilder.WriteString(" [")
+		errStrBuilder.WriteString(contextToString(e.ctx))
+		errStrBuilder.WriteRune(']')
 	}
-	return str
+
+	// Add nested error on a new line
+	if e.err != nil {
+		errStrBuilder.WriteRune('\n')
+		errStrBuilder.WriteString(e.err.Error())
+	}
+
+	// Indent each nested error
+	errStr := errStrBuilder.String()
+	if split := strings.Split(errStr, "\n"); len(split) > 1 {
+		errStrBuilder.Reset()
+		for i := range split {
+			split[i] = strings.TrimSpace(split[i])
+			for tabsPrinted := 0; tabsPrinted < i; tabsPrinted++ {
+				split[i] = "\t" + split[i]
+			}
+		}
+		errStr = strings.Join(split, "\n")
+	}
+
+	return errStr
 }
 
 func (e *DbError) Is(target error) bool {

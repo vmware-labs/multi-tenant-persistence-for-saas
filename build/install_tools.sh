@@ -15,9 +15,9 @@ $(go env GOPATH)/bin/golangci-lint version | grep ${GOLNT_VERSION} || curl -sSfL
 
 if [[ "${OSTYPE}" == "linux"* ]]; then
   /tmp/typos --version | grep ${TYPOS_VERSION} || wget -qO- https://github.com/crate-ci/typos/releases/download/v${TYPOS_VERSION}/typos-v${TYPOS_VERSION}-x86_64-unknown-linux-musl.tar.gz | tar -zxf - -C /tmp/ ./typos
+  sudo snap install mdl
 elif [[ "${OSTYPE}" == "darwin"* ]]; then
   /tmp/typos --version | grep ${TYPOS_VERSION} || wget -qO- https://github.com/crate-ci/typos/releases/download/v${TYPOS_VERSION}/typos-v${TYPOS_VERSION}-x86_64-apple-darwin.tar.gz | tar -zxf - -C /tmp/ ./typos
 fi
 
 pip3 install addlicense mdv yamllint
-sudo snap install mdl
