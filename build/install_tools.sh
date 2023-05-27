@@ -12,6 +12,7 @@ go-licenser -version || go install github.com/elastic/go-licenser@latest
 $(go env GOPATH)/bin/shfmt -version | grep ${SHFMT_VERSION} || go install mvdan.cc/sh/v3/cmd/shfmt@${SHFMT_VERSION}
 $(go env GOPATH)/bin/gomarkdoc --version | grep ${GOMRK_VERSION} || go install github.com/princjef/gomarkdoc/cmd/gomarkdoc@${GOMRK_VERSION}
 $(go env GOPATH)/bin/golangci-lint version | grep ${GOLNT_VERSION} || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin ${GOLNT_VERSION}
+go install -v github.com/incu6us/goimports-reviser/v3@latest
 
 if [[ "${OSTYPE}" == "linux"* ]]; then
   /tmp/typos --version | grep ${TYPOS_VERSION} || wget -qO- https://github.com/crate-ci/typos/releases/download/v${TYPOS_VERSION}/typos-v${TYPOS_VERSION}-x86_64-unknown-linux-musl.tar.gz | tar -zxf - -C /tmp/ ./typos

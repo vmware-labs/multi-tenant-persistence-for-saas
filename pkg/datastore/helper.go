@@ -25,12 +25,13 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
-	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
-	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
-	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/errors"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
+	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/errors"
 )
 
 const (

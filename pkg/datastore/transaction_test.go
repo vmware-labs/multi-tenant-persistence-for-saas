@@ -23,11 +23,12 @@ import (
 
 	"github.com/bxcodec/faker/v4"
 	"github.com/stretchr/testify/assert"
+	"gorm.io/gorm"
+
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/datastore"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/protostore"
 	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/test"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/test/pb"
-	"gorm.io/gorm"
 )
 
 func testSingleTableTransactions(t *testing.T, ds datastore.DataStore, ps protostore.ProtoStore) {

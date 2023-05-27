@@ -32,7 +32,7 @@ linters:
     - forbidigo
     # forcetypeassert
     - funlen
-    - gci
+    # gci
     - gochecknoglobals
     - gochecknoinits
     - gocognit
