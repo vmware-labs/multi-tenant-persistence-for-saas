@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
 	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/errors"
 	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/test"

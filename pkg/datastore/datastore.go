@@ -39,9 +39,10 @@ package datastore
 import (
 	"context"
 
+	"gorm.io/gorm"
+
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
-	"gorm.io/gorm"
 )
 
 type DataStore interface {

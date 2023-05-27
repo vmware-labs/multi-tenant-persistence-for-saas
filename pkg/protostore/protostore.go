@@ -32,12 +32,13 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/proto"
+	"gorm.io/gorm"
+
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/datastore"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
 	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/errors"
-	"google.golang.org/protobuf/proto"
-	"gorm.io/gorm"
 )
 
 type ProtoStore interface {

@@ -22,9 +22,10 @@ import (
 	"context"
 	"strings"
 
+	"google.golang.org/grpc/metadata"
+
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
 	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/errors"
-	"google.golang.org/grpc/metadata"
 )
 
 const (

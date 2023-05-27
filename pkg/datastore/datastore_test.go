@@ -32,6 +32,7 @@ import (
 	"github.com/bxcodec/faker/v4"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/datastore"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"

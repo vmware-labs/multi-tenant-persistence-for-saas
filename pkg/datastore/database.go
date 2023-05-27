@@ -43,11 +43,12 @@ import (
 
 	_ "github.com/lib/pq"
 	"github.com/sirupsen/logrus"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
 	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/errors"
-	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 const (

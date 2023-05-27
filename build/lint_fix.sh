@@ -9,6 +9,6 @@ $(go env GOPATH)/bin/golangci-lint run --enable-all -c /dev/null --fix || echo "
 
 go vet ./...
 go fix ./...
-find . | grep -e \.go$ | grep -v vendor\/ | xargs -t -I ARGS sh -c 'goimports -w ARGS; gofmt -w ARGS'
+find . -name "*.go" -print0 | xargs -0 -I {} goimports-reviser --imports-order "std,general,company,project" {}
 
 $(go env GOPATH)/bin/shfmt -w -ci -i 2 .
