@@ -37,6 +37,9 @@ const (
 	COLUMN_ORGID      = "org_id"
 	COLUMN_INSTANCEID = "instance_id"
 	COLUMN_REVISION   = "revision"
+	COLUMN_CREATED_AT = "created_at"
+	COLUMN_UPDATED_AT = "updated_at"
+	COLUMN_DELETED_AT = "deleted_at"
 
 	// Messages.
 	REVISION_OUTDATED_MSG = "Invalid update - outdated "
@@ -57,6 +60,12 @@ func cacheSchemaSpec(tableName string, s *schema.Schema) {
 	schemaMap[tableName][COLUMN_ORGID] = ok
 	_, ok = s.FieldsByDBName[COLUMN_INSTANCEID]
 	schemaMap[tableName][COLUMN_INSTANCEID] = ok
+	_, ok = s.FieldsByDBName[COLUMN_CREATED_AT]
+	schemaMap[tableName][COLUMN_CREATED_AT] = ok
+	_, ok = s.FieldsByDBName[COLUMN_UPDATED_AT]
+	schemaMap[tableName][COLUMN_UPDATED_AT] = ok
+	_, ok = s.FieldsByDBName[COLUMN_DELETED_AT]
+	schemaMap[tableName][COLUMN_DELETED_AT] = ok
 }
 
 // Checks if revisioning is supported in the given table.

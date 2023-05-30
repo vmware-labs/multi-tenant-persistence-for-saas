@@ -439,7 +439,24 @@ func (db *relationalDb) UpsertInTable(ctx context.Context, tableName string, rec
 	}
 	defer rollbackTx(tx, db)
 
-	if err = tx.Clauses(clause.OnConflict{UpdateAll: true}).Create(record).Error; err != nil {
+	// On conflict, update all non-primary key columns that do not have default values + created_at & updated_at columns
+	onConflictClause := clause.OnConflict{
+		UpdateAll: true, // Update all columns to new value on conflict except primary keys and those columns having default values from sql func
+	}
+	defaultValueColumns := make([]string, 0) // Names of DB columns that have default values set and need to be updated on conflict
+	if IsColumnPresent(record, tableName, COLUMN_CREATED_AT) {
+		defaultValueColumns = append(defaultValueColumns, COLUMN_CREATED_AT)
+	}
+
+	if IsColumnPresent(record, tableName, COLUMN_UPDATED_AT) {
+		defaultValueColumns = append(defaultValueColumns, COLUMN_UPDATED_AT)
+	}
+
+	if len(defaultValueColumns) > 0 {
+		onConflictClause.DoUpdates = clause.AssignmentColumns(defaultValueColumns)
+	}
+
+	if err = tx.Clauses(onConflictClause).Create(record).Error; err != nil {
 		db.logger.Error(err)
 		if strings.Contains(err.Error(), REVISION_OUTDATED_MSG) {
 			return 0, ErrRevisionConflict.Wrap(err)

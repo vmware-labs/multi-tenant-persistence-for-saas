@@ -20,14 +20,14 @@ package protostore_test
 
 import (
 	"context"
-	"io"
-	"sort"
-	"testing"
-
 	"github.com/bxcodec/faker/v3"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/proto"
+	"io"
+	"sort"
+	"testing"
+	"time"
 
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/datastore"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
@@ -494,6 +494,114 @@ func TestProtoStoreInDbFindAll(t *testing.T) {
 	}
 }
 
+/*
+Checks if Protostore's insert, update, and upsert methods are able to accept explicit
+created_at & updated_at timestamps.
+*/
+func TestProtoStoreInDbTimestamps(t *testing.T) {
+	assert := assert.New(t)
+	p := setupDbContext(t, "TestProtoStoreInDbTimestamps")
+
+	ctx := AmericasPepsiAdminCtx
+	//Check if InsertWithMetadata, UpdateWithMetadata, and Update work correctly
+	{
+		id := P1
+		cpuMsg := pb.CPU{}
+		_ = faker.FakeData(&cpuMsg)
+		timestamp1 := time.Date(1999, 12, 31, 23, 59, 59, 0, time.UTC)
+		metadata := protostore.Metadata{
+			Id:        id,
+			Revision:  1,
+			CreatedAt: timestamp1,
+			UpdatedAt: timestamp1,
+		}
+		_, _, err := p.InsertWithMetadata(ctx, id, &cpuMsg, metadata)
+		assert.NoError(err)
+
+		expectedMd := metadata
+		actualMd, err := p.GetMetadata(ctx, id, &cpuMsg)
+		assert.NoError(err)
+		assert.Equal(expectedMd.Id, actualMd.Id)
+		assert.Equal(expectedMd.ParentId, actualMd.ParentId)
+		assert.Equal(expectedMd.Revision, actualMd.Revision)
+		assert.True(expectedMd.CreatedAt.Equal(actualMd.CreatedAt), "Expected custom created_at timestamp to be persisted")
+		assert.True(expectedMd.UpdatedAt.Equal(actualMd.UpdatedAt), "Expected custom updated_at timestamp to be persisted")
+
+		_ = faker.FakeData(&cpuMsg)
+		timestamp2 := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+		metadata.UpdatedAt = timestamp2
+		_, _, err = p.UpdateWithMetadata(ctx, id, &cpuMsg, metadata)
+		assert.NoError(err)
+
+		expectedMd = metadata
+		expectedMd.Revision++
+		actualMd, err = p.GetMetadata(ctx, id, &cpuMsg)
+		assert.NoError(err)
+		assert.Equal(expectedMd.Id, actualMd.Id)
+		assert.Equal(expectedMd.ParentId, actualMd.ParentId)
+		assert.Equal(expectedMd.Revision, actualMd.Revision)
+		assert.True(expectedMd.CreatedAt.Equal(actualMd.CreatedAt), "Expected custom created_at timestamp to be persisted")
+		assert.True(expectedMd.UpdatedAt.Equal(actualMd.UpdatedAt), "Expected custom updated_at timestamp to be persisted")
+
+		_ = faker.FakeData(&cpuMsg)
+		_, _, err = p.Update(ctx, id, &cpuMsg)
+		assert.NoError(err)
+
+		actualMd, err = p.GetMetadata(ctx, id, &cpuMsg)
+		assert.NoError(err)
+		assert.False(timestamp2.Equal(actualMd.UpdatedAt), "Expected Update to set current time as updated_at")
+	}
+
+	//Check if UpsertWithMetadata, acting as insertion or update, and Upsert work correctly
+	{
+		id := P4
+		cpuMsg := pb.CPU{}
+		_ = faker.FakeData(&cpuMsg)
+		timestamp1 := time.Date(1999, 12, 31, 23, 59, 59, 0, time.UTC)
+		metadata := protostore.Metadata{
+			Id:        id,
+			Revision:  1,
+			CreatedAt: timestamp1,
+			UpdatedAt: timestamp1,
+		}
+		_, _, err := p.UpsertWithMetadata(ctx, id, &cpuMsg, metadata) //Upsert acting as insertion
+		assert.NoError(err)
+
+		expectedMd := metadata
+		actualMd, err := p.GetMetadata(ctx, id, &cpuMsg)
+		assert.NoError(err)
+		assert.Equal(expectedMd.Id, actualMd.Id)
+		assert.Equal(expectedMd.ParentId, actualMd.ParentId)
+		assert.Equal(expectedMd.Revision, actualMd.Revision)
+		assert.True(expectedMd.CreatedAt.Equal(actualMd.CreatedAt), "Expected custom created_at timestamp to be persisted")
+		assert.True(expectedMd.UpdatedAt.Equal(actualMd.UpdatedAt), "Expected custom updated_at timestamp to be persisted")
+
+		_ = faker.FakeData(&cpuMsg)
+		timestamp2 := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+		metadata.UpdatedAt = timestamp2
+		_, _, err = p.UpsertWithMetadata(ctx, id, &cpuMsg, metadata) //Upsert acting as update
+		assert.NoError(err)
+
+		expectedMd = metadata
+		expectedMd.Revision++
+		actualMd, err = p.GetMetadata(ctx, id, &cpuMsg)
+		assert.NoError(err)
+		assert.Equal(expectedMd.Id, actualMd.Id)
+		assert.Equal(expectedMd.ParentId, actualMd.ParentId)
+		assert.Equal(expectedMd.Revision, actualMd.Revision)
+		assert.True(expectedMd.CreatedAt.Equal(actualMd.CreatedAt), "Expected custom created_at timestamp to be persisted")
+		assert.True(expectedMd.UpdatedAt.Equal(actualMd.UpdatedAt), "Expected custom updated_at timestamp to be persisted")
+
+		_ = faker.FakeData(&cpuMsg)
+		_, _, err = p.Upsert(ctx, id, &cpuMsg)
+		assert.NoError(err)
+
+		actualMd, err = p.GetMetadata(ctx, id, &cpuMsg)
+		assert.NoError(err)
+		assert.False(timestamp2.Equal(actualMd.UpdatedAt), "Expected Upsert to set current time as updated_at")
+	}
+}
+
 func TestProtoStoreInDbCrud(t *testing.T) {
 	p := setupDbContext(t, "TestProtoStoreInDbCrud")
 	testProtoStoreCrud(t, p, AmericasPepsiAdminCtx, false)
@@ -533,6 +641,8 @@ func testProtoStoreCrud(t *testing.T, p protostore.ProtoStore, ctx context.Conte
 	err = p.FindById(ctx, P4, &cpuMsg2, &metadata1)
 	assert.NoError(err, "Failed to find a Protobuf message in ProtoStore")
 	assert.Equal(cpuMsg1.String(), cpuMsg2.String())
+	assert.False(metadata1.CreatedAt.IsZero(), "Expected created_at to be set automatically by Insert")
+	assert.False(metadata1.UpdatedAt.IsZero(), "Expected updated_at to be set automatically by Insert")
 	revision, err := p.GetRevision(ctx, P4, &pb.CPU{})
 	assert.NoError(err)
 	assert.Equal(int64(1), revision)
@@ -595,7 +705,6 @@ func testProtoStoreCrud(t *testing.T, p protostore.ProtoStore, ctx context.Conte
 	memMsg1 := pb.Memory{}
 	_ = faker.FakeData(&memMsg1)
 	if useUpsert {
-		// rowsAffected, _, err = p.UpsertWithMetadata(ctx, P4, &memMsg1, Metadata{Revision: 1})
 		rowsAffected, _, err = p.Upsert(ctx, P4, &memMsg1)
 	} else {
 		rowsAffected, _, err = p.Insert(ctx, P4, &memMsg1)
@@ -609,6 +718,8 @@ func testProtoStoreCrud(t *testing.T, p protostore.ProtoStore, ctx context.Conte
 	assert.Equal(memMsg1.String(), memMsg2.String())
 	assert.Equal(P4, metadata1.Id)
 	assert.Equal(int64(1), metadata1.Revision)
+	assert.False(metadata1.CreatedAt.IsZero(), "Expected Upsert/Insert to set created_at column to current timestamp")
+	assert.False(metadata1.UpdatedAt.IsZero(), "Expected Upsert/Insert to set updated_at column to current timestamp")
 	revision, err = p.GetRevision(ctx, P4, &pb.Memory{})
 	assert.NoError(err)
 	assert.Equal(int64(1), revision)
