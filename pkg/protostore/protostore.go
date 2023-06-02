@@ -80,10 +80,10 @@ type ProtoStoreMsg struct {
 	Msg        []byte
 	ParentId   string
 	Revision   int64
-	OrgId      string    `gorm:"primaryKey"`
-	InstanceId string    `gorm:"primaryKey"`
-	CreatedAt  time.Time `gorm:"autoUpdateTime:false;default:current_timestamp"`
-	UpdatedAt  time.Time `gorm:"autoUpdateTime:false;default:current_timestamp"`
+	OrgId      string `gorm:"primaryKey"`
+	InstanceId string `gorm:"primaryKey"`
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 	DeletedAt  gorm.DeletedAt
 	XTableName string `gorm:"-"`
 }
@@ -187,7 +187,6 @@ func (p ProtobufDataStore) Update(ctx context.Context, id string, msg proto.Mess
 	if err != nil {
 		return 0, Metadata{}, err
 	}
-	md.UpdatedAt = time.Now()
 	return p.UpdateWithMetadata(ctx, id, msg, md)
 }
 
@@ -226,7 +225,6 @@ func (p ProtobufDataStore) Upsert(ctx context.Context, id string, msg proto.Mess
 		md.Revision = 1
 	}
 
-	md.UpdatedAt = time.Now()
 	return p.UpsertWithMetadata(ctx, id, msg, md)
 }
 
@@ -441,8 +439,6 @@ func (p ProtobufDataStore) MsgToPersist(ctx context.Context, id string, msg prot
 	pMsg.Msg = bytes
 	pMsg.ParentId = md.ParentId
 	pMsg.Revision = md.Revision
-	pMsg.CreatedAt = md.CreatedAt
-	pMsg.UpdatedAt = md.UpdatedAt
 	return pMsg, nil
 }
 

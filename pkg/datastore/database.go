@@ -443,18 +443,18 @@ func (db *relationalDb) UpsertInTable(ctx context.Context, tableName string, rec
 	onConflictClause := clause.OnConflict{
 		UpdateAll: true, // Update all columns to new value on conflict except primary keys and those columns having default values from sql func
 	}
-	defaultValueColumns := make([]string, 0) // Names of DB columns that have default values set and need to be updated on conflict
-	if IsColumnPresent(record, tableName, COLUMN_CREATED_AT) {
-		defaultValueColumns = append(defaultValueColumns, COLUMN_CREATED_AT)
-	}
-
-	if IsColumnPresent(record, tableName, COLUMN_UPDATED_AT) {
-		defaultValueColumns = append(defaultValueColumns, COLUMN_UPDATED_AT)
-	}
-
-	if len(defaultValueColumns) > 0 {
-		onConflictClause.DoUpdates = clause.AssignmentColumns(defaultValueColumns)
-	}
+	//defaultValueColumns := make([]string, 0) // Names of DB columns that have default values set and need to be updated on conflict
+	//if IsColumnPresent(record, tableName, COLUMN_CREATED_AT) {
+	//	defaultValueColumns = append(defaultValueColumns, COLUMN_CREATED_AT)
+	//}
+	//
+	//if IsColumnPresent(record, tableName, COLUMN_UPDATED_AT) {
+	//	defaultValueColumns = append(defaultValueColumns, COLUMN_UPDATED_AT)
+	//}
+	//
+	//if len(defaultValueColumns) > 0 {
+	//	onConflictClause.DoUpdates = clause.AssignmentColumns(defaultValueColumns)
+	//}
 
 	if err = tx.Clauses(onConflictClause).Create(record).Error; err != nil {
 		db.logger.Error(err)
