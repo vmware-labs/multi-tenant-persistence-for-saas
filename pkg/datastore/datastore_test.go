@@ -45,6 +45,21 @@ var LOG *logrus.Entry
 
 // TODO - add a test that would show that the DB users are not able to create, drop, or truncate tables
 
+func TestHasTable(t *testing.T) {
+	assert := assert.New(t)
+
+	ds, _ := SetupDataStore("TestTruncate")
+	_, _, _ = SetupDbTables(ds)
+
+	exists, err := ds.TestHelper().HasTable("non-existent-table")
+	assert.NoError(err)
+	assert.False(exists, "Expected non-existent table not to be found ")
+
+	exists, err = ds.TestHelper().HasTable(datastore.GetTableName(App{}))
+	assert.NoError(err)
+	assert.True(exists, "Expected existing table to be found ")
+}
+
 func TestTruncate(t *testing.T) {
 	assert := assert.New(t)
 

@@ -415,6 +415,20 @@ func (db *relationalDb) TruncateCascade(cascade bool, tableNames ...string) (err
 	return nil
 }
 
+func (db *relationalDb) HasTable(tableName string) (bool, error) {
+	if tx, err := db.GetDBConn(dbrole.MAIN); err != nil {
+		db.logger.Error(err)
+		return false, err
+	} else {
+		exists := tx.Migrator().HasTable(tableName)
+		if err = tx.Error; err != nil {
+			db.logger.Error(err)
+			return exists, ErrExecutingSqlStmt.Wrap(err)
+		}
+		return exists, nil
+	}
+}
+
 /*
 Updates a record in a DB table.
 */

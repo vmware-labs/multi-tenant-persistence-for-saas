@@ -86,4 +86,5 @@ type TestHelper interface {
 	DropTables(records ...Record) error                       // Drop DB tables by records
 	Truncate(tableNames ...string) error                      // Truncates DB tables
 	TruncateCascade(cascade bool, tableNames ...string) error // Truncates DB tables, with an option to truncate them in a cascading fashion
+	HasTable(tableName string) (bool, error)                  // Checks if DB table exists
 }
