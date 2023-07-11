@@ -27,7 +27,13 @@ import "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
 - [type SimpleInstancer](<#SimpleInstancer>)
   - [func \(s SimpleInstancer\) GetInstanceId\(ctx context.Context\) \(string, error\)](<#SimpleInstancer.GetInstanceId>)
   - [func \(s SimpleInstancer\) WithInstanceId\(ctx context.Context, instanceId string\) context.Context](<#SimpleInstancer.WithInstanceId>)
+- [type SimpleTransactionFetcher](<#SimpleTransactionFetcher>)
+  - [func \(s SimpleTransactionFetcher\) GetTransactionCtx\(ctx context.Context\) \*gorm.DB](<#SimpleTransactionFetcher.GetTransactionCtx>)
+  - [func \(s SimpleTransactionFetcher\) IsTransactionCtx\(ctx context.Context\) bool](<#SimpleTransactionFetcher.IsTransactionCtx>)
+  - [func \(s SimpleTransactionFetcher\) WithTransactionCtx\(ctx context.Context, tx \*gorm.DB\) context.Context](<#SimpleTransactionFetcher.WithTransactionCtx>)
 - [type Tenancer](<#Tenancer>)
+- [type TransactionContextKey](<#TransactionContextKey>)
+- [type TransactionFetcher](<#TransactionFetcher>)
 
 
 ## Constants
@@ -52,6 +58,14 @@ const (
 ```go
 const (
     INSTANCE_ID = ContextKey("multiinstance.id")
+)
+```
+
+<a name="TransactionCtx"></a>
+
+```go
+const (
+    TransactionCtx = TransactionContextKey("DB_TRANSACTION")
 )
 ```
 
@@ -172,6 +186,42 @@ func (s SimpleInstancer) WithInstanceId(ctx context.Context, instanceId string) 
 
 
 
+<a name="SimpleTransactionFetcher"></a>
+## type [SimpleTransactionFetcher](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/transaction.go#L21>)
+
+
+
+```go
+type SimpleTransactionFetcher struct{}
+```
+
+<a name="SimpleTransactionFetcher.GetTransactionCtx"></a>
+### func \(SimpleTransactionFetcher\) [GetTransactionCtx](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/transaction.go#L23>)
+
+```go
+func (s SimpleTransactionFetcher) GetTransactionCtx(ctx context.Context) *gorm.DB
+```
+
+
+
+<a name="SimpleTransactionFetcher.IsTransactionCtx"></a>
+### func \(SimpleTransactionFetcher\) [IsTransactionCtx](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/transaction.go#L36>)
+
+```go
+func (s SimpleTransactionFetcher) IsTransactionCtx(ctx context.Context) bool
+```
+
+
+
+<a name="SimpleTransactionFetcher.WithTransactionCtx"></a>
+### func \(SimpleTransactionFetcher\) [WithTransactionCtx](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/transaction.go#L32>)
+
+```go
+func (s SimpleTransactionFetcher) WithTransactionCtx(ctx context.Context, tx *gorm.DB) context.Context
+```
+
+
+
 <a name="Tenancer"></a>
 ## type [Tenancer](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/authorizer.go#L38-L40>)
 
@@ -180,6 +230,28 @@ func (s SimpleInstancer) WithInstanceId(ctx context.Context, instanceId string) 
 ```go
 type Tenancer interface {
     GetOrgFromContext(ctx context.Context) (string, error)
+}
+```
+
+<a name="TransactionContextKey"></a>
+## type [TransactionContextKey](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/transaction.go#L9>)
+
+
+
+```go
+type TransactionContextKey string
+```
+
+<a name="TransactionFetcher"></a>
+## type [TransactionFetcher](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/transaction.go#L15-L19>)
+
+
+
+```go
+type TransactionFetcher interface {
+    IsTransactionCtx(ctx context.Context) bool
+    GetTransactionCtx(ctx context.Context) *gorm.DB
+    WithTransactionCtx(ctx context.Context, tx *gorm.DB) context.Context
 }
 ```
 
@@ -226,8 +298,8 @@ DataStore interface exposes basic methods like Find/FindAll/Upsert/Delete. For r
 - [type DBConfig](<#DBConfig>)
   - [func ConfigFromEnv\(dbName string\) DBConfig](<#ConfigFromEnv>)
 - [type DataStore](<#DataStore>)
-  - [func FromConfig\(l \*logrus.Entry, authorizer authorizer.Authorizer, instancer authorizer.Instancer, cfg DBConfig\) \(d DataStore, err error\)](<#FromConfig>)
-  - [func FromEnv\(l \*logrus.Entry, authorizer authorizer.Authorizer, instancer authorizer.Instancer\) \(d DataStore, err error\)](<#FromEnv>)
+  - [func FromConfig\(l \*logrus.Entry, a authorizer.Authorizer, instancer authorizer.Instancer, cfg DBConfig\) \(d DataStore, err error\)](<#FromConfig>)
+  - [func FromEnv\(l \*logrus.Entry, a authorizer.Authorizer, instancer authorizer.Instancer\) \(d DataStore, err error\)](<#FromEnv>)
 - [type Helper](<#Helper>)
 - [type Pagination](<#Pagination>)
   - [func DefaultPagination\(\) \*Pagination](<#DefaultPagination>)
@@ -318,7 +390,7 @@ var TRACE = func(format string, v ...any) {
 ```
 
 <a name="DBCreate"></a>
-## func [DBCreate](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/helper.go#L219>)
+## func [DBCreate](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/helper.go#L220>)
 
 ```go
 func DBCreate(cfg DBConfig) error
@@ -327,7 +399,7 @@ func DBCreate(cfg DBConfig) error
 Create a Postgres DB using the provided config if it doesn't exist.
 
 <a name="DBExists"></a>
-## func [DBExists](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/helper.go#L241>)
+## func [DBExists](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/helper.go#L242>)
 
 ```go
 func DBExists(cfg DBConfig) bool
@@ -790,7 +862,7 @@ err != nil - true
 ### func [FromConfig](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/helper.go#L104>)
 
 ```go
-func FromConfig(l *logrus.Entry, authorizer authorizer.Authorizer, instancer authorizer.Instancer, cfg DBConfig) (d DataStore, err error)
+func FromConfig(l *logrus.Entry, a authorizer.Authorizer, instancer authorizer.Instancer, cfg DBConfig) (d DataStore, err error)
 ```
 
 
@@ -799,7 +871,7 @@ func FromConfig(l *logrus.Entry, authorizer authorizer.Authorizer, instancer aut
 ### func [FromEnv](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/helper.go#L100>)
 
 ```go
-func FromEnv(l *logrus.Entry, authorizer authorizer.Authorizer, instancer authorizer.Instancer) (d DataStore, err error)
+func FromEnv(l *logrus.Entry, a authorizer.Authorizer, instancer authorizer.Instancer) (d DataStore, err error)
 ```
 
 
@@ -879,7 +951,7 @@ func GetRecordInstanceFromSlice(x interface{}) Record
 
 
 <a name="TenancyInfo"></a>
-## type [TenancyInfo](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/database.go#L72-L76>)
+## type [TenancyInfo](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/database.go#L73-L77>)
 
 
 

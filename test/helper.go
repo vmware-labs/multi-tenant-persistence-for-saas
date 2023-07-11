@@ -32,7 +32,6 @@ func SetupDataStore(dbName string) (datastore.DataStore, protostore.ProtoStore) 
 	if err != nil {
 		log.Fatalf("Failed to create database from cfg %+v", cfg)
 	}
-	log.Printf("Created/Exists database %s", dbName)
 	ds, err := datastore.FromConfig(datastore.GetCompLogger(), TestMetadataAuthorizer, TestInstancer, cfg)
 	if err != nil {
 		log.Fatalf("Failed to initialize datastore from cfg %+v", cfg)
