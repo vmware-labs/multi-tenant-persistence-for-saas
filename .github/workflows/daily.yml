@@ -48,4 +48,4 @@ jobs:
         run: |
           mkdir -p $(go env GOPATH)
           mkdir -p $(go env GOCACHE)
-          make lint
+          make lint mlint
