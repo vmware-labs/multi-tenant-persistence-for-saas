@@ -894,7 +894,7 @@ type TenancyInfo struct {
 ```
 
 <a name="TestHelper"></a>
-## type [TestHelper](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/datastore.go#L85-L89>)
+## type [TestHelper](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/datastore.go#L85-L90>)
 
 
 
@@ -903,6 +903,7 @@ type TestHelper interface {
     DropTables(records ...Record) error                       // Drop DB tables by records
     Truncate(tableNames ...string) error                      // Truncates DB tables
     TruncateCascade(cascade bool, tableNames ...string) error // Truncates DB tables, with an option to truncate them in a cascading fashion
+    HasTable(tableName string) (bool, error)                  // Checks if DB table exists
 }
 ```
 
