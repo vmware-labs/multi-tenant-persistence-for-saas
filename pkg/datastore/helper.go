@@ -126,7 +126,7 @@ func FromConfig(l *logrus.Entry, authorizer authorizer.Authorizer, instancer aut
 			for _, dbUserSpec := range getAllDbUsers() {
 				stmt := getCreateUserStmt(string(dbUserSpec.username), dbUserSpec.password)
 				if tx := db.gormDBMap[dbrole.MAIN].Exec(stmt); tx.Error != nil {
-					err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
+					err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt).WithValue(DB_NAME, db.dbName)
 					// Suppresses following duplicate insertion error,
 					// ERROR: duplicate key value violates unique constraint
 					// "pg_authid_rolname_index" (SQLSTATE 23505)
@@ -148,7 +148,7 @@ func FromConfig(l *logrus.Entry, authorizer authorizer.Authorizer, instancer aut
 					db.logger.Infoln(tx.Error)
 					return nil
 				}
-				err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt)
+				err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt).WithValue(DB_NAME, db.dbName)
 				db.logger.Error(err)
 				return err
 			}
@@ -179,6 +179,7 @@ func FromConfig(l *logrus.Entry, authorizer authorizer.Authorizer, instancer aut
 		return nil
 	}
 	return &relationalDb{
+		dbName:      cfg.dbName,
 		authorizer:  authorizer,
 		instancer:   instancer,
 		gormDBMap:   make(map[dbrole.DbRole]*gorm.DB),

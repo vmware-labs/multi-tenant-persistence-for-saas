@@ -61,6 +61,7 @@ Postgres-backed implementation of DataStore interface. By default, uses Metadata
 */
 type relationalDb struct {
 	sync.RWMutex
+	dbName      string
 	authorizer  authorizer.Authorizer // Allows or cancels operations on the DB depending on user's org. and service roles
 	instancer   authorizer.Instancer  // Allows multi instance services to persist data with separation
 	gormDBMap   map[dbrole.DbRole]*gorm.DB
@@ -106,8 +107,9 @@ func (db *relationalDb) getDBTransaction(ctx context.Context, tableName string, 
 	tx = tx.Table(tableName)
 	if err = tx.Error; err != nil {
 		err = ErrStartingTx.Wrap(err).WithMap(map[ErrorContextKey]string{
+			DB_NAME:      db.dbName,
 			"db_role":    string(tenancyInfo.DbRole),
-			"table_name": tableName,
+			TABLE_NAME:   tableName,
 			"authorizer": TypeName(db.authorizer),
 		})
 		db.logger.Error(err)
@@ -174,7 +176,7 @@ func (db *relationalDb) configureTxWithTenancyScope(tenancyInfo TenancyInfo) (*g
 		stmt := getSetConfigStmt(DbConfigOrgId, tenancyInfo.OrgId)
 		if err = tx.Exec(stmt).Error; err != nil {
 			db.logger.Error(err)
-			return nil, ErrExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, stmt)
+			return nil, ErrExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, stmt).WithValue(DB_NAME, db.dbName)
 		}
 	} else {
 		TRACE("Skipping tenant scoping for %+v", tenancyInfo)
@@ -184,7 +186,7 @@ func (db *relationalDb) configureTxWithTenancyScope(tenancyInfo TenancyInfo) (*g
 	stmt := getSetConfigStmt(DbConfigInstanceId, tenancyInfo.InstanceId)
 	if err = tx.Exec(stmt).Error; err != nil {
 		db.logger.Error(err)
-		return nil, ErrExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, stmt)
+		return nil, ErrExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, stmt).WithValue(DB_NAME, db.dbName)
 	}
 	return tx, nil
 }
@@ -220,14 +222,14 @@ func (db *relationalDb) FindInTable(ctx context.Context, tableName string, recor
 
 	if err = tx.Table(tableName).Where(record).First(record).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrRecordNotFound.Wrap(err).WithValue("record", fmt.Sprintf("%+v", record))
+			return ErrRecordNotFound.Wrap(err).WithValue("record", fmt.Sprintf("%+v", record)).WithValue(DB_NAME, db.dbName)
 		}
 		db.logger.Error(err)
-		return ErrExecutingSqlStmt.Wrap(err)
+		return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 	}
 	if err = tx.Commit().Error; err != nil {
 		db.logger.Error(err)
-		return ErrExecutingSqlStmt.Wrap(err)
+		return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 	}
 	return nil
 }
@@ -275,7 +277,7 @@ func (db *relationalDb) FindWithFilterInTable(ctx context.Context, tableName str
 
 	if err = tx.Table(tableName).Where(record).Error; err != nil {
 		db.logger.Error(err)
-		return ErrExecutingSqlStmt.Wrap(err)
+		return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 	}
 	if pagination != nil {
 		tx.Offset(pagination.Offset).Limit(pagination.Limit)
@@ -285,12 +287,12 @@ func (db *relationalDb) FindWithFilterInTable(ctx context.Context, tableName str
 	}
 	if err = tx.Find(records).Error; err != nil {
 		db.logger.Error(err)
-		return ErrExecutingSqlStmt.Wrap(err)
+		return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 	}
 
 	if err = tx.Commit().Error; err != nil {
 		db.logger.Error(err)
-		return ErrExecutingSqlStmt.Wrap(err)
+		return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 	}
 	return nil
 }
@@ -314,11 +316,11 @@ func (db *relationalDb) InsertInTable(ctx context.Context, tableName string, rec
 
 	if err = tx.Create(record).Error; err != nil {
 		db.logger.Error(err)
-		return 0, ErrExecutingSqlStmt.Wrap(err)
+		return 0, ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 	}
 	if err = tx.Commit().Error; err != nil {
 		db.logger.Error(err)
-		return 0, ErrExecutingSqlStmt.Wrap(err)
+		return 0, ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 	}
 	return tx.RowsAffected, nil
 }
@@ -361,17 +363,17 @@ func (db *relationalDb) delete(ctx context.Context, tableName string, record Rec
 	if softDelete {
 		if err = tx.Delete(record).Error; err != nil {
 			db.logger.Error(err)
-			return 0, ErrExecutingSqlStmt.Wrap(err)
+			return 0, ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 		}
 	} else {
 		if err = tx.Unscoped().Delete(record).Error; err != nil {
 			db.logger.Error(err)
-			return 0, ErrExecutingSqlStmt.Wrap(err)
+			return 0, ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 		}
 	}
 	if err = tx.Commit().Error; err != nil {
 		db.logger.Error(err)
-		return 0, ErrExecutingSqlStmt.Wrap(err)
+		return 0, ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 	}
 	return tx.RowsAffected, nil
 }
@@ -388,7 +390,7 @@ func (db *relationalDb) DropTables(records ...Record) error {
 		err = tx.Migrator().DropTable(record)
 		if err != nil {
 			db.logger.Error(err)
-			return ErrExecutingSqlStmt.Wrap(err)
+			return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 		}
 	}
 	return nil
@@ -408,7 +410,7 @@ func (db *relationalDb) TruncateCascade(cascade bool, tableNames ...string) (err
 		}
 		if err = tx.Exec(stmt).Error; err != nil {
 			db.logger.Error(err)
-			return ErrExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, stmt)
+			return ErrExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, stmt).WithValue(DB_NAME, db.dbName)
 		}
 	}
 
@@ -423,7 +425,7 @@ func (db *relationalDb) HasTable(tableName string) (bool, error) {
 		exists := tx.Migrator().HasTable(tableName)
 		if err = tx.Error; err != nil {
 			db.logger.Error(err)
-			return exists, ErrExecutingSqlStmt.Wrap(err)
+			return exists, ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 		}
 		return exists, nil
 	}
@@ -456,14 +458,14 @@ func (db *relationalDb) UpsertInTable(ctx context.Context, tableName string, rec
 	if err = tx.Clauses(clause.OnConflict{UpdateAll: true}).Create(record).Error; err != nil {
 		db.logger.Error(err)
 		if strings.Contains(err.Error(), REVISION_OUTDATED_MSG) {
-			return 0, ErrRevisionConflict.Wrap(err)
+			return 0, ErrRevisionConflict.Wrap(err).WithValue(DB_NAME, db.dbName)
 		} else {
-			return 0, ErrExecutingSqlStmt.Wrap(err)
+			return 0, ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 		}
 	}
 	if err = tx.Commit().Error; err != nil {
 		db.logger.Error(err)
-		return 0, ErrExecutingSqlStmt.Wrap(err)
+		return 0, ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 	}
 	return tx.RowsAffected, nil
 }
@@ -481,14 +483,16 @@ func (db *relationalDb) UpdateInTable(ctx context.Context, tableName string, rec
 	if err = tx.Model(record).Select("*").Updates(record).Error; err != nil {
 		db.logger.Error(err)
 		if strings.Contains(err.Error(), REVISION_OUTDATED_MSG) {
-			return 0, ErrRevisionConflict.Wrap(err)
+			err = ErrRevisionConflict.Wrap(err).WithValue(DB_NAME, db.dbName)
+			return 0, err
 		} else {
-			return 0, ErrExecutingSqlStmt.Wrap(err)
+			err = ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
+			return 0, err
 		}
 	}
 	if err = tx.Commit().Error; err != nil {
 		db.logger.Error(err)
-		return 0, ErrExecutingSqlStmt.Wrap(err)
+		return 0, ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 	}
 	return tx.RowsAffected, nil
 }
@@ -516,7 +520,7 @@ func (db *relationalDb) RegisterHelper(_ context.Context, roleMapping map[string
 		return err
 	}
 	if err = tx.Table(tableName).AutoMigrate(record); err != nil {
-		err = ErrRegisteringStruct.Wrap(err).WithValue(TABLE_NAME, tableName)
+		err = ErrRegisteringStruct.Wrap(err).WithValue(TABLE_NAME, tableName).WithValue(DB_NAME, db.dbName)
 		db.logger.Error(err)
 		return err
 	}
@@ -537,6 +541,7 @@ func (db *relationalDb) RegisterHelper(_ context.Context, roleMapping map[string
 		}
 		if err := tx.Exec(stmt).Error; err != nil {
 			err = ErrRegisteringStruct.Wrap(err).WithMap(map[ErrorContextKey]string{
+				DB_NAME:    db.dbName,
 				TABLE_NAME: tableName,
 				SQL_STMT:   stmt,
 			})
@@ -550,6 +555,7 @@ func (db *relationalDb) RegisterHelper(_ context.Context, roleMapping map[string
 	for _, dbUserSpec := range users {
 		if err = db.grantPrivileges(dbUserSpec, tableName, record); err != nil {
 			err = ErrRegisteringStruct.Wrap(err).WithMap(map[ErrorContextKey]string{
+				DB_NAME:    db.dbName,
 				TABLE_NAME: tableName,
 			})
 			return err
@@ -573,7 +579,7 @@ func (db *relationalDb) enforceRevisioning(tableName string) (err error) {
 	}
 	stmt := getDropTriggerStmt(tableName, functionName)
 	if err = tx.Exec(stmt).Error; err != nil {
-		err = ErrExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, stmt)
+		err = ErrExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, stmt).WithValue(DB_NAME, db.dbName)
 		db.logger.Error(err)
 		return err
 	}
@@ -585,7 +591,7 @@ func (db *relationalDb) enforceRevisioning(tableName string) (err error) {
 	if err = tx.Exec(stmt).Error; err != nil {
 		if !strings.Contains(err.Error(), "duplicate key value") {
 			db.logger.Error(err)
-			return ErrExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, stmt)
+			return ErrExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, stmt).WithValue(DB_NAME, db.dbName)
 		}
 	}
 
@@ -602,7 +608,7 @@ func (db *relationalDb) grantPrivileges(dbUser dbUserSpec, tableName string, rec
 	stmt := getGrantPrivilegesStmt(tableName, string(dbUser.username), dbUser.commands)
 	if err := tx.Exec(stmt).Error; err != nil {
 		db.logger.Error(err)
-		return ErrExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, stmt)
+		return ErrExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, stmt).WithValue(DB_NAME, db.dbName)
 	}
 
 	// Enable row-level security in a multi-tenant or multi-instanced table
@@ -613,7 +619,7 @@ func (db *relationalDb) grantPrivileges(dbUser dbUserSpec, tableName string, rec
 		}
 		stmt = getCreatePolicyStmt(tableName, record, dbUser)
 		if err := tx.Exec(stmt).Error; err != nil {
-			err = ErrExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, stmt)
+			err = ErrExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, stmt).WithValue(DB_NAME, db.dbName)
 			db.logger.Error(err)
 			return err
 		}
@@ -663,7 +669,7 @@ func (db *relationalDb) getTenancyInfoFromCtx(ctx context.Context, tableNames ..
 func (db *relationalDb) GetDBConn(dbRole dbrole.DbRole) (*gorm.DB, error) {
 	if _, ok := db.gormDBMap[dbRole]; !ok {
 		if err := db.initializer(db, dbRole); err != nil {
-			err = ErrConnectingToDb.Wrap(err)
+			err = ErrConnectingToDb.Wrap(err).WithValue(DB_NAME, db.dbName)
 			return nil, err
 		}
 	}
@@ -671,5 +677,5 @@ func (db *relationalDb) GetDBConn(dbRole dbrole.DbRole) (*gorm.DB, error) {
 		TRACE("Returning DB connection for %s", dbRole)
 		return conn, nil
 	}
-	return nil, ErrConnectingToDb.WithValue(DB_ROLE, string(dbRole))
+	return nil, ErrConnectingToDb.WithValue(DB_ROLE, string(dbRole)).WithValue(DB_NAME, db.dbName)
 }
