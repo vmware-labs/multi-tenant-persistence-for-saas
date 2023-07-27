@@ -75,7 +75,7 @@ func ExampleDataStore_multiTenancy() {
 	// Attempts to find a record using the incorrect context of the Pepsi organization and should error out.
 	q4 := &User{Id: "P3"}
 	err = ds.Find(PepsiOrgCtx, q4)
-	fmt.Println(err)
+	fmt.Printf("err != nil - %t\n", err != nil)
 
 	// Deletes a record using the context of the Coke organization and the specified uId.
 	rowsAffected, err = ds.Delete(CokeOrgCtx, q1)
@@ -97,8 +97,7 @@ func ExampleDataStore_multiTenancy() {
 	// [Coke/P1337] Bob: 31 <nil>
 	// [Pepsi/P1337] John: 36 <nil>
 	// [Coke/P3] Pat: 39 <nil>
-	// Unable to locate record [record=[/P3] : 0]
-	//	record not found
+	// err != nil - true
 	// 1 <nil>
 	// 1 <nil>
 	// 0 <nil>

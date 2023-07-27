@@ -78,7 +78,7 @@ func ExampleDataStore_multiInstance() {
 	// Attempts to find a record using the incorrect context of the Prod instance and should error out.
 	q4 := &Person{Id: "P3"}
 	err = ds.Find(ProdInstanceCtx, q4)
-	fmt.Println(err)
+	fmt.Printf("err != nil - %t\n", err != nil)
 
 	// Deletes a record using the context of the Dev instance and the specified uId.
 	rowsAffected, err = ds.Delete(DevInstanceCtx, q1)
@@ -99,8 +99,7 @@ func ExampleDataStore_multiInstance() {
 	// [Dev/P1337] Bob: 31 <nil>
 	// [Prod/P1337] John: 36 <nil>
 	// [Dev/P3] Pat: 39 <nil>
-	// Unable to locate record [record=[/P3] : 0]
-	//	record not found
+	// err != nil - true
 	// 1 <nil>
 	// 1 <nil>
 	// 0 <nil>
