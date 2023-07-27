@@ -220,16 +220,19 @@ func (db *relationalDb) FindInTable(ctx context.Context, tableName string, recor
 	}
 	defer rollbackTx(tx, db)
 
-	if err = tx.Table(tableName).Where(record).First(record).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrRecordNotFound.Wrap(err).WithValue("record", fmt.Sprintf("%+v", record)).WithValue(DB_NAME, db.dbName)
-		}
+	var stmt = func(tx *gorm.DB) *gorm.DB { return tx.Table(tableName).Where(record).First(record) }
+	if err = stmt(tx).Error; err != nil {
 		db.logger.Error(err)
-		return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
+		kvMap := map[ErrorContextKey]string{DB_NAME: db.dbName, SQL_STMT: db.toSQL(stmt)}
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			kvMap["record"] = fmt.Sprintf("%+v", record)
+			return ErrRecordNotFound.Wrap(err).WithMap(kvMap)
+		}
+		return ErrExecutingSqlStmt.Wrap(err).WithMap(kvMap)
 	}
 	if err = tx.Commit().Error; err != nil {
 		db.logger.Error(err)
-		return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
+		return ErrCommittingTx.Wrap(err).WithValue(DB_NAME, db.dbName)
 	}
 	return nil
 }
@@ -275,24 +278,25 @@ func (db *relationalDb) FindWithFilterInTable(ctx context.Context, tableName str
 		return err
 	}
 
-	if err = tx.Table(tableName).Where(record).Error; err != nil {
-		db.logger.Error(err)
-		return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
-	}
-	if pagination != nil {
-		tx.Offset(pagination.Offset).Limit(pagination.Limit)
-		if pagination.SortBy != "" {
-			tx.Order(pagination.SortBy)
+	var stmt = func(tx *gorm.DB) *gorm.DB {
+		tx = tx.Table(tableName).Where(record)
+		if pagination != nil {
+			tx.Offset(pagination.Offset).Limit(pagination.Limit)
+			if pagination.SortBy != "" {
+				tx.Order(pagination.SortBy)
+			}
 		}
+		return tx.Find(records)
 	}
-	if err = tx.Find(records).Error; err != nil {
+	if err = stmt(tx).Error; err != nil {
 		db.logger.Error(err)
-		return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
+		kvMap := map[ErrorContextKey]string{DB_NAME: db.dbName, SQL_STMT: db.toSQL(stmt)}
+		return ErrExecutingSqlStmt.Wrap(err).WithMap(kvMap)
 	}
 
 	if err = tx.Commit().Error; err != nil {
 		db.logger.Error(err)
-		return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
+		return ErrCommittingTx.Wrap(err).WithValue(DB_NAME, db.dbName)
 	}
 	return nil
 }
@@ -314,13 +318,15 @@ func (db *relationalDb) InsertInTable(ctx context.Context, tableName string, rec
 	}
 	defer rollbackTx(tx, db)
 
-	if err = tx.Create(record).Error; err != nil {
+	var stmt = func(tx *gorm.DB) *gorm.DB { return tx.Create(record) }
+	if err = stmt(tx).Error; err != nil {
 		db.logger.Error(err)
-		return 0, ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
+		kvMap := map[ErrorContextKey]string{DB_NAME: db.dbName, SQL_STMT: db.toSQL(stmt)}
+		return 0, ErrExecutingSqlStmt.Wrap(err).WithMap(kvMap)
 	}
 	if err = tx.Commit().Error; err != nil {
 		db.logger.Error(err)
-		return 0, ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
+		return 0, ErrCommittingTx.Wrap(err).WithValue(DB_NAME, db.dbName)
 	}
 	return tx.RowsAffected, nil
 }
@@ -360,20 +366,21 @@ func (db *relationalDb) delete(ctx context.Context, tableName string, record Rec
 	}
 	defer rollbackTx(tx, db)
 
-	if softDelete {
-		if err = tx.Delete(record).Error; err != nil {
-			db.logger.Error(err)
-			return 0, ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
+	var stmt = func(tx *gorm.DB) *gorm.DB {
+		if !softDelete {
+			tx = tx.Unscoped()
 		}
-	} else {
-		if err = tx.Unscoped().Delete(record).Error; err != nil {
-			db.logger.Error(err)
-			return 0, ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
-		}
+		return tx.Delete(record)
 	}
+	if err = stmt(tx).Error; err != nil {
+		db.logger.Error(err)
+		kvMap := map[ErrorContextKey]string{DB_NAME: db.dbName, SQL_STMT: db.toSQL(stmt)}
+		return 0, ErrExecutingSqlStmt.Wrap(err).WithMap(kvMap)
+	}
+
 	if err = tx.Commit().Error; err != nil {
 		db.logger.Error(err)
-		return 0, ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
+		return 0, ErrCommittingTx.Wrap(err).WithValue(DB_NAME, db.dbName)
 	}
 	return tx.RowsAffected, nil
 }
@@ -455,17 +462,20 @@ func (db *relationalDb) UpsertInTable(ctx context.Context, tableName string, rec
 	}
 	defer rollbackTx(tx, db)
 
-	if err = tx.Clauses(clause.OnConflict{UpdateAll: true}).Create(record).Error; err != nil {
+	var stmt = func(tx *gorm.DB) *gorm.DB { return tx.Clauses(clause.OnConflict{UpdateAll: true}).Create(record) }
+	if err = stmt(tx).Error; err != nil {
 		db.logger.Error(err)
+		kvMap := map[ErrorContextKey]string{DB_NAME: db.dbName, SQL_STMT: db.toSQL(stmt)}
 		if strings.Contains(err.Error(), REVISION_OUTDATED_MSG) {
-			return 0, ErrRevisionConflict.Wrap(err).WithValue(DB_NAME, db.dbName)
+			err = ErrRevisionConflict.Wrap(err).WithMap(kvMap)
 		} else {
-			return 0, ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
+			err = ErrExecutingSqlStmt.Wrap(err).WithMap(kvMap)
 		}
+		return 0, err
 	}
 	if err = tx.Commit().Error; err != nil {
 		db.logger.Error(err)
-		return 0, ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
+		return 0, ErrCommittingTx.Wrap(err).WithValue(DB_NAME, db.dbName)
 	}
 	return tx.RowsAffected, nil
 }
@@ -480,19 +490,20 @@ func (db *relationalDb) UpdateInTable(ctx context.Context, tableName string, rec
 	}
 	defer rollbackTx(tx, db)
 
-	if err = tx.Model(record).Select("*").Updates(record).Error; err != nil {
+	var stmt = func(tx *gorm.DB) *gorm.DB { return tx.Model(record).Select("*").Updates(record) }
+	if err = stmt(tx).Error; err != nil {
 		db.logger.Error(err)
+		kvMap := map[ErrorContextKey]string{DB_NAME: db.dbName, SQL_STMT: db.toSQL(stmt)}
 		if strings.Contains(err.Error(), REVISION_OUTDATED_MSG) {
-			err = ErrRevisionConflict.Wrap(err).WithValue(DB_NAME, db.dbName)
-			return 0, err
+			err = ErrRevisionConflict.Wrap(err).WithMap(kvMap)
 		} else {
-			err = ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
-			return 0, err
+			err = ErrExecutingSqlStmt.Wrap(err).WithMap(kvMap)
 		}
+		return 0, err
 	}
 	if err = tx.Commit().Error; err != nil {
 		db.logger.Error(err)
-		return 0, ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
+		return 0, ErrCommittingTx.Wrap(err).WithValue(DB_NAME, db.dbName)
 	}
 	return tx.RowsAffected, nil
 }
@@ -579,8 +590,8 @@ func (db *relationalDb) enforceRevisioning(tableName string) (err error) {
 	}
 	stmt := getDropTriggerStmt(tableName, functionName)
 	if err = tx.Exec(stmt).Error; err != nil {
-		err = ErrExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, stmt).WithValue(DB_NAME, db.dbName)
 		db.logger.Error(err)
+		err = ErrExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, stmt).WithValue(DB_NAME, db.dbName)
 		return err
 	}
 
@@ -678,4 +689,10 @@ func (db *relationalDb) GetDBConn(dbRole dbrole.DbRole) (*gorm.DB, error) {
 		return conn, nil
 	}
 	return nil, ErrConnectingToDb.WithValue(DB_ROLE, string(dbRole)).WithValue(DB_NAME, db.dbName)
+}
+
+// toSQL accept as input a function that performs a set of SQL operations on a gorm DB object
+// and returns a SQL string that would get executed by the function.
+func (db *relationalDb) toSQL(sqlStmt func(tx *gorm.DB) *gorm.DB) string {
+	return db.gormDBMap[dbrole.MAIN].ToSQL(sqlStmt)
 }
