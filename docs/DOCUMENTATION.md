@@ -493,10 +493,14 @@ func main() {
 	DevInstanceCtx := instancer.WithInstanceId(ServiceAdminCtx, "Dev")
 	ProdInstanceCtx := instancer.WithInstanceId(ServiceAdminCtx, "Prod")
 
-	// Initializes the Datastore using the metadata authorizer and connection details obtained from the ENV variables.
-	ds, err := datastore.FromEnv(datastore.GetCompLogger(), mdAuthorizer, instancer)
+	// Initializes the Datastore using the metadata authorizer and connection details obtained from the ENV variables, except for DB name.
+	cfg := datastore.ConfigFromEnv("ExampleDataStore_multiInstance" /* dbName */)
+	if err := datastore.DBCreate(cfg); err != nil {
+		log.Fatalf("DB creation failed: %s", err)
+	}
+	ds, err := datastore.FromConfig(datastore.GetCompLogger(), mdAuthorizer, instancer, cfg)
 	if err != nil {
-		log.Fatalf("datastore initialization from env errored: %s", err)
+		log.Fatalf("datastore initialization from config errored: %s", err)
 	}
 
 	// Registers the necessary structs with their corresponding role mappings.
@@ -533,7 +537,7 @@ func main() {
 	// Attempts to find a record using the incorrect context of the Prod instance and should error out.
 	q4 := &Person{Id: "P3"}
 	err = ds.Find(ProdInstanceCtx, q4)
-	fmt.Println(err)
+	fmt.Printf("err != nil - %t\n", err != nil)
 
 	// Deletes a record using the context of the Dev instance and the specified uId.
 	rowsAffected, err = ds.Delete(DevInstanceCtx, q1)
@@ -559,8 +563,7 @@ func main() {
 [Dev/P1337] Bob: 31 <nil>
 [Prod/P1337] John: 36 <nil>
 [Dev/P3] Pat: 39 <nil>
-Unable to locate record [record=[/P3] : 0, dbName=postgres]
-	record not found
+err != nil - true
 1 <nil>
 1 <nil>
 0 <nil>
@@ -613,10 +616,14 @@ func main() {
 	CokeOrgCtx := mdAuthorizer.GetAuthContext("Coke", TENANT_ADMIN)
 	PepsiOrgCtx := mdAuthorizer.GetAuthContext("Pepsi", TENANT_ADMIN)
 
-	// Initializes the Datastore using the metadata authorizer and connection details obtained from the ENV variables.
-	ds, err := datastore.FromEnv(datastore.GetCompLogger(), mdAuthorizer, nil)
+	// Initializes the Datastore using the metadata authorizer and connection details obtained from the ENV variables, except for DB name.
+	cfg := datastore.ConfigFromEnv("ExampleDataStore_multiTenancy" /* dbName */)
+	if err := datastore.DBCreate(cfg); err != nil {
+		log.Fatalf("DB creation failed: %s", err)
+	}
+	ds, err := datastore.FromConfig(datastore.GetCompLogger(), mdAuthorizer, nil /* instancer */, cfg)
 	if err != nil {
-		log.Fatalf("datastore initialization from env errored: %s", err)
+		log.Fatalf("datastore initialization from config errored: %s", err)
 	}
 
 	// Registers the necessary structs with their corresponding tenant role mappings.
@@ -653,7 +660,7 @@ func main() {
 	// Attempts to find a record using the incorrect context of the Pepsi organization and should error out.
 	q4 := &User{Id: "P3"}
 	err = ds.Find(PepsiOrgCtx, q4)
-	fmt.Println(err)
+	fmt.Printf("err != nil - %t\n", err != nil)
 
 	// Deletes a record using the context of the Coke organization and the specified uId.
 	rowsAffected, err = ds.Delete(CokeOrgCtx, q1)
@@ -680,8 +687,7 @@ func main() {
 [Coke/P1337] Bob: 31 <nil>
 [Pepsi/P1337] John: 36 <nil>
 [Coke/P3] Pat: 39 <nil>
-Unable to locate record [record=[/P3] : 0, dbName=postgres]
-	record not found
+err != nil - true
 1 <nil>
 1 <nil>
 0 <nil>
@@ -1131,7 +1137,10 @@ func main() {
 	// Initialize protostore with proper logger, authorizer and datastore
 	myLogger := datastore.GetCompLogger()
 	mdAuthorizer := authorizer.MetadataBasedAuthorizer{}
-	myDatastore, _ := datastore.FromEnv(myLogger, mdAuthorizer, nil)
+
+	cfg := datastore.ConfigFromEnv("ExampleProtoStore" /* dbName */)
+	_ = datastore.DBCreate(cfg)
+	myDatastore, _ := datastore.FromConfig(myLogger, mdAuthorizer, nil /* instancer */, cfg)
 	ctx := mdAuthorizer.GetAuthContext("Coke", "service_admin")
 	myProtostore := protostore.GetProtoStore(myLogger, myDatastore)
 

@@ -35,10 +35,14 @@ func ExampleDataStore_multiTenancy() {
 	CokeOrgCtx := mdAuthorizer.GetAuthContext("Coke", TENANT_ADMIN)
 	PepsiOrgCtx := mdAuthorizer.GetAuthContext("Pepsi", TENANT_ADMIN)
 
-	// Initializes the Datastore using the metadata authorizer and connection details obtained from the ENV variables.
-	ds, err := datastore.FromEnv(datastore.GetCompLogger(), mdAuthorizer, nil)
+	// Initializes the Datastore using the metadata authorizer and connection details obtained from the ENV variables, except for DB name.
+	cfg := datastore.ConfigFromEnv("ExampleDataStore_multiTenancy" /* dbName */)
+	if err := datastore.DBCreate(cfg); err != nil {
+		log.Fatalf("DB creation failed: %s", err)
+	}
+	ds, err := datastore.FromConfig(datastore.GetCompLogger(), mdAuthorizer, nil /* instancer */, cfg)
 	if err != nil {
-		log.Fatalf("datastore initialization from env errored: %s", err)
+		log.Fatalf("datastore initialization from config errored: %s", err)
 	}
 
 	// Registers the necessary structs with their corresponding tenant role mappings.
