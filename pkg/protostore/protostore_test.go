@@ -20,6 +20,7 @@ package protostore_test
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"sort"
 	"testing"
@@ -698,4 +699,29 @@ func BenchmarkCrudProtoStoreInDb(b *testing.B) {
 		testProtoStoreCrud(&t, p, AmericasCokeAdminCtx, false)
 		testProtoStoreCrud(&t, p, AmericasCokeAdminCtx, true)
 	}
+}
+
+func TestProtoStoreMsg_String(t *testing.T) {
+	assert := assert.New(t)
+	p := setupDbContext(t, "TestProtoStoreMsg_String")
+	const id = "some-key"
+	var cpu = &pb.CPU{Brand: "Intel"}
+	var md = protostore.Metadata{Id: id, Revision: 10}
+	var orgId, _ = p.GetAuthorizer().GetOrgFromContext(AmericasPepsiAdminCtx)
+	pMsg, err := p.MsgToPersist(AmericasPepsiAdminCtx, id, cpu, md)
+	if err != nil {
+		assert.FailNow("Failed to generate ProtoStoreMsg", err)
+	}
+	var isJson = func(str string) bool { return len(str) >= 2 && str[0] == '{' && str[len(str)-1] == '}' }
+	for _, pMsgStr := range []string{pMsg.String(), fmt.Sprintf("%+v", pMsg)} {
+		assert.True(isJson(pMsgStr), "Expected string version of ProtoStoreMsg to be a JSON string")
+		assert.Contains(pMsgStr, id, "Expected unique ID of ProtoStoreMsg to be printed")
+		assert.Contains(pMsgStr, orgId, "Expected org. ID to be printed")
+		assert.NotContains(pMsgStr, cpu.Brand, "Expected Protobuf message contents not to be printed")
+		assert.NotContains(pMsgStr, "CreatedAt", "Expected Protobuf message contents not to be printed")
+		assert.NotContains(pMsgStr, "UpdatedAt", "Expected Protobuf message contents not to be printed")
+		assert.NotContains(pMsgStr, "DeletedAt", "Expected Protobuf message contents not to be printed")
+	}
+	assert.Equal(pMsg.String(), fmt.Sprintf("%+v", pMsg),
+		"Expected fmt.Printf(\"%+v\", pMsg) to print the same JSON as pMsg.String()")
 }
