@@ -493,10 +493,14 @@ func main() {
 	DevInstanceCtx := instancer.WithInstanceId(ServiceAdminCtx, "Dev")
 	ProdInstanceCtx := instancer.WithInstanceId(ServiceAdminCtx, "Prod")
 
-	// Initializes the Datastore using the metadata authorizer and connection details obtained from the ENV variables.
-	ds, err := datastore.FromEnv(datastore.GetCompLogger(), mdAuthorizer, instancer)
+	// Initializes the Datastore using the metadata authorizer and connection details obtained from the ENV variables, except for DB name.
+	cfg := datastore.ConfigFromEnv("ExampleDataStore_multiInstance" /* dbName */)
+	if err := datastore.DBCreate(cfg); err != nil {
+		log.Fatalf("DB creation failed: %s", err)
+	}
+	ds, err := datastore.FromConfig(datastore.GetCompLogger(), mdAuthorizer, instancer, cfg)
 	if err != nil {
-		log.Fatalf("datastore initialization from env errored: %s", err)
+		log.Fatalf("datastore initialization from config errored: %s", err)
 	}
 
 	// Registers the necessary structs with their corresponding role mappings.
@@ -612,10 +616,14 @@ func main() {
 	CokeOrgCtx := mdAuthorizer.GetAuthContext("Coke", TENANT_ADMIN)
 	PepsiOrgCtx := mdAuthorizer.GetAuthContext("Pepsi", TENANT_ADMIN)
 
-	// Initializes the Datastore using the metadata authorizer and connection details obtained from the ENV variables.
-	ds, err := datastore.FromEnv(datastore.GetCompLogger(), mdAuthorizer, nil)
+	// Initializes the Datastore using the metadata authorizer and connection details obtained from the ENV variables, except for DB name.
+	cfg := datastore.ConfigFromEnv("ExampleDataStore_multiTenancy" /* dbName */)
+	if err := datastore.DBCreate(cfg); err != nil {
+		log.Fatalf("DB creation failed: %s", err)
+	}
+	ds, err := datastore.FromConfig(datastore.GetCompLogger(), mdAuthorizer, nil /* instancer */, cfg)
 	if err != nil {
-		log.Fatalf("datastore initialization from env errored: %s", err)
+		log.Fatalf("datastore initialization from config errored: %s", err)
 	}
 
 	// Registers the necessary structs with their corresponding tenant role mappings.
@@ -1130,7 +1138,10 @@ func main() {
 	// Initialize protostore with proper logger, authorizer and datastore
 	myLogger := datastore.GetCompLogger()
 	mdAuthorizer := authorizer.MetadataBasedAuthorizer{}
-	myDatastore, _ := datastore.FromEnv(myLogger, mdAuthorizer, nil)
+
+	cfg := datastore.ConfigFromEnv("ExampleProtoStore" /* dbName */)
+	_ = datastore.DBCreate(cfg)
+	myDatastore, _ := datastore.FromConfig(myLogger, mdAuthorizer, nil /* instancer */, cfg)
 	ctx := mdAuthorizer.GetAuthContext("Coke", "service_admin")
 	myProtostore := protostore.GetProtoStore(myLogger, myDatastore)
 
