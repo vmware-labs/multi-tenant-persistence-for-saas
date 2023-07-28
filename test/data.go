@@ -19,9 +19,9 @@
 package test
 
 import (
+	"encoding/json"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/uuid"
-
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
 )
 
@@ -97,10 +97,26 @@ func (a AppUser) AreNonKeyFieldsEmpty() bool {
 	return cmp.Equal(a, AppUser{})
 }
 
+func (a AppUser) String() string {
+	if bytes, err := json.Marshal(a); err != nil {
+		return "{}"
+	} else {
+		return string(bytes)
+	}
+}
+
 func (a App) AreNonKeyFieldsEmpty() bool {
 	a.Id = ""
 	a.TenantId = ""
 	return cmp.Equal(a, App{})
+}
+
+func (a App) String() string {
+	if bytes, err := json.Marshal(a); err != nil {
+		return "{}"
+	} else {
+		return string(bytes)
+	}
 }
 
 type Group struct {
@@ -108,4 +124,12 @@ type Group struct {
 	Name       string
 	Revision   int
 	InstanceId string `gorm:"primaryKey"`
+}
+
+func (g Group) String() string {
+	if bytes, err := json.Marshal(g); err != nil {
+		return "{}"
+	} else {
+		return string(bytes)
+	}
 }

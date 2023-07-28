@@ -26,6 +26,7 @@ package protostore
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -76,20 +77,32 @@ type Metadata struct {
 }
 
 type ProtoStoreMsg struct {
-	Id         string `gorm:"primaryKey"`
-	Msg        []byte
-	ParentId   string
-	Revision   int64
-	OrgId      string `gorm:"primaryKey"`
-	InstanceId string `gorm:"primaryKey"`
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
-	DeletedAt  gorm.DeletedAt
-	XTableName string `gorm:"-"`
+	Id         string         `gorm:"primaryKey" json:"id"`
+	Msg        []byte         `json:"-"`
+	ParentId   string         `json:"parent_id,omitempty"`
+	Revision   int64          `json:"revision"`
+	OrgId      string         `gorm:"primaryKey" json:"org_id"`
+	InstanceId string         `gorm:"primaryKey" json:"instance_id,omitempty"`
+	CreatedAt  time.Time      `json:"-"`
+	UpdatedAt  time.Time      `json:"-"`
+	DeletedAt  gorm.DeletedAt `json:"-"`
+	XTableName string         `gorm:"-" json:"x_table_name"`
 }
 
 func (msg *ProtoStoreMsg) TableName() string {
 	return msg.XTableName
+}
+
+func (msg *ProtoStoreMsg) String() string {
+	if msg == nil {
+		return "{}"
+	}
+
+	if bytes, err := json.Marshal(msg); err != nil {
+		return ""
+	} else {
+		return string(bytes)
+	}
 }
 
 func FromBytes(bytes []byte, message proto.Message) error {
