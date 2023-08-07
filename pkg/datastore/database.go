@@ -513,7 +513,7 @@ func (db *relationalDb) RegisterHelper(_ context.Context, roleMapping map[string
 		roleMapping = make(map[string]dbrole.DbRole)
 	}
 
-	db.logger.Debugf("Registering the struct %q with DAL (backed by Postgres)... Using authorizer %s...", tableName, GetTableName(db.authorizer))
+	db.logger.Debugf("Registering the struct %q with DAL... Using authorizer %s...", tableName, TypeName(db.authorizer))
 
 	tx, err := db.GetDBConn(dbrole.MAIN)
 	if err != nil {
