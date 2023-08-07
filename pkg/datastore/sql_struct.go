@@ -199,7 +199,6 @@ func getCreatePolicyStmt(tableName string, _ Record, dbUser dbUserSpec) string {
 
 func typeName(x interface{}, prefix string) string {
 	t := reflect.TypeOf(x)
-	TRACE("type for %+v is %s\n", x, t.Kind())
 	for t.Kind() == reflect.Ptr {
 		t = t.Elem()
 		prefix += "*"
@@ -215,6 +214,7 @@ func typeName(x interface{}, prefix string) string {
 	return prefix + t.Name()
 }
 
+// TypeName returns name of the data type of the given variable.
 func TypeName(x interface{}) string {
 	return typeName(x, "")
 }
@@ -245,9 +245,8 @@ func GetTableName(x interface{}) (tableName string) {
 			tableNameMap[typ] = s.Table
 		}
 		tableName = tableNameMap[typ]
-		TRACE("TableName is %s for %s(%+v)\n", tableName, typ, x)
+		TRACE("TableName is %q for %s\n", tableName, typ)
 	}
-	TRACE("TableNameMap is %+v\n", tableNameMap)
 	return tableName
 }
 
@@ -331,7 +330,7 @@ func getCheckAndUpdateRevisionFunc() (functionName, functionBody string) {
 	stmt.WriteString(COLUMN_REVISION)
 	stmt.WriteString(";\n")
 	stmt.WriteString("\t\tEND IF;")
-	return "check_and_update_revision", stmt.String()
+	return "check_and_update_revision", stmt.String() // TODO add version # to function name
 }
 
 func getCreateTriggerFunctionStmt(functionName, functionBody string) string {

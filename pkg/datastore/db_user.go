@@ -19,11 +19,11 @@
 package datastore
 
 import (
+	"encoding/json"
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
 	"hash/fnv"
 	"os"
 	"strconv"
-
-	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
 )
 
 // Specifications for database user.
@@ -34,6 +34,41 @@ type dbUserSpec struct {
 	commands         []string // Commands to be permitted in the policy. Could be SELECT, INSERT, UPDATE, DELETE
 	existingRowsCond string   // SQL conditional expression to be checked for existing rows. Only those rows for which the condition is true will be visible.
 	newRowsCond      string   // SQL conditional expression to be checked for rows being inserted or updated. Only those rows for which the condition is true will be inserted/updated
+}
+
+func (m dbUserSpec) MarshalJSON() ([]byte, error) {
+	data := struct {
+		Username         dbrole.DbRole
+		Password         string
+		PolicyName       string
+		Commands         []string
+		ExistingRowsCond string
+		NewRowsCond      string
+	}{
+		Username:         m.username,
+		Password:         "*****",
+		PolicyName:       m.policyName,
+		Commands:         m.commands,
+		ExistingRowsCond: m.existingRowsCond,
+		NewRowsCond:      m.newRowsCond,
+	}
+
+	// Marshal the anonymous struct to JSON
+	jsonData, err := json.MarshalIndent(data, "", "\t")
+	if err != nil {
+		return nil, err
+	}
+
+	return jsonData, nil
+}
+
+func (spec dbUserSpec) String() string {
+	jsonBytes, err := spec.MarshalJSON()
+	if err != nil {
+		return "{}"
+	}
+
+	return string(jsonBytes)
 }
 
 func getDbUser(dbRole dbrole.DbRole) dbUserSpec {
@@ -105,7 +140,8 @@ func getDbUsers(tableName string, withTenantIdCheck, withInstanceIdCheck bool) [
 		dbUsers[i].password = getPassword(string(dbUsers[i].username))
 		dbUsers[i].policyName = getRlsPolicyName(string(dbUsers[i].username), tableName)
 	}
-	TRACE("Returning db user specs for %s, %s, %s: %+v", tableName, withTenantIdCheck, withInstanceIdCheck, dbUsers)
+	TRACE("Returning DB user specs for table %q:\n\twithTenantIdCheck - %t\n\twithInstanceIdCheck -  %t\n\tdbUsers - %+v\n",
+		tableName, withTenantIdCheck, withInstanceIdCheck, dbUsers)
 	return dbUsers
 }
 

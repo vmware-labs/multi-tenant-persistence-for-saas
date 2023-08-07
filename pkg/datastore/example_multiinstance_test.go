@@ -38,14 +38,10 @@ func ExampleDataStore_multiInstance() {
 	DevInstanceCtx := instancer.WithInstanceId(ServiceAdminCtx, "Dev")
 	ProdInstanceCtx := instancer.WithInstanceId(ServiceAdminCtx, "Prod")
 
-	// Initializes the Datastore using the metadata authorizer and connection details obtained from the ENV variables, except for DB name.
-	cfg := datastore.ConfigFromEnv("ExampleDataStore_multiInstance" /* dbName */)
-	if err := datastore.DBCreate(cfg); err != nil {
-		log.Fatalf("DB creation failed: %s", err)
-	}
-	ds, err := datastore.FromConfig(datastore.GetCompLogger(), mdAuthorizer, instancer, cfg)
+	// Initializes the Datastore using the metadata authorizer and connection details obtained from the ENV variables.
+	ds, err := datastore.FromEnv(datastore.GetCompLogger(), mdAuthorizer, instancer)
 	if err != nil {
-		log.Fatalf("datastore initialization from config errored: %s", err)
+		log.Fatalf("datastore initialization from env errored: %s", err)
 	}
 
 	// Registers the necessary structs with their corresponding role mappings.

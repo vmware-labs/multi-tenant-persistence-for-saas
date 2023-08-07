@@ -286,7 +286,7 @@ Checks if a Postgres DB exists and returns true.
 func GetCompLogger() *logrus.Entry
 ```
 
-## func [GetFieldValue](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L400>)
+## func [GetFieldValue](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L399>)
 
 ```go
 func GetFieldValue(record Record, fieldName, columnName string) (string, bool)
@@ -300,7 +300,7 @@ Returns the requested fields value from record, which is a pointer to a struct i
 func GetGormLogger(l *logrus.Entry) logger.Interface
 ```
 
-## func [GetInstanceId](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L388>)
+## func [GetInstanceId](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L387>)
 
 ```go
 func GetInstanceId(record Record) (string, bool)
@@ -320,7 +320,7 @@ func GetLogLevel() string
 func GetLogger() *logrus.Logger
 ```
 
-## func [GetOrgId](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L380>)
+## func [GetOrgId](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L379>)
 
 ```go
 func GetOrgId(record Record) (string, bool)
@@ -380,13 +380,13 @@ func IsRowLevelSecurityRequired(record Record, tableName string, instancerConfig
 
 Row Level Security to used to partition tables for multi\-tenancy and multi\-instance support.
 
-## func [SetFieldValue](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L421>)
+## func [SetFieldValue](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L420>)
 
 ```go
 func SetFieldValue(record Record, fieldName, columnName, value string) bool
 ```
 
-## func [SetInstanceId](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L392>)
+## func [SetInstanceId](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L391>)
 
 ```go
 func SetInstanceId(record Record, value string) bool
@@ -397,6 +397,8 @@ func SetInstanceId(record Record, value string) bool
 ```go
 func TypeName(x interface{}) string
 ```
+
+TypeName returns name of the data type of the given variable.
 
 ## type [DBConfig](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/helper.go#L50-L57>)
 
@@ -493,14 +495,10 @@ func main() {
 	DevInstanceCtx := instancer.WithInstanceId(ServiceAdminCtx, "Dev")
 	ProdInstanceCtx := instancer.WithInstanceId(ServiceAdminCtx, "Prod")
 
-	// Initializes the Datastore using the metadata authorizer and connection details obtained from the ENV variables, except for DB name.
-	cfg := datastore.ConfigFromEnv("ExampleDataStore_multiInstance" /* dbName */)
-	if err := datastore.DBCreate(cfg); err != nil {
-		log.Fatalf("DB creation failed: %s", err)
-	}
-	ds, err := datastore.FromConfig(datastore.GetCompLogger(), mdAuthorizer, instancer, cfg)
+	// Initializes the Datastore using the metadata authorizer and connection details obtained from the ENV variables.
+	ds, err := datastore.FromEnv(datastore.GetCompLogger(), mdAuthorizer, instancer)
 	if err != nil {
-		log.Fatalf("datastore initialization from config errored: %s", err)
+		log.Fatalf("datastore initialization from env errored: %s", err)
 	}
 
 	// Registers the necessary structs with their corresponding role mappings.
@@ -616,14 +614,10 @@ func main() {
 	CokeOrgCtx := mdAuthorizer.GetAuthContext("Coke", TENANT_ADMIN)
 	PepsiOrgCtx := mdAuthorizer.GetAuthContext("Pepsi", TENANT_ADMIN)
 
-	// Initializes the Datastore using the metadata authorizer and connection details obtained from the ENV variables, except for DB name.
-	cfg := datastore.ConfigFromEnv("ExampleDataStore_multiTenancy" /* dbName */)
-	if err := datastore.DBCreate(cfg); err != nil {
-		log.Fatalf("DB creation failed: %s", err)
-	}
-	ds, err := datastore.FromConfig(datastore.GetCompLogger(), mdAuthorizer, nil /* instancer */, cfg)
+	// Initializes the Datastore using the metadata authorizer and connection details obtained from the ENV variables.
+	ds, err := datastore.FromEnv(datastore.GetCompLogger(), mdAuthorizer, nil)
 	if err != nil {
-		log.Fatalf("datastore initialization from config errored: %s", err)
+		log.Fatalf("datastore initialization from env errored: %s", err)
 	}
 
 	// Registers the necessary structs with their corresponding tenant role mappings.
@@ -1138,10 +1132,7 @@ func main() {
 	// Initialize protostore with proper logger, authorizer and datastore
 	myLogger := datastore.GetCompLogger()
 	mdAuthorizer := authorizer.MetadataBasedAuthorizer{}
-
-	cfg := datastore.ConfigFromEnv("ExampleProtoStore" /* dbName */)
-	_ = datastore.DBCreate(cfg)
-	myDatastore, _ := datastore.FromConfig(myLogger, mdAuthorizer, nil /* instancer */, cfg)
+	myDatastore, _ := datastore.FromEnv(myLogger, mdAuthorizer, nil)
 	ctx := mdAuthorizer.GetAuthContext("Coke", "service_admin")
 	myProtostore := protostore.GetProtoStore(myLogger, myDatastore)
 
