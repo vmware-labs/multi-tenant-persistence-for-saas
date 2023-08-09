@@ -705,14 +705,14 @@ func TestProtoStoreMsg_String(t *testing.T) {
 	assert := assert.New(t)
 	p := setupDbContext(t, "TestProtoStoreMsg_String")
 	const id = "some-key"
-	var cpu = &pb.CPU{Brand: "Intel"}
-	var md = protostore.Metadata{Id: id, Revision: 10}
-	var orgId, _ = p.GetAuthorizer().GetOrgFromContext(AmericasPepsiAdminCtx)
+	cpu := &pb.CPU{Brand: "Intel"}
+	md := protostore.Metadata{Id: id, Revision: 10}
+	orgId, _ := p.GetAuthorizer().GetOrgFromContext(AmericasPepsiAdminCtx)
 	pMsg, err := p.MsgToPersist(AmericasPepsiAdminCtx, id, cpu, md)
 	if err != nil {
 		assert.FailNow("Failed to generate ProtoStoreMsg", err)
 	}
-	var isJson = func(str string) bool { return len(str) >= 2 && str[0] == '{' && str[len(str)-1] == '}' }
+	isJson := func(str string) bool { return len(str) >= 2 && str[0] == '{' && str[len(str)-1] == '}' }
 	for _, pMsgStr := range []string{pMsg.String(), fmt.Sprintf("%+v", pMsg)} {
 		assert.True(isJson(pMsgStr), "Expected string version of ProtoStoreMsg to be a JSON string")
 		assert.Contains(pMsgStr, id, "Expected unique ID of ProtoStoreMsg to be printed")
