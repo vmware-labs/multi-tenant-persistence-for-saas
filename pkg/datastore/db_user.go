@@ -20,10 +20,11 @@ package datastore
 
 import (
 	"encoding/json"
-	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
 	"hash/fnv"
 	"os"
 	"strconv"
+
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
 )
 
 // Specifications for database user.

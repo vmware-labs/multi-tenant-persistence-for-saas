@@ -13,7 +13,7 @@ require (
 	google.golang.org/grpc v1.53.0
 	google.golang.org/protobuf v1.28.1
 	gorm.io/driver/postgres v1.4.7
-	gorm.io/gorm v1.24.5
+	gorm.io/gorm v1.25.2
 )
 
 require (
@@ -30,4 +30,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace gorm.io/gorm => github.com/go-gorm/gorm v1.24.3
+replace gorm.io/gorm => github.com/go-gorm/gorm v1.25.2

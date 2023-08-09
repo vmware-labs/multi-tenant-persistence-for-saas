@@ -20,8 +20,10 @@ package test
 
 import (
 	"encoding/json"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/uuid"
+
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
 )
 
