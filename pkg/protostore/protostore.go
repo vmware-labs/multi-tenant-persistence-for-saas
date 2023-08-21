@@ -63,6 +63,7 @@ type ProtoStore interface {
 	MsgToFilter(ctx context.Context, id string, msg proto.Message) (pMsg *ProtoStoreMsg, err error)
 	MsgToPersist(ctx context.Context, id string, msg proto.Message, md Metadata) (pMsg *ProtoStoreMsg, err error)
 
+	GetDataStore() datastore.DataStore
 	GetAuthorizer() authorizer.Authorizer
 	DropTables(msgs ...proto.Message) error
 }
@@ -143,6 +144,10 @@ func GetProtoStore(logger *logrus.Entry, ds datastore.DataStore) ProtoStore {
 		logger: logger,
 	}
 	return p
+}
+
+func (p ProtobufDataStore) GetDataStore() datastore.DataStore {
+	return p.ds
 }
 
 func (p ProtobufDataStore) GetAuthorizer() authorizer.Authorizer {
