@@ -73,20 +73,13 @@ func TestTruncate(t *testing.T) {
 		assert.FailNow("Failed to set up test case")
 	}
 
-	err := ds.TestHelper().Truncate(datastore.GetTableName(App{}))
+	err := ds.TestHelper().Truncate(App{})
 	assert.NoError(err)
 
 	queryResults = make([]App, 0)
 	err = ds.FindAll(CokeAdminCtx, &queryResults, datastore.DefaultPagination())
 	assert.NoError(err)
 	assert.Empty(queryResults, "Expected all records to be deleted after table truncate")
-}
-
-func TestTruncateNonExistent(t *testing.T) {
-	assert := assert.New(t)
-	ds, _ := SetupDataStore("TestTruncateNonExistent")
-	err := ds.TestHelper().Truncate("non_existent_table")
-	assert.NoError(err, "Expected no error when trying to truncate a non-existent table")
 }
 
 func TestFindInEmpty(t *testing.T) {

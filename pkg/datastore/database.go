@@ -383,11 +383,11 @@ func (db *relationalDb) delete(ctx context.Context, tableName string, record Rec
  */
 func (db *relationalDb) DropTables(records ...Record) error {
 	for _, record := range records {
-		tx, err := db.GetDBConn(dbrole.MAIN)
+		conn, err := db.GetDBConn(dbrole.MAIN)
 		if err != nil {
 			return err
 		}
-		err = tx.Migrator().DropTable(record)
+		err = conn.Migrator().DropTable(record)
 		if err != nil {
 			db.logger.Error(err)
 			return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
@@ -396,21 +396,17 @@ func (db *relationalDb) DropTables(records ...Record) error {
 	return nil
 }
 
-func (db *relationalDb) Truncate(tableNames ...string) error {
-	return db.TruncateCascade(false, tableNames...)
-}
-
-func (db *relationalDb) TruncateCascade(cascade bool, tableNames ...string) (err error) {
-	// Truncate DB tables
-	var tx *gorm.DB
-	for _, tableName := range tableNames {
-		stmt := getTruncateTableStmt(tableName, cascade)
-		if tx, err = db.GetDBConn(dbrole.MAIN); err != nil {
+func (db *relationalDb) Truncate(records ...Record) error {
+	for _, record := range records {
+		conn, err := db.GetDBConn(dbrole.MAIN)
+		if err != nil {
 			return err
 		}
-		if err = tx.Exec(stmt).Error; err != nil {
+
+		tableName := GetTableName(record)
+		if err = conn.Table(tableName).Unscoped().Where("TRUE").Delete(record).Error; err != nil {
 			db.logger.Error(err)
-			return ErrExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, stmt).WithValue(DB_NAME, db.dbName)
+			return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 		}
 	}
 

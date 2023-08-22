@@ -105,12 +105,6 @@ func addIfNotExists(stmt, cond string) string {
 	return wrapper.String()
 }
 
-func addIfExists(stmt, cond string) string {
-	wrapper := addIfNotExists(stmt, cond)
-	wrapper = strings.Replace(wrapper, "IF NOT EXISTS", "IF EXISTS", 1)
-	return wrapper
-}
-
 // Returns a SQL statement that sets a Postgres config. parameter
 // settingName - parameter name
 // settingValue - parameter value.
@@ -347,29 +341,6 @@ func getCreateTriggerFunctionStmt(functionName, functionBody string) string {
 	stmt.WriteString("$$ LANGUAGE PLPGSQL;")
 	TRACE("[SQL] %s", stmt.String())
 	return stmt.String()
-}
-
-func getFindTableStmt(tableName string) string {
-	var findTableQuery strings.Builder
-
-	findTableQuery.WriteString("SELECT * FROM pg_tables WHERE schemaname = 'public' AND tablename = '")
-	findTableQuery.WriteString(strings.ReplaceAll(tableName, "\"", ""))
-	findTableQuery.WriteString("'")
-
-	return findTableQuery.String()
-}
-
-func getTruncateTableStmt(tableName string, cascade bool) string {
-	findTableStmt := getFindTableStmt(tableName)
-
-	var truncateTableStmt strings.Builder
-	truncateTableStmt.WriteString("TRUNCATE TABLE ")
-	truncateTableStmt.WriteString(tableName)
-	if cascade {
-		truncateTableStmt.WriteString(" CASCADE")
-	}
-
-	return addIfExists(truncateTableStmt.String(), findTableStmt)
 }
 
 // Returns the requested OrgId field's value from record, which is a pointer
