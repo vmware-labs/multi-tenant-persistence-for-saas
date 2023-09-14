@@ -45,8 +45,12 @@ const (
 )
 
 func contextToString(ctx context.Context) string {
-	contextType := reflect.TypeOf(ctx).Elem()
-	if contextType.Kind() != reflect.Struct {
+	typ := reflect.TypeOf(ctx)
+	if fmt.Sprintf("XXX%s", typ) == "XXXcontext.backgroundCtx" {
+		return "" // Empty Background context case
+	}
+	contextElem := typ.Elem()
+	if contextElem.Kind() != reflect.Struct {
 		return ""
 	}
 
@@ -57,7 +61,7 @@ func contextToString(ctx context.Context) string {
 		reflectValue := contextValue.Field(i)
 		reflectValue = reflect.NewAt(reflectValue.Type(), unsafe.Pointer(reflectValue.UnsafeAddr())).Elem()
 
-		reflectField := contextType.Field(i)
+		reflectField := contextElem.Field(i)
 		switch reflectField.Name {
 		case "Context":
 			innerCtxStr := contextToString(reflectValue.Interface().(context.Context))

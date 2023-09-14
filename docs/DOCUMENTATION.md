@@ -1091,7 +1091,7 @@ var (
 ```
 
 <a name="DbError"></a>
-## type [DbError](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/errors/error_codes.go#L81-L85>)
+## type [DbError](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/errors/error_codes.go#L85-L89>)
 
 
 
@@ -1102,7 +1102,7 @@ type DbError struct {
 ```
 
 <a name="DbError.Error"></a>
-### func \(\*DbError\) [Error](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/errors/error_codes.go#L87>)
+### func \(\*DbError\) [Error](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/errors/error_codes.go#L91>)
 
 ```go
 func (e *DbError) Error() string
@@ -1111,7 +1111,7 @@ func (e *DbError) Error() string
 
 
 <a name="DbError.Is"></a>
-### func \(\*DbError\) [Is](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/errors/error_codes.go#L122>)
+### func \(\*DbError\) [Is](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/errors/error_codes.go#L126>)
 
 ```go
 func (e *DbError) Is(target error) bool
@@ -1120,7 +1120,7 @@ func (e *DbError) Is(target error) bool
 
 
 <a name="DbError.Unwrap"></a>
-### func \(\*DbError\) [Unwrap](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/errors/error_codes.go#L130>)
+### func \(\*DbError\) [Unwrap](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/errors/error_codes.go#L134>)
 
 ```go
 func (e *DbError) Unwrap() error
@@ -1129,7 +1129,7 @@ func (e *DbError) Unwrap() error
 
 
 <a name="DbError.With"></a>
-### func \(\*DbError\) [With](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/errors/error_codes.go#L142>)
+### func \(\*DbError\) [With](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/errors/error_codes.go#L146>)
 
 ```go
 func (e *DbError) With(msg string) *DbError
@@ -1138,7 +1138,7 @@ func (e *DbError) With(msg string) *DbError
 
 
 <a name="DbError.WithContext"></a>
-### func \(\*DbError\) [WithContext](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/errors/error_codes.go#L150>)
+### func \(\*DbError\) [WithContext](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/errors/error_codes.go#L154>)
 
 ```go
 func (e *DbError) WithContext(ctx context.Context) *DbError
@@ -1147,7 +1147,7 @@ func (e *DbError) WithContext(ctx context.Context) *DbError
 
 
 <a name="DbError.WithMap"></a>
-### func \(\*DbError\) [WithMap](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/errors/error_codes.go#L174>)
+### func \(\*DbError\) [WithMap](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/errors/error_codes.go#L178>)
 
 ```go
 func (e *DbError) WithMap(kvMap map[ErrorContextKey]string) *DbError
@@ -1156,7 +1156,7 @@ func (e *DbError) WithMap(kvMap map[ErrorContextKey]string) *DbError
 
 
 <a name="DbError.WithValue"></a>
-### func \(\*DbError\) [WithValue](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/errors/error_codes.go#L162>)
+### func \(\*DbError\) [WithValue](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/errors/error_codes.go#L166>)
 
 ```go
 func (e *DbError) WithValue(key ErrorContextKey, value string) *DbError
@@ -1165,7 +1165,7 @@ func (e *DbError) WithValue(key ErrorContextKey, value string) *DbError
 
 
 <a name="DbError.Wrap"></a>
-### func \(\*DbError\) [Wrap](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/errors/error_codes.go#L134>)
+### func \(\*DbError\) [Wrap](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/errors/error_codes.go#L138>)
 
 ```go
 func (e *DbError) Wrap(err error) *DbError
@@ -1183,7 +1183,7 @@ type ErrorContextKey string
 ```
 
 <a name="ErrorContextKey.String"></a>
-### func \(ErrorContextKey\) [String](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/errors/error_codes.go#L158>)
+### func \(ErrorContextKey\) [String](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/errors/error_codes.go#L162>)
 
 ```go
 func (c ErrorContextKey) String() string
@@ -1217,6 +1217,7 @@ This package exposes interface \[pkg.protostore.ProtoStore\] to the consumer, wh
   - [func \(p ProtobufDataStore\) FindAllAsMap\(ctx context.Context, msgsMap interface\{\}, pagination \*datastore.Pagination\) \(metadataMap map\[string\]Metadata, err error\)](<#ProtobufDataStore.FindAllAsMap>)
   - [func \(p ProtobufDataStore\) FindById\(ctx context.Context, id string, msg proto.Message, metadata \*Metadata\) error](<#ProtobufDataStore.FindById>)
   - [func \(p ProtobufDataStore\) GetAuthorizer\(\) authorizer.Authorizer](<#ProtobufDataStore.GetAuthorizer>)
+  - [func \(p ProtobufDataStore\) GetDataStore\(\) datastore.DataStore](<#ProtobufDataStore.GetDataStore>)
   - [func \(p ProtobufDataStore\) GetMetadata\(ctx context.Context, id string, msg proto.Message\) \(md Metadata, err error\)](<#ProtobufDataStore.GetMetadata>)
   - [func \(p ProtobufDataStore\) GetRevision\(ctx context.Context, id string, msg proto.Message\) \(int64, error\)](<#ProtobufDataStore.GetRevision>)
   - [func \(p ProtobufDataStore\) Insert\(ctx context.Context, id string, msg proto.Message\) \(rowsAffected int64, md Metadata, err error\)](<#ProtobufDataStore.Insert>)
@@ -1232,7 +1233,7 @@ This package exposes interface \[pkg.protostore.ProtoStore\] to the consumer, wh
 
 
 <a name="FromBytes"></a>
-## func [FromBytes](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L108>)
+## func [FromBytes](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L109>)
 
 ```go
 func FromBytes(bytes []byte, message proto.Message) error
@@ -1241,7 +1242,7 @@ func FromBytes(bytes []byte, message proto.Message) error
 
 
 <a name="ToBytes"></a>
-## func [ToBytes](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L116>)
+## func [ToBytes](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L117>)
 
 ```go
 func ToBytes(message proto.Message) ([]byte, error)
@@ -1250,7 +1251,7 @@ func ToBytes(message proto.Message) ([]byte, error)
 
 
 <a name="Metadata"></a>
-## type [Metadata](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L70-L77>)
+## type [Metadata](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L71-L78>)
 
 
 
@@ -1266,7 +1267,7 @@ type Metadata struct {
 ```
 
 <a name="MetadataFrom"></a>
-### func [MetadataFrom](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L124>)
+### func [MetadataFrom](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L125>)
 
 ```go
 func MetadataFrom(protoStoreMsg ProtoStoreMsg) Metadata
@@ -1275,7 +1276,7 @@ func MetadataFrom(protoStoreMsg ProtoStoreMsg) Metadata
 
 
 <a name="ProtoStore"></a>
-## type [ProtoStore](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L45-L68>)
+## type [ProtoStore](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L45-L69>)
 
 
 
@@ -1301,6 +1302,7 @@ type ProtoStore interface {
     MsgToFilter(ctx context.Context, id string, msg proto.Message) (pMsg *ProtoStoreMsg, err error)
     MsgToPersist(ctx context.Context, id string, msg proto.Message, md Metadata) (pMsg *ProtoStoreMsg, err error)
 
+    GetDataStore() datastore.DataStore
     GetAuthorizer() authorizer.Authorizer
     DropTables(msgs ...proto.Message) error
 }
@@ -1392,7 +1394,7 @@ DeleteById:: rowsAffected: 1 err: <nil>
 </details>
 
 <a name="GetProtoStore"></a>
-### func [GetProtoStore](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L140>)
+### func [GetProtoStore](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L141>)
 
 ```go
 func GetProtoStore(logger *logrus.Entry, ds datastore.DataStore) ProtoStore
@@ -1401,7 +1403,7 @@ func GetProtoStore(logger *logrus.Entry, ds datastore.DataStore) ProtoStore
 
 
 <a name="ProtoStoreMsg"></a>
-## type [ProtoStoreMsg](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L79-L90>)
+## type [ProtoStoreMsg](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L80-L91>)
 
 
 
@@ -1421,7 +1423,7 @@ type ProtoStoreMsg struct {
 ```
 
 <a name="ProtoStoreMsg.String"></a>
-### func \(\*ProtoStoreMsg\) [String](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L96>)
+### func \(\*ProtoStoreMsg\) [String](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L97>)
 
 ```go
 func (msg *ProtoStoreMsg) String() string
@@ -1430,7 +1432,7 @@ func (msg *ProtoStoreMsg) String() string
 
 
 <a name="ProtoStoreMsg.TableName"></a>
-### func \(\*ProtoStoreMsg\) [TableName](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L92>)
+### func \(\*ProtoStoreMsg\) [TableName](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L93>)
 
 ```go
 func (msg *ProtoStoreMsg) TableName() string
@@ -1439,7 +1441,7 @@ func (msg *ProtoStoreMsg) TableName() string
 
 
 <a name="ProtobufDataStore"></a>
-## type [ProtobufDataStore](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L135-L138>)
+## type [ProtobufDataStore](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L136-L139>)
 
 
 
@@ -1450,7 +1452,7 @@ type ProtobufDataStore struct {
 ```
 
 <a name="ProtobufDataStore.DeleteById"></a>
-### func \(ProtobufDataStore\) [DeleteById](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L419>)
+### func \(ProtobufDataStore\) [DeleteById](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L424>)
 
 ```go
 func (p ProtobufDataStore) DeleteById(ctx context.Context, id string, msg proto.Message) (int64, error)
@@ -1459,7 +1461,7 @@ func (p ProtobufDataStore) DeleteById(ctx context.Context, id string, msg proto.
 
 
 <a name="ProtobufDataStore.DropTables"></a>
-### func \(ProtobufDataStore\) [DropTables](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L427>)
+### func \(ProtobufDataStore\) [DropTables](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L432>)
 
 ```go
 func (p ProtobufDataStore) DropTables(msgs ...proto.Message) error
@@ -1468,7 +1470,7 @@ func (p ProtobufDataStore) DropTables(msgs ...proto.Message) error
 
 
 <a name="ProtobufDataStore.FindAll"></a>
-### func \(ProtobufDataStore\) [FindAll](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L362>)
+### func \(ProtobufDataStore\) [FindAll](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L367>)
 
 ```go
 func (p ProtobufDataStore) FindAll(ctx context.Context, msgs interface{}, pagination *datastore.Pagination) (metadataMap map[string]Metadata, err error)
@@ -1477,7 +1479,7 @@ func (p ProtobufDataStore) FindAll(ctx context.Context, msgs interface{}, pagina
 FindAll Finds all messages \(of the same type as the element of msgs\) in Protostore and stores the result in msgs. msgs must be a pointer to a slice of Protobuf structs or a pointer to a slice of pointers to Protobuf structs. It will be modified in\-place. Returns a map of Protobuf messages' IDs to their metadata \(parent ID & revision\).
 
 <a name="ProtobufDataStore.FindAllAsMap"></a>
-### func \(ProtobufDataStore\) [FindAllAsMap](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L304>)
+### func \(ProtobufDataStore\) [FindAllAsMap](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L309>)
 
 ```go
 func (p ProtobufDataStore) FindAllAsMap(ctx context.Context, msgsMap interface{}, pagination *datastore.Pagination) (metadataMap map[string]Metadata, err error)
@@ -1486,7 +1488,7 @@ func (p ProtobufDataStore) FindAllAsMap(ctx context.Context, msgsMap interface{}
 
 
 <a name="ProtobufDataStore.FindById"></a>
-### func \(ProtobufDataStore\) [FindById](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L270>)
+### func \(ProtobufDataStore\) [FindById](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L275>)
 
 ```go
 func (p ProtobufDataStore) FindById(ctx context.Context, id string, msg proto.Message, metadata *Metadata) error
@@ -1495,7 +1497,7 @@ func (p ProtobufDataStore) FindById(ctx context.Context, id string, msg proto.Me
 Finds a Protobuf message by ID. If metadata arg. is non\-nil, fills it with the metadata \(parent ID & revision\) of the Protobuf message that was found.
 
 <a name="ProtobufDataStore.GetAuthorizer"></a>
-### func \(ProtobufDataStore\) [GetAuthorizer](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L148>)
+### func \(ProtobufDataStore\) [GetAuthorizer](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L153>)
 
 ```go
 func (p ProtobufDataStore) GetAuthorizer() authorizer.Authorizer
@@ -1503,8 +1505,17 @@ func (p ProtobufDataStore) GetAuthorizer() authorizer.Authorizer
 
 
 
+<a name="ProtobufDataStore.GetDataStore"></a>
+### func \(ProtobufDataStore\) [GetDataStore](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L149>)
+
+```go
+func (p ProtobufDataStore) GetDataStore() datastore.DataStore
+```
+
+
+
 <a name="ProtobufDataStore.GetMetadata"></a>
-### func \(ProtobufDataStore\) [GetMetadata](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L286>)
+### func \(ProtobufDataStore\) [GetMetadata](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L291>)
 
 ```go
 func (p ProtobufDataStore) GetMetadata(ctx context.Context, id string, msg proto.Message) (md Metadata, err error)
@@ -1513,7 +1524,7 @@ func (p ProtobufDataStore) GetMetadata(ctx context.Context, id string, msg proto
 
 
 <a name="ProtobufDataStore.GetRevision"></a>
-### func \(ProtobufDataStore\) [GetRevision](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L295>)
+### func \(ProtobufDataStore\) [GetRevision](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L300>)
 
 ```go
 func (p ProtobufDataStore) GetRevision(ctx context.Context, id string, msg proto.Message) (int64, error)
@@ -1522,7 +1533,7 @@ func (p ProtobufDataStore) GetRevision(ctx context.Context, id string, msg proto
 
 
 <a name="ProtobufDataStore.Insert"></a>
-### func \(ProtobufDataStore\) [Insert](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L165>)
+### func \(ProtobufDataStore\) [Insert](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L170>)
 
 ```go
 func (p ProtobufDataStore) Insert(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, md Metadata, err error)
@@ -1531,7 +1542,7 @@ func (p ProtobufDataStore) Insert(ctx context.Context, id string, msg proto.Mess
 @DEPRECATED See \[InsertWithMetadata\].
 
 <a name="ProtobufDataStore.InsertWithMetadata"></a>
-### func \(ProtobufDataStore\) [InsertWithMetadata](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L174>)
+### func \(ProtobufDataStore\) [InsertWithMetadata](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L179>)
 
 ```go
 func (p ProtobufDataStore) InsertWithMetadata(ctx context.Context, id string, msg proto.Message, metadata Metadata) (rowsAffected int64, md Metadata, err error)
@@ -1540,7 +1551,7 @@ func (p ProtobufDataStore) InsertWithMetadata(ctx context.Context, id string, ms
 Inserts a new Protobuf record in the DB. Returns, rowsAffected \- 0 if insertion fails; 1 otherwise md \- metadata of the new Protobuf record err \- error that occurred during insertion, if any.
 
 <a name="ProtobufDataStore.MsgToFilter"></a>
-### func \(ProtobufDataStore\) [MsgToFilter](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L459>)
+### func \(ProtobufDataStore\) [MsgToFilter](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L465>)
 
 ```go
 func (p ProtobufDataStore) MsgToFilter(ctx context.Context, id string, msg proto.Message) (pMsg *ProtoStoreMsg, err error)
@@ -1549,7 +1560,7 @@ func (p ProtobufDataStore) MsgToFilter(ctx context.Context, id string, msg proto
 Return the ProtoStoreMsg that can be used for filtering with id/orgId filled up and error that occurred during extraction orgId from context.
 
 <a name="ProtobufDataStore.MsgToPersist"></a>
-### func \(ProtobufDataStore\) [MsgToPersist](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L440>)
+### func \(ProtobufDataStore\) [MsgToPersist](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L446>)
 
 ```go
 func (p ProtobufDataStore) MsgToPersist(ctx context.Context, id string, msg proto.Message, md Metadata) (pMsg *ProtoStoreMsg, err error)
@@ -1558,7 +1569,7 @@ func (p ProtobufDataStore) MsgToPersist(ctx context.Context, id string, msg prot
 Return the serialized ProtoStoreMsg that can be persisted to database and error that occurred during extraction orgId from context, or serialization.
 
 <a name="ProtobufDataStore.Register"></a>
-### func \(ProtobufDataStore\) [Register](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L152>)
+### func \(ProtobufDataStore\) [Register](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L157>)
 
 ```go
 func (p ProtobufDataStore) Register(ctx context.Context, roleMapping map[string]dbrole.DbRole, msgs ...proto.Message) error
@@ -1567,7 +1578,7 @@ func (p ProtobufDataStore) Register(ctx context.Context, roleMapping map[string]
 
 
 <a name="ProtobufDataStore.SoftDeleteById"></a>
-### func \(ProtobufDataStore\) [SoftDeleteById](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L411>)
+### func \(ProtobufDataStore\) [SoftDeleteById](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L416>)
 
 ```go
 func (p ProtobufDataStore) SoftDeleteById(ctx context.Context, id string, msg proto.Message) (int64, error)
@@ -1576,7 +1587,7 @@ func (p ProtobufDataStore) SoftDeleteById(ctx context.Context, id string, msg pr
 
 
 <a name="ProtobufDataStore.Update"></a>
-### func \(ProtobufDataStore\) [Update](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L198>)
+### func \(ProtobufDataStore\) [Update](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L203>)
 
 ```go
 func (p ProtobufDataStore) Update(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, md Metadata, err error)
@@ -1585,7 +1596,7 @@ func (p ProtobufDataStore) Update(ctx context.Context, id string, msg proto.Mess
 Update Fetches metadata for the record and updates the Protobuf message. NOTE: Avoid using this method in user\-workflows and only in service\-to\-service workflows when the updates are already ordered by some other service/app.
 
 <a name="ProtobufDataStore.UpdateWithMetadata"></a>
-### func \(ProtobufDataStore\) [UpdateWithMetadata](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L211>)
+### func \(ProtobufDataStore\) [UpdateWithMetadata](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L216>)
 
 ```go
 func (p ProtobufDataStore) UpdateWithMetadata(ctx context.Context, id string, msg proto.Message, metadata Metadata) (rowsAffected int64, md Metadata, err error)
@@ -1594,7 +1605,7 @@ func (p ProtobufDataStore) UpdateWithMetadata(ctx context.Context, id string, ms
 Updates an existing Protobuf record in the DB. Returns, rowsAffected \- 0 if update fails; 1 otherwise md \- metadata of the updated Protobuf record err \- error that occurred during update, if any.
 
 <a name="ProtobufDataStore.Upsert"></a>
-### func \(ProtobufDataStore\) [Upsert](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L230>)
+### func \(ProtobufDataStore\) [Upsert](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L235>)
 
 ```go
 func (p ProtobufDataStore) Upsert(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, md Metadata, err error)
@@ -1603,7 +1614,7 @@ func (p ProtobufDataStore) Upsert(ctx context.Context, id string, msg proto.Mess
 Upsert Fetches metadata for the record and upserts the Protobuf message. NOTE: Avoid using this method in user\-workflows and only in service\-to\-service workflows when the updates are already ordered by some other service/app.
 
 <a name="ProtobufDataStore.UpsertWithMetadata"></a>
-### func \(ProtobufDataStore\) [UpsertWithMetadata](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L248-L250>)
+### func \(ProtobufDataStore\) [UpsertWithMetadata](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/protostore/protostore.go#L253-L255>)
 
 ```go
 func (p ProtobufDataStore) UpsertWithMetadata(ctx context.Context, id string, msg proto.Message, metadata Metadata) (rowsAffected int64, md Metadata, err error)

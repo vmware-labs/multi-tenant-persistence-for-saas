@@ -3,7 +3,11 @@ set -eux
 
 source $(dirname "$0")/env.sh
 
-GOLNT_VERSION=v1.50.1
+if go version | grep 1.2; then
+  GOLNT_VERSION=${GOLNT_VERSION:=v1.52.2}
+else
+  GOLNT_VERSION=${GOLNT_VERSION:=v1.50.1}
+fi
 GOMRK_VERSION=v1.1.0
 SHFMT_VERSION=v3.6.0
 TYPOS_VERSION=1.13.6
