@@ -42,6 +42,7 @@ func TestDataStoreWithoutInstancer(t *testing.T) {
 	ProdInstanceCtx := instancer.WithInstanceId(ServiceAdminCtx, "Prod")
 
 	ds, _ := datastore.FromEnv(datastore.GetCompLogger(), mdAuthorizer, nil)
+	defer ds.Reset()
 	roleMapping := map[string]dbrole.DbRole{
 		SERVICE_AUDITOR: dbrole.READER,
 		SERVICE_ADMIN:   dbrole.WRITER,

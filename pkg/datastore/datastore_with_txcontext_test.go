@@ -41,22 +41,27 @@ func rollbackTx(t *testing.T, tx *gorm.DB) {
 	}
 }
 
-func testTxCrud(t *testing.T, ds datastore.DataStore, ctx context.Context, myCokeApp *App, user1, user2 *AppUser) {
+func testTxCrud(t *testing.T, ds datastore.DataStore, ctx context.Context, user1, user2 *AppUser) {
 	t.Helper()
 	assert := assert.New(t)
 	var err error
 
 	txFetcher := authorizer.SimpleTransactionFetcher{}
 
-	// Querying of previously inserted records should succeed
+	t.Log("Querying created records in single transaction")
+	tx, err := ds.GetTransaction(ctx, user1)
+	assert.NoError(err)
+	defer rollbackTx(t, tx)
+	txCtx := txFetcher.WithTransactionCtx(ctx, tx)
 	for _, record := range []*AppUser{user1, user2} {
 		queryResult := AppUser{Id: record.Id}
-		err = ds.Find(ctx, &queryResult)
+		err = ds.Find(txCtx, &queryResult)
 		assert.NoError(err)
 		assert.Equal(record, &queryResult)
 	}
+	assert.NoError(tx.Commit().Error)
 
-	// Updating non-key fields in a record should succeed
+	t.Log("Verifying update and find in single transaction")
 	user1.Name = "Jeyhun G."
 	user1.Email = "jeyhun111@mail.com"
 	user1.EmailConfirmed = !user1.EmailConfirmed
@@ -65,58 +70,56 @@ func testTxCrud(t *testing.T, ds datastore.DataStore, ctx context.Context, myCok
 	user2.Email = "jahangir111@mail.com"
 	user2.EmailConfirmed = !user2.EmailConfirmed
 	user2.NumFollowers--
-
-	// TODO: Find, Update and Delete are still not supported due to appending where clauses,
-	// after each call to Find/Update/Delete methods
-
-	tx, err := ds.Helper().GetDBTransaction(ctx, datastore.GetTableName(user1), user1)
-	assert.NoError(err)
-	defer rollbackTx(t, tx)
-	txCtx := txFetcher.WithTransactionCtx(ctx, tx)
-	for _, record := range []*AppUser{user1, user2} {
-		rowsAffected, err := ds.Upsert(txCtx, record)
-		assert.NoError(err)
-		assert.EqualValues(1, rowsAffected)
-	}
-	assert.NoError(tx.Commit().Error)
-
-	for _, record := range []*AppUser{user1, user2} {
-		queryResult := &AppUser{Id: record.Id}
-		err = ds.Find(ctx, queryResult)
-		assert.NoError(err)
-		assert.Equal(record, queryResult)
-	}
-
-	tx, err = ds.Helper().GetDBTransaction(ctx, datastore.GetTableName(user1), user1)
+	tx, err = ds.GetTransaction(ctx, user1)
 	assert.NoError(err)
 	defer rollbackTx(t, tx)
 	txCtx = txFetcher.WithTransactionCtx(ctx, tx)
-	// Upsert operation should be an update for already existing records
+	for _, record := range []*AppUser{user1, user2} {
+		rowsAffected, err := ds.Update(txCtx, record)
+		assert.NoError(err)
+		assert.EqualValues(1, rowsAffected)
+
+		queryResult := &AppUser{Id: record.Id}
+		err = ds.Find(txCtx, queryResult)
+		assert.NoError(err)
+		assert.Equal(record, queryResult)
+	}
+	assert.NoError(tx.Commit().Error)
+
+	t.Log("Verifying upsert and find in single transaction")
 	user1.NumFollowers++
 	user2.NumFollowers--
+	tx, err = ds.GetTransaction(ctx, user1)
+	assert.NoError(err)
+	defer rollbackTx(t, tx)
+	txCtx = txFetcher.WithTransactionCtx(ctx, tx)
 	for _, record := range []*AppUser{user1, user2} {
 		rowsAffected, err := ds.Upsert(txCtx, record)
 		assert.NoError(err)
 		assert.EqualValues(1, rowsAffected)
-	}
-	assert.NoError(tx.Commit().Error)
-	for _, record := range []*AppUser{user1, user2} {
+
 		queryResult := &AppUser{Id: record.Id}
-		err = ds.Find(ctx, queryResult)
+		err = ds.Find(txCtx, queryResult)
 		assert.NoError(err)
 		assert.Equal(record, queryResult)
 	}
+	assert.NoError(tx.Commit().Error)
 
-	// Deletion of existing records should not fail, and the records should no longer be found in the DB
+	t.Log("Verifying deletion and find in single transaction")
+	tx, err = ds.GetTransaction(ctx, user1)
+	assert.NoError(err)
+	defer rollbackTx(t, tx)
+	txCtx = txFetcher.WithTransactionCtx(ctx, tx)
 	for _, record := range []*AppUser{user1, user2} {
-		rowsAffected, err := ds.Delete(ctx, record)
+		rowsAffected, err := ds.Delete(txCtx, record)
 		assert.NoError(err)
 		assert.EqualValues(1, rowsAffected)
 		queryResult := AppUser{Id: record.Id}
-		err = ds.Find(ctx, &queryResult)
+		err = ds.Find(txCtx, &queryResult)
 		assert.ErrorIs(err, ErrRecordNotFound)
 		assert.True(queryResult.AreNonKeyFieldsEmpty())
 	}
+	assert.NoError(tx.Commit().Error)
 }
 
 func BenchmarkTxCrud(b *testing.B) {
@@ -126,17 +129,91 @@ func BenchmarkTxCrud(b *testing.B) {
 	LOG = logger.WithField(datastore.COMP, datastore.SAAS_PERSISTENCE)
 
 	var t testing.T
-	ds, _ := SetupDataStore("BenchmarkCrud")
+	ds, _ := SetupDataStore("BenchmarkTxCrud")
 	defer ds.Reset()
-	myCokeApp, user1, user2 := SetupDbTables(ds)
+	_, user1, user2 := SetupDbTables(ds)
 	for n := 0; n < b.N; n++ {
-		testCrud(&t, ds, CokeAdminCtx, myCokeApp, user1, user2)
+		testTxCrud(&t, ds, CokeAdminCtx, user1, user2)
 	}
 }
 
 func TestTxCrud(t *testing.T) {
 	ds, _ := SetupDataStore("TestTxCrud")
 	defer ds.Reset()
-	myCokeApp, user1, user2 := SetupDbTables(ds)
-	testTxCrud(t, ds, CokeAdminCtx, myCokeApp, user1, user2)
+	_, user1, user2 := SetupDbTables(ds)
+	testTxCrud(t, ds, CokeAdminCtx, user1, user2)
+}
+
+func TestSingleTxCrud(t *testing.T) {
+	assert := assert.New(t)
+	var err error
+
+	ctx := CokeAdminCtx
+	ds, _ := SetupDataStore("TestSingleTxCrud")
+	defer ds.Reset()
+	_, user1, user2 := SetupDbTables(ds)
+
+	txFetcher := authorizer.SimpleTransactionFetcher{}
+	tx, err := ds.GetTransaction(ctx, user1)
+	assert.NoError(err)
+	defer rollbackTx(t, tx)
+	txCtx := txFetcher.WithTransactionCtx(ctx, tx)
+
+	t.Log("Querying created records in same transaction")
+	for _, record := range []*AppUser{user1, user2} {
+		queryResult := AppUser{Id: record.Id}
+		err = ds.Find(txCtx, &queryResult)
+		assert.NoError(err)
+		assert.Equal(record, &queryResult)
+	}
+
+	t.Log("Verifying update and find in same transaction")
+	user1.Name = "Jeyhun G."
+	user1.Email = "jeyhun111@mail.com"
+	user1.EmailConfirmed = !user1.EmailConfirmed
+	user1.NumFollowers++
+	user2.Name = "Jahangir G."
+	user2.Email = "jahangir111@mail.com"
+	user2.EmailConfirmed = !user2.EmailConfirmed
+	user2.NumFollowers--
+	tx, err = ds.GetTransaction(ctx, user1)
+	assert.NoError(err)
+	defer rollbackTx(t, tx)
+	txCtx = txFetcher.WithTransactionCtx(ctx, tx)
+	for _, record := range []*AppUser{user1, user2} {
+		rowsAffected, err := ds.Update(txCtx, record)
+		assert.NoError(err)
+		assert.EqualValues(1, rowsAffected)
+
+		queryResult := &AppUser{Id: record.Id}
+		err = ds.Find(txCtx, queryResult)
+		assert.NoError(err)
+		assert.Equal(record, queryResult)
+	}
+
+	t.Log("Verifying upsert and find in same transaction")
+	user1.NumFollowers++
+	user2.NumFollowers--
+	for _, record := range []*AppUser{user1, user2} {
+		rowsAffected, err := ds.Upsert(txCtx, record)
+		assert.NoError(err)
+		assert.EqualValues(1, rowsAffected)
+
+		queryResult := &AppUser{Id: record.Id}
+		err = ds.Find(txCtx, queryResult)
+		assert.NoError(err)
+		assert.Equal(record, queryResult)
+	}
+
+	t.Log("Verifying deletion and find in same transaction")
+	for _, record := range []*AppUser{user1, user2} {
+		rowsAffected, err := ds.Delete(txCtx, record)
+		assert.NoError(err)
+		assert.EqualValues(1, rowsAffected)
+		queryResult := AppUser{Id: record.Id}
+		err = ds.Find(txCtx, &queryResult)
+		assert.ErrorIs(err, ErrRecordNotFound)
+		assert.True(queryResult.AreNonKeyFieldsEmpty())
+	}
+	assert.NoError(tx.Commit().Error)
 }

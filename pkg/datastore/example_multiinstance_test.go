@@ -40,6 +40,7 @@ func ExampleDataStore_multiInstance() {
 
 	// Initializes the Datastore using the metadata authorizer and connection details obtained from the ENV variables.
 	ds, err := datastore.FromEnvWithDB(datastore.GetCompLogger(), mdAuthorizer, instancer, "ExampleDataStore_multiInstance")
+	defer ds.Reset()
 	if err != nil {
 		log.Fatalf("datastore initialization from env errored: %s", err)
 	}
