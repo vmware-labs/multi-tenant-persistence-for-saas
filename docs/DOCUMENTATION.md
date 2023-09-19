@@ -668,6 +668,7 @@ func main() {
 
 	// Initializes the Datastore using the metadata authorizer and connection details obtained from the ENV variables.
 	ds, err := datastore.FromEnvWithDB(datastore.GetCompLogger(), mdAuthorizer, instancer, "ExampleDataStore_multiInstance")
+	defer ds.Reset()
 	if err != nil {
 		log.Fatalf("datastore initialization from env errored: %s", err)
 	}
@@ -787,6 +788,7 @@ func main() {
 
 	// Initializes the Datastore using the metadata authorizer and connection details obtained from the ENV variables.
 	ds, err := datastore.FromEnvWithDB(datastore.GetCompLogger(), mdAuthorizer, nil, "ExampleDataStore_multiTenancy")
+	defer ds.Reset()
 	if err != nil {
 		log.Fatalf("datastore initialization from env errored: %s", err)
 	}
@@ -1417,6 +1419,7 @@ func main() {
 	myLogger := datastore.GetCompLogger()
 	mdAuthorizer := authorizer.MetadataBasedAuthorizer{}
 	myDatastore, _ := datastore.FromEnvWithDB(myLogger, mdAuthorizer, nil, "ExampleProtoStore")
+	defer myDatastore.Reset()
 	ctx := mdAuthorizer.GetAuthContext("Coke", "service_admin")
 	myProtostore := protostore.GetProtoStore(myLogger, myDatastore)
 
