@@ -49,6 +49,7 @@ func TestHasTable(t *testing.T) {
 	assert := assert.New(t)
 
 	ds, _ := SetupDataStore("TestTruncate")
+	defer ds.Reset()
 	_, _, _ = SetupDbTables(ds)
 
 	exists, err := ds.TestHelper().HasTable("non-existent-table")
@@ -64,6 +65,7 @@ func TestTruncate(t *testing.T) {
 	assert := assert.New(t)
 
 	ds, _ := SetupDataStore("TestTruncate")
+	defer ds.Reset()
 	_, _, _ = SetupDbTables(ds)
 
 	queryResults := make([]App, 0)
@@ -85,6 +87,7 @@ func TestTruncate(t *testing.T) {
 func TestTruncateNonExistent(t *testing.T) {
 	assert := assert.New(t)
 	ds, _ := SetupDataStore("TestTruncateNonExistent")
+	defer ds.Reset()
 	err := ds.TestHelper().Truncate("non_existent_table")
 	assert.NoError(err, "Expected no error when trying to truncate a non-existent table")
 }
@@ -93,6 +96,7 @@ func TestFindInEmpty(t *testing.T) {
 	assert := assert.New(t)
 
 	ds, _ := SetupDataStore("TestFindInEmpty")
+	defer ds.Reset()
 	RecreateAllTables(ds)
 
 	{
@@ -189,6 +193,7 @@ func BenchmarkCrud(b *testing.B) {
 
 	var t testing.T
 	ds, _ := SetupDataStore("BenchmarkCrud")
+	defer ds.Reset()
 	myCokeApp, user1, user2 := SetupDbTables(ds)
 	for n := 0; n < b.N; n++ {
 		testCrud(&t, ds, CokeAdminCtx, myCokeApp, user1, user2)
@@ -197,6 +202,7 @@ func BenchmarkCrud(b *testing.B) {
 
 func TestCrud(t *testing.T) {
 	ds, _ := SetupDataStore("TestCrud")
+	defer ds.Reset()
 	myCokeApp, user1, user2 := SetupDbTables(ds)
 	testCrud(t, ds, CokeAdminCtx, myCokeApp, user1, user2)
 }
@@ -204,6 +210,7 @@ func TestCrud(t *testing.T) {
 func TestFindAll(t *testing.T) {
 	assert := assert.New(t)
 	ds, _ := SetupDataStore("TestFindAll")
+	defer ds.Reset()
 	_, user1, user2 := SetupDbTables(ds)
 
 	// FindAll should return all (two) records
@@ -227,6 +234,7 @@ func myID(i int) string {
 func TestFindAllWithPagination(t *testing.T) {
 	assert := assert.New(t)
 	ds, _ := SetupDataStore("TestFindAllWithPagination")
+	defer ds.Reset()
 	RecreateAllTables(ds)
 
 	a1 := &App{}
@@ -269,6 +277,7 @@ func TestFindWithCriteria(t *testing.T) {
 	t.Helper()
 	assert := assert.New(t)
 	ds, _ := SetupDataStore("TestFindWithCriteria")
+	defer ds.Reset()
 	_, user1, user2 := SetupDbTables(ds)
 
 	expected := []*AppUser{user1, user2}
@@ -295,6 +304,7 @@ func TestCrudWithMissingOrgId(t *testing.T) {
 	assert := assert.New(t)
 
 	ds, _ := SetupDataStore("TestCrudWithMissingOrgId")
+	defer ds.Reset()
 	RecreateAllTables(ds)
 	_, apps := make([]AppUser, 0), make([]App, 0)
 
@@ -332,6 +342,7 @@ func TestCrudWithInvalidParams(t *testing.T) {
 	t.Helper()
 	assert := assert.New(t)
 	ds, _ := SetupDataStore("TestCrudWithInvalidParams")
+	defer ds.Reset()
 	RecreateAllTables(ds)
 	ctx := CokeAdminCtx
 
@@ -370,6 +381,7 @@ func TestDALRegistration(t *testing.T) {
 	t.Helper()
 	assert := assert.New(t)
 	ds, _ := SetupDataStore("TestDALRegistration")
+	defer ds.Reset()
 
 	roleMapping := map[string]dbrole.DbRole{SERVICE_AUDITOR: dbrole.READER}
 	// When registering a struct with DAL, you should be able to pass it either by value or by reference
@@ -406,6 +418,7 @@ func TestDeleteWithMultipleCSPRoles(t *testing.T) {
 	const APP_ADMIN = "app_admin"
 	assert := assert.New(t)
 	ds, _ := SetupDataStore("TestDeleteWithMultipleCSPRoles")
+	defer ds.Reset()
 
 	// Create context for custom admin who will have 2 service roles
 	customCtx := ds.GetAuthorizer().GetAuthContext(COKE, APP_ADMIN, SERVICE_ADMIN)
@@ -435,6 +448,7 @@ Tries to perform a query with a service role that has not been authorized to acc
 func TestUnauthorizedAccess(t *testing.T) {
 	assert := assert.New(t)
 	ds, _ := SetupDataStore("TestUnauthorizedAccess")
+	defer ds.Reset()
 
 	myCokeApp, _, _ := SetupDbTables(ds)
 	ctx := ds.GetAuthorizer().GetAuthContext(COKE, "unauthorized service role")
@@ -450,6 +464,7 @@ func TestCrudWithMismatchingOrgId(t *testing.T) {
 	t.Helper()
 	assert := assert.New(t)
 	ds, _ := SetupDataStore("TestCrudWithMismatchingOrgId")
+	defer ds.Reset()
 	myCokeApp, _, _ := SetupDbTables(ds)
 	tenantStr := "tenant=Pepsi"
 	orgIdStr := "orgIdCol=Coke"
@@ -597,6 +612,7 @@ Tests revision blocking updates that are outdated.
 func TestRevision(t *testing.T) {
 	assert := assert.New(t)
 	ds, _ := SetupDataStore("TestRevision")
+	defer ds.Reset()
 
 	if err := ds.TestHelper().DropTables(&Group{}); err != nil {
 		assert.FailNow("Failed to drop DB tables for the following reason:\n" + err.Error())
@@ -701,6 +717,7 @@ func TestRevision(t *testing.T) {
 func TestTransactions(t *testing.T) {
 	assert := assert.New(t)
 	ds, ps := SetupDataStore("TestTransactions")
+	defer ds.Reset()
 	_, _, _ = SetupDbTables(ds)
 	roleMapping := map[string]dbrole.DbRole{
 		TENANT_AUDITOR:  dbrole.TENANT_READER,

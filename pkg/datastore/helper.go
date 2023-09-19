@@ -20,6 +20,7 @@ package datastore
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -44,7 +45,8 @@ const (
 	DB_ADMIN_PASSWORD_ENV_VAR = "DB_ADMIN_PASSWORD"
 
 	// SQL Error Codes.
-	ERROR_DUPLICATE_KEY = "SQLSTATE 23505"
+	ERROR_DUPLICATE_KEY      = "SQLSTATE 23505"
+	ERROR_DUPLICATE_DATABASE = "SQLSTATE 42P04"
 )
 
 type DBConfig struct {
@@ -99,6 +101,15 @@ func ConfigFromEnv(dbName string) DBConfig {
 
 func FromEnv(l *logrus.Entry, a authorizer.Authorizer, instancer authorizer.Instancer) (d DataStore, err error) {
 	return FromConfig(l, a, instancer, ConfigFromEnv(""))
+}
+
+func FromEnvWithDB(l *logrus.Entry, a authorizer.Authorizer, instancer authorizer.Instancer, dbName string) (d DataStore, err error) {
+	cfg := ConfigFromEnv(dbName)
+	err = DBCreate(cfg)
+	if err != nil {
+		log.Fatalf("Failed to create database: %v", err)
+	}
+	return FromConfig(l, a, instancer, cfg)
 }
 
 func FromConfig(l *logrus.Entry, a authorizer.Authorizer, instancer authorizer.Instancer, cfg DBConfig) (d DataStore, err error) {
@@ -156,6 +167,9 @@ func FromConfig(l *logrus.Entry, a authorizer.Authorizer, instancer authorizer.I
 		}
 
 		dbUserSpec := getDbUser(dbRole)
+		if _, ok := db.gormDBMap[dbUserSpec.username]; ok {
+			return nil
+		}
 		db.logger.Infof("Connecting to database %s@%s:%d[%s] ...", dbUserSpec.username, cfg.host, cfg.port, cfg.dbName)
 		db.gormDBMap[dbUserSpec.username], err = openDb(gl, cfg.host, cfg.port, string(dbUserSpec.username), dbUserSpec.password, cfg.dbName, cfg.sslMode)
 		if err != nil {
@@ -172,9 +186,6 @@ func FromConfig(l *logrus.Entry, a authorizer.Authorizer, instancer authorizer.I
 		}
 		db.logger.Infof("Connecting to database %s@%s:%d[%s] succeeded",
 			dbUserSpec.username, cfg.host, cfg.port, cfg.dbName)
-		if _, ok := db.gormDBMap[dbRole]; ok {
-			return nil
-		}
 
 		return nil
 	}
@@ -230,7 +241,7 @@ func DBCreate(cfg DBConfig) error {
 
 	createDbCmd := fmt.Sprintf("CREATE DATABASE %s;", cfg.dbName)
 	if err := db.Exec(createDbCmd).Error; err != nil {
-		if strings.Contains(err.Error(), "SQLSTATE 42P04") {
+		if strings.Contains(err.Error(), ERROR_DUPLICATE_DATABASE) {
 			return nil
 		}
 		return err

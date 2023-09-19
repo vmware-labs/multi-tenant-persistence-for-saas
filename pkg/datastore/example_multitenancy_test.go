@@ -36,7 +36,7 @@ func ExampleDataStore_multiTenancy() {
 	PepsiOrgCtx := mdAuthorizer.GetAuthContext("Pepsi", TENANT_ADMIN)
 
 	// Initializes the Datastore using the metadata authorizer and connection details obtained from the ENV variables.
-	ds, err := datastore.FromEnv(datastore.GetCompLogger(), mdAuthorizer, nil)
+	ds, err := datastore.FromEnvWithDB(datastore.GetCompLogger(), mdAuthorizer, nil, "ExampleDataStore_multiTenancy")
 	if err != nil {
 		log.Fatalf("datastore initialization from env errored: %s", err)
 	}
