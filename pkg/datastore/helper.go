@@ -97,11 +97,11 @@ func ConfigFromEnv(dbName string) DBConfig {
 	return cfg
 }
 
-func FromEnv(l *logrus.Entry, authorizer authorizer.Authorizer, instancer authorizer.Instancer) (d DataStore, err error) {
-	return FromConfig(l, authorizer, instancer, ConfigFromEnv(""))
+func FromEnv(l *logrus.Entry, a authorizer.Authorizer, instancer authorizer.Instancer) (d DataStore, err error) {
+	return FromConfig(l, a, instancer, ConfigFromEnv(""))
 }
 
-func FromConfig(l *logrus.Entry, authorizer authorizer.Authorizer, instancer authorizer.Instancer, cfg DBConfig) (d DataStore, err error) {
+func FromConfig(l *logrus.Entry, a authorizer.Authorizer, instancer authorizer.Instancer, cfg DBConfig) (d DataStore, err error) {
 	gl := GetGormLogger(l)
 	dbConnInitializer := func(db *relationalDb, dbRole dbrole.DbRole) error {
 		db.Lock()
@@ -180,11 +180,12 @@ func FromConfig(l *logrus.Entry, authorizer authorizer.Authorizer, instancer aut
 	}
 	return &relationalDb{
 		dbName:      cfg.dbName,
-		authorizer:  authorizer,
+		authorizer:  a,
 		instancer:   instancer,
 		gormDBMap:   make(map[dbrole.DbRole]*gorm.DB),
 		initializer: dbConnInitializer,
 		logger:      l,
+		txFetcher:   authorizer.SimpleTransactionFetcher{},
 	}, nil
 }
 

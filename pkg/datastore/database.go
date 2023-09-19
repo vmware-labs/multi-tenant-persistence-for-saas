@@ -67,6 +67,7 @@ type relationalDb struct {
 	gormDBMap   map[dbrole.DbRole]*gorm.DB
 	logger      *logrus.Entry
 	initializer func(db *relationalDb, dbRole dbrole.DbRole) error
+	txFetcher   authorizer.TransactionFetcher
 }
 
 type TenancyInfo struct {
@@ -100,10 +101,12 @@ func (db *relationalDb) getDBTransaction(ctx context.Context, tableName string, 
 		return nil, err
 	}
 
-	if tx, err = db.configureTxWithTenancyScope(tenancyInfo); err != nil {
-		return nil, err
+	tx = db.txFetcher.GetTransactionCtx(ctx)
+	if tx == nil {
+		if tx, err = db.configureTxWithTenancyScope(tenancyInfo); err != nil {
+			return nil, err
+		}
 	}
-
 	tx = tx.Table(tableName)
 	if err = tx.Error; err != nil {
 		err = ErrStartingTx.Wrap(err).WithMap(map[ErrorContextKey]string{
@@ -218,7 +221,12 @@ func (db *relationalDb) FindInTable(ctx context.Context, tableName string, recor
 	if tx, err = db.GetDBTransaction(ctx, tableName, record); err != nil {
 		return err
 	}
-	defer rollbackTx(tx, db)
+
+	defer func() {
+		if !db.txFetcher.IsTransactionCtx(ctx) {
+			rollbackTx(tx, db)
+		}
+	}()
 
 	if err = tx.Table(tableName).Where(record).First(record).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -227,9 +235,11 @@ func (db *relationalDb) FindInTable(ctx context.Context, tableName string, recor
 		db.logger.Debug(err)
 		return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 	}
-	if err = tx.Commit().Error; err != nil {
-		db.logger.Debug(err)
-		return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
+	if !db.txFetcher.IsTransactionCtx(ctx) {
+		if err = tx.Commit().Error; err != nil {
+			db.logger.Debug(err)
+			return ErrExecutingSqlStmt.Wrap(err)
+		}
 	}
 	return nil
 }
@@ -290,9 +300,11 @@ func (db *relationalDb) FindWithFilterInTable(ctx context.Context, tableName str
 		return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 	}
 
-	if err = tx.Commit().Error; err != nil {
-		db.logger.Debug(err)
-		return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
+	if !db.txFetcher.IsTransactionCtx(ctx) {
+		if err = tx.Commit().Error; err != nil {
+			db.logger.Debug(err)
+			return ErrExecutingSqlStmt.Wrap(err)
+		}
 	}
 	return nil
 }
@@ -312,15 +324,22 @@ func (db *relationalDb) InsertInTable(ctx context.Context, tableName string, rec
 	if tx, err = db.GetDBTransaction(ctx, tableName, record); err != nil {
 		return 0, err
 	}
-	defer rollbackTx(tx, db)
+
+	defer func() {
+		if !db.txFetcher.IsTransactionCtx(ctx) {
+			rollbackTx(tx, db)
+		}
+	}()
 
 	if err = tx.Create(record).Error; err != nil {
 		db.logger.Debug(err)
 		return 0, ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 	}
-	if err = tx.Commit().Error; err != nil {
-		db.logger.Debug(err)
-		return 0, ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
+	if !db.txFetcher.IsTransactionCtx(ctx) {
+		if err = tx.Commit().Error; err != nil {
+			db.logger.Debug(err)
+			return 0, ErrExecutingSqlStmt.Wrap(err)
+		}
 	}
 	return tx.RowsAffected, nil
 }
@@ -354,11 +373,16 @@ func (db *relationalDb) DeleteInTable(ctx context.Context, tableName string, rec
 }
 
 func (db *relationalDb) delete(ctx context.Context, tableName string, record Record, softDelete bool) (rowsAffected int64, err error) {
-	tx, err := db.GetDBTransaction(ctx, tableName, record)
-	if err != nil {
+	var tx *gorm.DB
+	if tx, err = db.GetDBTransaction(ctx, tableName, record); err != nil {
 		return 0, err
 	}
-	defer rollbackTx(tx, db)
+
+	defer func() {
+		if !db.txFetcher.IsTransactionCtx(ctx) {
+			rollbackTx(tx, db)
+		}
+	}()
 
 	if softDelete {
 		if err = tx.Delete(record).Error; err != nil {
@@ -371,9 +395,11 @@ func (db *relationalDb) delete(ctx context.Context, tableName string, record Rec
 			return 0, ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 		}
 	}
-	if err = tx.Commit().Error; err != nil {
-		db.logger.Debug(err)
-		return 0, ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
+	if !db.txFetcher.IsTransactionCtx(ctx) {
+		if err = tx.Commit().Error; err != nil {
+			db.logger.Debug(err)
+			return 0, ErrExecutingSqlStmt.Wrap(err)
+		}
 	}
 	return tx.RowsAffected, nil
 }
@@ -453,7 +479,12 @@ func (db *relationalDb) UpsertInTable(ctx context.Context, tableName string, rec
 	if tx, err = db.GetDBTransaction(ctx, tableName, record); err != nil {
 		return 0, err
 	}
-	defer rollbackTx(tx, db)
+
+	defer func() {
+		if !db.txFetcher.IsTransactionCtx(ctx) {
+			rollbackTx(tx, db)
+		}
+	}()
 
 	if err = tx.Clauses(clause.OnConflict{UpdateAll: true}).Create(record).Error; err != nil {
 		db.logger.Debug(err)
@@ -463,9 +494,11 @@ func (db *relationalDb) UpsertInTable(ctx context.Context, tableName string, rec
 			return 0, ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 		}
 	}
-	if err = tx.Commit().Error; err != nil {
-		db.logger.Debug(err)
-		return 0, ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
+	if !db.txFetcher.IsTransactionCtx(ctx) {
+		if err = tx.Commit().Error; err != nil {
+			db.logger.Debug(err)
+			return 0, ErrExecutingSqlStmt.Wrap(err)
+		}
 	}
 	return tx.RowsAffected, nil
 }
@@ -478,7 +511,12 @@ func (db *relationalDb) UpdateInTable(ctx context.Context, tableName string, rec
 	if tx, err = db.GetDBTransaction(ctx, tableName, record); err != nil {
 		return 0, err
 	}
-	defer rollbackTx(tx, db)
+
+	defer func() {
+		if !db.txFetcher.IsTransactionCtx(ctx) {
+			rollbackTx(tx, db)
+		}
+	}()
 
 	if err = tx.Model(record).Select("*").Updates(record).Error; err != nil {
 		db.logger.Debug(err)
@@ -490,9 +528,11 @@ func (db *relationalDb) UpdateInTable(ctx context.Context, tableName string, rec
 			return 0, err
 		}
 	}
-	if err = tx.Commit().Error; err != nil {
-		db.logger.Debug(err)
-		return 0, ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
+	if !db.txFetcher.IsTransactionCtx(ctx) {
+		if err = tx.Commit().Error; err != nil {
+			db.logger.Debug(err)
+			return 0, ErrExecutingSqlStmt.Wrap(err)
+		}
 	}
 	return tx.RowsAffected, nil
 }
