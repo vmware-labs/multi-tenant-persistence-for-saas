@@ -9,7 +9,6 @@ on:
         description: 'Log level'
         required: true
         default: 'trace'
-
 jobs:
   test:
     name: Unit test
@@ -24,6 +23,7 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
           check-latest: true
+          cache-dependency-path: go.sum
       - name: Run unit tests
         run: |
           mkdir -p $(go env GOPATH)
@@ -36,7 +36,6 @@ jobs:
           file: test-results/coverage.out
           flags: unit-tests
           name: codecov-unit-test
-
   lint:
     name: Check lint
     runs-on: [ubuntu-latest]
@@ -50,6 +49,7 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
           check-latest: true
+          cache-dependency-path: go.sum
       - name: Run lint
         run: |
           mkdir -p $(go env GOPATH)

@@ -300,6 +300,7 @@ DataStore interface exposes basic methods like Find/FindAll/Upsert/Delete. For r
 - [type DataStore](<#DataStore>)
   - [func FromConfig\(l \*logrus.Entry, a authorizer.Authorizer, instancer authorizer.Instancer, cfg DBConfig\) \(d DataStore, err error\)](<#FromConfig>)
   - [func FromEnv\(l \*logrus.Entry, a authorizer.Authorizer, instancer authorizer.Instancer\) \(d DataStore, err error\)](<#FromEnv>)
+  - [func FromEnvWithDB\(l \*logrus.Entry, a authorizer.Authorizer, instancer authorizer.Instancer, dbName string\) \(d DataStore, err error\)](<#FromEnvWithDB>)
 - [type Helper](<#Helper>)
 - [type Pagination](<#Pagination>)
   - [func DefaultPagination\(\) \*Pagination](<#DefaultPagination>)
@@ -319,6 +320,8 @@ DataStore interface exposes basic methods like Find/FindAll/Upsert/Delete. For r
 const (
     DbConfigOrgId      = "multitenant.orgId"      // Name of Postgres run-time config. parameter that will store current user's org. ID
     DbConfigInstanceId = "multitenant.instanceId" // Name of Postgres run-time config. parameter that will store current session's instance ID
+
+    MaxIdleConns = 1
 )
 ```
 
@@ -335,7 +338,8 @@ const (
     DB_ADMIN_PASSWORD_ENV_VAR = "DB_ADMIN_PASSWORD"
 
     // SQL Error Codes.
-    ERROR_DUPLICATE_KEY = "SQLSTATE 23505"
+    ERROR_DUPLICATE_KEY      = "SQLSTATE 23505"
+    ERROR_DUPLICATE_DATABASE = "SQLSTATE 42P04"
 )
 ```
 
@@ -390,7 +394,7 @@ var TRACE = func(format string, v ...any) {
 ```
 
 <a name="DBCreate"></a>
-## func [DBCreate](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/helper.go#L220>)
+## func [DBCreate](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/helper.go#L231>)
 
 ```go
 func DBCreate(cfg DBConfig) error
@@ -399,7 +403,7 @@ func DBCreate(cfg DBConfig) error
 Create a Postgres DB using the provided config if it doesn't exist.
 
 <a name="DBExists"></a>
-## func [DBExists](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/helper.go#L242>)
+## func [DBExists](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/helper.go#L253>)
 
 ```go
 func DBExists(cfg DBConfig) bool
@@ -561,7 +565,7 @@ func TypeName(x interface{}) string
 TypeName returns name of the data type of the given variable.
 
 <a name="DBConfig"></a>
-## type [DBConfig](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/helper.go#L50-L57>)
+## type [DBConfig](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/helper.go#L52-L59>)
 
 
 
@@ -572,7 +576,7 @@ type DBConfig struct {
 ```
 
 <a name="ConfigFromEnv"></a>
-### func [ConfigFromEnv](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/helper.go#L62>)
+### func [ConfigFromEnv](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/helper.go#L64>)
 
 ```go
 func ConfigFromEnv(dbName string) DBConfig
@@ -663,7 +667,7 @@ func main() {
 	ProdInstanceCtx := instancer.WithInstanceId(ServiceAdminCtx, "Prod")
 
 	// Initializes the Datastore using the metadata authorizer and connection details obtained from the ENV variables.
-	ds, err := datastore.FromEnv(datastore.GetCompLogger(), mdAuthorizer, instancer)
+	ds, err := datastore.FromEnvWithDB(datastore.GetCompLogger(), mdAuthorizer, instancer, "ExampleDataStore_multiInstance")
 	if err != nil {
 		log.Fatalf("datastore initialization from env errored: %s", err)
 	}
@@ -782,7 +786,7 @@ func main() {
 	PepsiOrgCtx := mdAuthorizer.GetAuthContext("Pepsi", TENANT_ADMIN)
 
 	// Initializes the Datastore using the metadata authorizer and connection details obtained from the ENV variables.
-	ds, err := datastore.FromEnv(datastore.GetCompLogger(), mdAuthorizer, nil)
+	ds, err := datastore.FromEnvWithDB(datastore.GetCompLogger(), mdAuthorizer, nil, "ExampleDataStore_multiTenancy")
 	if err != nil {
 		log.Fatalf("datastore initialization from env errored: %s", err)
 	}
@@ -859,7 +863,7 @@ err != nil - true
 </details>
 
 <a name="FromConfig"></a>
-### func [FromConfig](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/helper.go#L104>)
+### func [FromConfig](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/helper.go#L115>)
 
 ```go
 func FromConfig(l *logrus.Entry, a authorizer.Authorizer, instancer authorizer.Instancer, cfg DBConfig) (d DataStore, err error)
@@ -868,10 +872,19 @@ func FromConfig(l *logrus.Entry, a authorizer.Authorizer, instancer authorizer.I
 
 
 <a name="FromEnv"></a>
-### func [FromEnv](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/helper.go#L100>)
+### func [FromEnv](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/helper.go#L102>)
 
 ```go
 func FromEnv(l *logrus.Entry, a authorizer.Authorizer, instancer authorizer.Instancer) (d DataStore, err error)
+```
+
+
+
+<a name="FromEnvWithDB"></a>
+### func [FromEnvWithDB](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/helper.go#L106>)
+
+```go
+func FromEnvWithDB(l *logrus.Entry, a authorizer.Authorizer, instancer authorizer.Instancer, dbName string) (d DataStore, err error)
 ```
 
 
@@ -951,7 +964,7 @@ func GetRecordInstanceFromSlice(x interface{}) Record
 
 
 <a name="TenancyInfo"></a>
-## type [TenancyInfo](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/database.go#L73-L77>)
+## type [TenancyInfo](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/database.go#L75-L79>)
 
 
 
@@ -1403,7 +1416,7 @@ func main() {
 	// Initialize protostore with proper logger, authorizer and datastore
 	myLogger := datastore.GetCompLogger()
 	mdAuthorizer := authorizer.MetadataBasedAuthorizer{}
-	myDatastore, _ := datastore.FromEnv(myLogger, mdAuthorizer, nil)
+	myDatastore, _ := datastore.FromEnvWithDB(myLogger, mdAuthorizer, nil, "ExampleProtoStore")
 	ctx := mdAuthorizer.GetAuthContext("Coke", "service_admin")
 	myProtostore := protostore.GetProtoStore(myLogger, myDatastore)
 

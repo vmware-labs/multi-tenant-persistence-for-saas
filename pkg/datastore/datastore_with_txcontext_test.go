@@ -127,6 +127,7 @@ func BenchmarkTxCrud(b *testing.B) {
 
 	var t testing.T
 	ds, _ := SetupDataStore("BenchmarkCrud")
+	defer ds.Reset()
 	myCokeApp, user1, user2 := SetupDbTables(ds)
 	for n := 0; n < b.N; n++ {
 		testCrud(&t, ds, CokeAdminCtx, myCokeApp, user1, user2)
@@ -135,6 +136,7 @@ func BenchmarkTxCrud(b *testing.B) {
 
 func TestTxCrud(t *testing.T) {
 	ds, _ := SetupDataStore("TestTxCrud")
+	defer ds.Reset()
 	myCokeApp, user1, user2 := SetupDbTables(ds)
 	testTxCrud(t, ds, CokeAdminCtx, myCokeApp, user1, user2)
 }

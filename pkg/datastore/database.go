@@ -54,6 +54,8 @@ import (
 const (
 	DbConfigOrgId      = "multitenant.orgId"      // Name of Postgres run-time config. parameter that will store current user's org. ID
 	DbConfigInstanceId = "multitenant.instanceId" // Name of Postgres run-time config. parameter that will store current session's instance ID
+
+	MaxIdleConns = 1
 )
 
 /*
@@ -196,6 +198,13 @@ func (db *relationalDb) configureTxWithTenancyScope(tenancyInfo TenancyInfo) (*g
 
 // Reset Resets DB connection pools.
 func (db *relationalDb) Reset() {
+	for _, dbConn := range db.gormDBMap {
+		sqlDB, err := dbConn.DB()
+		if err == nil {
+			sqlDB.Close()
+			sqlDB.SetMaxIdleConns(MaxIdleConns)
+		}
+	}
 	db.gormDBMap = make(map[dbrole.DbRole]*gorm.DB)
 	db.authorizer = authorizer.MetadataBasedAuthorizer{}
 }
