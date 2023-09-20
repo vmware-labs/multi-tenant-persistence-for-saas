@@ -54,8 +54,7 @@ import (
 const (
 	DbConfigOrgId      = "multitenant.orgId"      // Name of Postgres run-time config. parameter that will store current user's org. ID
 	DbConfigInstanceId = "multitenant.instanceId" // Name of Postgres run-time config. parameter that will store current session's instance ID
-
-	MaxIdleConns = 1
+	MaxIdleConns       = 1
 )
 
 /*
