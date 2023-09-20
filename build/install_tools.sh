@@ -47,6 +47,7 @@ go_install_any "yamlfmt -h" github.com/google/yamlfmt/cmd/yamlfmt v${YAMLFMT_VER
 OS_TYPE=$(uname -s)
 if [ "${OS_TYPE}" = "Linux" ]; then
   /tmp/typos --version | grep ${TYPOS_VERSION} || wget -qO- https://github.com/crate-ci/typos/releases/download/v${TYPOS_VERSION}/typos-v${TYPOS_VERSION}-x86_64-unknown-linux-musl.tar.gz | tar -zxf - -C /tmp/ ./typos
+  sudo snap install mdl
 elif [ "${OS_TYPE}" = "Darwin" ]; then
   /tmp/typos --version | grep ${TYPOS_VERSION} || wget -qO- https://github.com/crate-ci/typos/releases/download/v${TYPOS_VERSION}/typos-v${TYPOS_VERSION}-x86_64-apple-darwin.tar.gz | tar -zxf - -C /tmp/ ./typos
 fi
