@@ -647,11 +647,11 @@ func testProtoStoreCrud(t *testing.T, p protostore.ProtoStore, ctx context.Conte
 	assert.NoError(err)
 	assert.Equal(memMsg3.String(), memMsg4.String(), "Protobuf message that was not supposed to be modified was still modified")
 
-	rowsAffected, err = p.SoftDeleteById(ctx, P4, &pb.Memory{})
+	rowsAffected, _, err = p.SoftDeleteById(ctx, P4, &pb.Memory{})
 	assert.NoError(err, "Failed to soft delete Protobuf message from ProtoStore")
 	assert.EqualValues(1, rowsAffected)
 
-	rowsAffected, err = p.SoftDeleteById(ctx, P4, &pb.Memory{})
+	rowsAffected, _, err = p.SoftDeleteById(ctx, P4, &pb.Memory{})
 	assert.NoError(err, "Soft Deleting a non-existent Protobuf message produced an error. SoftDeleteById() might be not idempotent.")
 	assert.EqualValues(0, rowsAffected)
 

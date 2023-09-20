@@ -54,7 +54,7 @@ func ExampleProtoStore() {
 	fmt.Println("FindAll::", "revision:", metadataMap[id].Revision, "rowsFound:", len(queryResults), "err:", err)
 
 	// Delete the protobuf (soft delete)
-	rowsAffected, err = myProtostore.SoftDeleteById(ctx, id, &pb.Memory{})
+	rowsAffected, _, err = myProtostore.SoftDeleteById(ctx, id, &pb.Memory{})
 	fmt.Println("SoftDeleteById::", "rowsAffected:", rowsAffected, "err:", err)
 
 	// Delete the protobuf (full delete)

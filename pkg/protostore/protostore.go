@@ -48,9 +48,11 @@ type ProtoStore interface {
 	Update(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, md Metadata, err error)
 	Upsert(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, md Metadata, err error)
 	FindById(ctx context.Context, id string, msg proto.Message, metadata *Metadata) error
+	FindByIdIncludingSoftDeleted(ctx context.Context, id string, msg proto.Message, metadata *Metadata) error
 	FindAll(ctx context.Context, msgs interface{}, pagination *datastore.Pagination) (metadataMap map[string]Metadata, err error)
+	FindAllIncludingSoftDeleted(ctx context.Context, msgs interface{}, pagination *datastore.Pagination) (metadataMap map[string]Metadata, err error)
 	FindAllAsMap(ctx context.Context, msgsMap interface{}, pagination *datastore.Pagination) (metadataMap map[string]Metadata, err error)
-	SoftDeleteById(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, err error)
+	SoftDeleteById(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, md Metadata, err error)
 	DeleteById(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, err error)
 
 	InsertWithMetadata(ctx context.Context, id string, msg proto.Message, metadata Metadata) (rowsAffected int64, md Metadata, err error)
@@ -288,12 +290,37 @@ func (p ProtobufDataStore) FindById(ctx context.Context, id string, msg proto.Me
 	return FromBytes(protoStoreMsg.Msg, msg)
 }
 
+func (p ProtobufDataStore) FindByIdIncludingSoftDeleted(ctx context.Context, id string, msg proto.Message, metadata *Metadata) error {
+	protoStoreMsg, err := p.MsgToFilter(ctx, id, msg)
+	if err != nil {
+		return err
+	}
+
+	err = p.ds.FindSoftDeleted(ctx, protoStoreMsg)
+	if err != nil {
+		return err
+	}
+	if metadata != nil {
+		*metadata = MetadataFrom(*protoStoreMsg)
+	}
+	return FromBytes(protoStoreMsg.Msg, msg)
+}
+
 func (p ProtobufDataStore) GetMetadata(ctx context.Context, id string, msg proto.Message) (md Metadata, err error) {
 	protoStoreMsg, err := p.MsgToFilter(ctx, id, msg)
 	if err != nil {
 		return md, err
 	}
 	err = p.ds.Find(ctx, protoStoreMsg)
+	return MetadataFrom(*protoStoreMsg), err
+}
+
+func (p ProtobufDataStore) GetSoftDeletedMetadata(ctx context.Context, id string, msg proto.Message) (md Metadata, err error) {
+	protoStoreMsg, err := p.MsgToFilter(ctx, id, msg)
+	if err != nil {
+		return md, err
+	}
+	err = p.ds.FindSoftDeleted(ctx, protoStoreMsg)
 	return MetadataFrom(*protoStoreMsg), err
 }
 
@@ -413,12 +440,69 @@ func (p ProtobufDataStore) FindAll(ctx context.Context, msgs interface{}, pagina
 	return metadataMap, nil
 }
 
-func (p ProtobufDataStore) SoftDeleteById(ctx context.Context, id string, msg proto.Message) (int64, error) {
+func (p ProtobufDataStore) FindAllIncludingSoftDeleted(ctx context.Context, msgs interface{}, pagination *datastore.Pagination) (metadataMap map[string]Metadata, err error) {
+	if reflect.TypeOf(msgs).Kind() != reflect.Ptr || reflect.TypeOf(msgs).Elem().Kind() != reflect.Slice {
+		errMsg := "\"msgs\" argument has to be a pointer to a slice"
+		p.logger.Error(errMsg)
+		err = ErrNotPtrToStructSlice.Wrap(fmt.Errorf(errMsg))
+		return nil, err
+	}
+
+	// Type of element that msgs slice consists of (either a protobuf message or a pointer to protobuf message)
+	sliceElemType := reflect.TypeOf(msgs).Elem().Elem()
+
+	// True if msgs is a pointer to a slice of pointers to structs
+	// False if msgs is a pointer to a slice of structs
+	isSlicePtrToStructs := reflect.TypeOf(msgs).Elem().Elem().Kind() == reflect.Ptr
+	tableName := datastore.GetTableName(msgs)
+
+	protoStoreMsgs := make([]ProtoStoreMsg, 0)
+	err = p.ds.Helper().FindAllInTableIncludingSoftDeleted(ctx, tableName, &protoStoreMsgs, pagination)
+	if err != nil {
+		return nil, err
+	}
+
+	output := reflect.MakeSlice(reflect.SliceOf(sliceElemType), 0, len(protoStoreMsgs))
+	metadataMap = make(map[string]Metadata, len(protoStoreMsgs))
+
+	for _, protoStoreMsg := range protoStoreMsgs {
+		var msgCopy proto.Message // Empty instance of a Protobuf message
+		if isSlicePtrToStructs {
+			msgCopy = reflect.New(sliceElemType.Elem()).Interface().(proto.Message)
+		} else {
+			msgCopy = reflect.New(sliceElemType).Interface().(proto.Message)
+		}
+
+		if err = FromBytes(protoStoreMsg.Msg, msgCopy); err != nil {
+			return nil, err
+		}
+
+		if isSlicePtrToStructs { // Append a pointer to Protobuf message to output slice
+			output = reflect.Append(output, reflect.ValueOf(msgCopy))
+		} else { // Append a Protobuf message to output slice
+			output = reflect.Append(output, reflect.ValueOf(msgCopy).Elem())
+		}
+		metadataMap[protoStoreMsg.Id] = MetadataFrom(protoStoreMsg)
+	}
+
+	reflect.ValueOf(msgs).Elem().Set(output)
+	return metadataMap, nil
+}
+
+func (p ProtobufDataStore) SoftDeleteById(ctx context.Context, id string, msg proto.Message) (int64, Metadata, error) {
 	protoStoreMsg, err := p.MsgToFilter(ctx, id, msg)
 	if err != nil {
-		return 0, err
+		return 0, Metadata{}, err
 	}
-	return p.ds.SoftDelete(ctx, protoStoreMsg)
+	rowsAffected, err := p.ds.SoftDelete(ctx, protoStoreMsg)
+	if err != nil {
+		return 0, Metadata{}, err
+	}
+	md, err := p.GetSoftDeletedMetadata(ctx, id, msg)
+	if err != nil {
+		return 0, Metadata{}, err
+	}
+	return rowsAffected, md, err
 }
 
 func (p ProtobufDataStore) DeleteById(ctx context.Context, id string, msg proto.Message) (int64, error) {
