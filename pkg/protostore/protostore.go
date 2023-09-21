@@ -387,11 +387,7 @@ func (p ProtobufDataStore) FindAllAsMap(ctx context.Context, msgsMap interface{}
 	return metadataMap, nil
 }
 
-// FindAll Finds all messages (of the same type as the element of msgs) in Protostore and stores the result in msgs.
-// msgs must be a pointer to a slice of Protobuf structs or a pointer to a slice of pointers to Protobuf structs.
-// It will be modified in-place.
-// Returns a map of Protobuf messages' IDs to their metadata (parent ID & revision).
-func (p ProtobufDataStore) FindAll(ctx context.Context, msgs interface{}, pagination *datastore.Pagination) (metadataMap map[string]Metadata, err error) {
+func (p ProtobufDataStore) findAll(ctx context.Context, msgs interface{}, pagination *datastore.Pagination, softDelete bool) (metadataMap map[string]Metadata, err error) {
 	if reflect.TypeOf(msgs).Kind() != reflect.Ptr || reflect.TypeOf(msgs).Elem().Kind() != reflect.Slice {
 		errMsg := "\"msgs\" argument has to be a pointer to a slice"
 		p.logger.Error(errMsg)
@@ -408,9 +404,16 @@ func (p ProtobufDataStore) FindAll(ctx context.Context, msgs interface{}, pagina
 	tableName := datastore.GetTableName(msgs)
 
 	protoStoreMsgs := make([]ProtoStoreMsg, 0)
-	err = p.ds.Helper().FindAllInTable(ctx, tableName, &protoStoreMsgs, pagination)
-	if err != nil {
-		return nil, err
+	if softDelete {
+		err = p.ds.Helper().FindAllInTableIncludingSoftDeleted(ctx, tableName, &protoStoreMsgs, pagination)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		err = p.ds.Helper().FindAllInTable(ctx, tableName, &protoStoreMsgs, pagination)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	output := reflect.MakeSlice(reflect.SliceOf(sliceElemType), 0, len(protoStoreMsgs))
@@ -440,53 +443,16 @@ func (p ProtobufDataStore) FindAll(ctx context.Context, msgs interface{}, pagina
 	return metadataMap, nil
 }
 
+// FindAll Finds all messages (of the same type as the element of msgs) in Protostore and stores the result in msgs.
+// msgs must be a pointer to a slice of Protobuf structs or a pointer to a slice of pointers to Protobuf structs.
+// It will be modified in-place.
+// Returns a map of Protobuf messages' IDs to their metadata (parent ID & revision).
+func (p ProtobufDataStore) FindAll(ctx context.Context, msgs interface{}, pagination *datastore.Pagination) (metadataMap map[string]Metadata, err error) {
+	return p.findAll(ctx, msgs, pagination, false)
+}
+
 func (p ProtobufDataStore) FindAllIncludingSoftDeleted(ctx context.Context, msgs interface{}, pagination *datastore.Pagination) (metadataMap map[string]Metadata, err error) {
-	if reflect.TypeOf(msgs).Kind() != reflect.Ptr || reflect.TypeOf(msgs).Elem().Kind() != reflect.Slice {
-		errMsg := "\"msgs\" argument has to be a pointer to a slice"
-		p.logger.Error(errMsg)
-		err = ErrNotPtrToStructSlice.Wrap(fmt.Errorf(errMsg))
-		return nil, err
-	}
-
-	// Type of element that msgs slice consists of (either a protobuf message or a pointer to protobuf message)
-	sliceElemType := reflect.TypeOf(msgs).Elem().Elem()
-
-	// True if msgs is a pointer to a slice of pointers to structs
-	// False if msgs is a pointer to a slice of structs
-	isSlicePtrToStructs := reflect.TypeOf(msgs).Elem().Elem().Kind() == reflect.Ptr
-	tableName := datastore.GetTableName(msgs)
-
-	protoStoreMsgs := make([]ProtoStoreMsg, 0)
-	err = p.ds.Helper().FindAllInTableIncludingSoftDeleted(ctx, tableName, &protoStoreMsgs, pagination)
-	if err != nil {
-		return nil, err
-	}
-
-	output := reflect.MakeSlice(reflect.SliceOf(sliceElemType), 0, len(protoStoreMsgs))
-	metadataMap = make(map[string]Metadata, len(protoStoreMsgs))
-
-	for _, protoStoreMsg := range protoStoreMsgs {
-		var msgCopy proto.Message // Empty instance of a Protobuf message
-		if isSlicePtrToStructs {
-			msgCopy = reflect.New(sliceElemType.Elem()).Interface().(proto.Message)
-		} else {
-			msgCopy = reflect.New(sliceElemType).Interface().(proto.Message)
-		}
-
-		if err = FromBytes(protoStoreMsg.Msg, msgCopy); err != nil {
-			return nil, err
-		}
-
-		if isSlicePtrToStructs { // Append a pointer to Protobuf message to output slice
-			output = reflect.Append(output, reflect.ValueOf(msgCopy))
-		} else { // Append a Protobuf message to output slice
-			output = reflect.Append(output, reflect.ValueOf(msgCopy).Elem())
-		}
-		metadataMap[protoStoreMsg.Id] = MetadataFrom(protoStoreMsg)
-	}
-
-	reflect.ValueOf(msgs).Elem().Set(output)
-	return metadataMap, nil
+	return p.findAll(ctx, msgs, pagination, true)
 }
 
 func (p ProtobufDataStore) SoftDeleteById(ctx context.Context, id string, msg proto.Message) (int64, Metadata, error) {
