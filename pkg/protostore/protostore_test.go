@@ -261,24 +261,28 @@ func TestProtoStoreInDbFindAll(t *testing.T) {
 	assert.Equal(int64(1), rowsAffected)
 	assert.Equal(P1, md.Id)
 	assert.Equal(int64(1), md.Revision)
+	assert.Equal(AMERICAS, md.InstanceId)
 
 	rowsAffected, md, err = p.Insert(ctx, P2, &memMsg2)
 	assert.NoError(err)
 	assert.Equal(int64(1), rowsAffected)
 	assert.Equal(P2, md.Id)
 	assert.Equal(int64(1), md.Revision)
+	assert.Equal(AMERICAS, md.InstanceId)
 
 	rowsAffected, md, err = p.Insert(ctx, P1, &cpuMsg1)
 	assert.NoError(err)
 	assert.Equal(int64(1), rowsAffected)
 	assert.Equal(P1, md.Id)
 	assert.Equal(int64(1), md.Revision)
+	assert.Equal(AMERICAS, md.InstanceId)
 
 	rowsAffected, md, err = p.Insert(ctx, P2, &cpuMsg2)
 	assert.NoError(err)
 	assert.Equal(int64(1), rowsAffected)
 	assert.Equal(P2, md.Id)
 	assert.Equal(int64(1), md.Revision)
+	assert.Equal(AMERICAS, md.InstanceId)
 
 	var expectedMemoryQueryResults MemoryPtrSlice = []*pb.Memory{&memMsg1, &memMsg2}
 	var expectedCPUQueryResults CPUPtrSlice = []*pb.CPU{&cpuMsg1, &cpuMsg2}
