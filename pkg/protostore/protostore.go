@@ -72,12 +72,13 @@ type ProtoStore interface {
 }
 
 type Metadata struct {
-	Id        string
-	ParentId  string
-	Revision  int64
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	DeletedAt gorm.DeletedAt
+	Id         string
+	InstanceId string
+	ParentId   string
+	Revision   int64
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	DeletedAt  gorm.DeletedAt
 }
 
 type ProtoStoreMsg struct {
@@ -127,12 +128,13 @@ func ToBytes(message proto.Message) ([]byte, error) {
 
 func MetadataFrom(protoStoreMsg ProtoStoreMsg) Metadata {
 	return Metadata{
-		Id:        protoStoreMsg.Id,
-		ParentId:  protoStoreMsg.ParentId,
-		Revision:  protoStoreMsg.Revision,
-		CreatedAt: protoStoreMsg.CreatedAt,
-		UpdatedAt: protoStoreMsg.UpdatedAt,
-		DeletedAt: protoStoreMsg.DeletedAt,
+		Id:         protoStoreMsg.Id,
+		InstanceId: protoStoreMsg.InstanceId,
+		ParentId:   protoStoreMsg.ParentId,
+		Revision:   protoStoreMsg.Revision,
+		CreatedAt:  protoStoreMsg.CreatedAt,
+		UpdatedAt:  protoStoreMsg.UpdatedAt,
+		DeletedAt:  protoStoreMsg.DeletedAt,
 	}
 }
 
