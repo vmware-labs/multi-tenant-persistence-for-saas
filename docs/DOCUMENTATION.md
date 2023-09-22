@@ -19,11 +19,11 @@ import "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
 - [type ContextKey](<#ContextKey>)
 - [type Instancer](<#Instancer>)
 - [type MetadataBasedAuthorizer](<#MetadataBasedAuthorizer>)
-  - [func \(s MetadataBasedAuthorizer\) Configure\(\_ string, \_ map\[string\]dbrole.DbRole\)](<#MetadataBasedAuthorizer.Configure>)
-  - [func \(s MetadataBasedAuthorizer\) GetAuthContext\(orgId string, roles ...string\) context.Context](<#MetadataBasedAuthorizer.GetAuthContext>)
-  - [func \(s MetadataBasedAuthorizer\) GetDefaultOrgAdminContext\(\) context.Context](<#MetadataBasedAuthorizer.GetDefaultOrgAdminContext>)
-  - [func \(s MetadataBasedAuthorizer\) GetMatchingDbRole\(ctx context.Context, \_ ...string\) \(dbrole.DbRole, error\)](<#MetadataBasedAuthorizer.GetMatchingDbRole>)
-  - [func \(s MetadataBasedAuthorizer\) GetOrgFromContext\(ctx context.Context\) \(string, error\)](<#MetadataBasedAuthorizer.GetOrgFromContext>)
+  - [func \(s \*MetadataBasedAuthorizer\) Configure\(tableName string, roleMapping map\[string\]dbrole.DbRole\)](<#MetadataBasedAuthorizer.Configure>)
+  - [func \(s \*MetadataBasedAuthorizer\) GetAuthContext\(orgId string, roles ...string\) context.Context](<#MetadataBasedAuthorizer.GetAuthContext>)
+  - [func \(s \*MetadataBasedAuthorizer\) GetDefaultOrgAdminContext\(\) context.Context](<#MetadataBasedAuthorizer.GetDefaultOrgAdminContext>)
+  - [func \(s \*MetadataBasedAuthorizer\) GetMatchingDbRole\(ctx context.Context, tableNames ...string\) \(dbrole.DbRole, error\)](<#MetadataBasedAuthorizer.GetMatchingDbRole>)
+  - [func \(s \*MetadataBasedAuthorizer\) GetOrgFromContext\(ctx context.Context\) \(string, error\)](<#MetadataBasedAuthorizer.GetOrgFromContext>)
 - [type SimpleInstancer](<#SimpleInstancer>)
   - [func \(s SimpleInstancer\) GetInstanceId\(ctx context.Context\) \(string, error\)](<#SimpleInstancer.GetInstanceId>)
   - [func \(s SimpleInstancer\) WithInstanceId\(ctx context.Context, instanceId string\) context.Context](<#SimpleInstancer.WithInstanceId>)
@@ -106,55 +106,57 @@ type Instancer interface {
 ```
 
 <a name="MetadataBasedAuthorizer"></a>
-## type [MetadataBasedAuthorizer](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/metadata_authorizer.go#L42>)
+## type [MetadataBasedAuthorizer](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/metadata_authorizer.go#L42-L44>)
 
 
 
 ```go
-type MetadataBasedAuthorizer struct{}
+type MetadataBasedAuthorizer struct {
+    // contains filtered or unexported fields
+}
 ```
 
 <a name="MetadataBasedAuthorizer.Configure"></a>
-### func \(MetadataBasedAuthorizer\) [Configure](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/metadata_authorizer.go#L80>)
+### func \(\*MetadataBasedAuthorizer\) [Configure](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/metadata_authorizer.go#L107>)
 
 ```go
-func (s MetadataBasedAuthorizer) Configure(_ string, _ map[string]dbrole.DbRole)
+func (s *MetadataBasedAuthorizer) Configure(tableName string, roleMapping map[string]dbrole.DbRole)
 ```
 
 
 
 <a name="MetadataBasedAuthorizer.GetAuthContext"></a>
-### func \(MetadataBasedAuthorizer\) [GetAuthContext](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/metadata_authorizer.go#L85>)
+### func \(\*MetadataBasedAuthorizer\) [GetAuthContext](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/metadata_authorizer.go#L116>)
 
 ```go
-func (s MetadataBasedAuthorizer) GetAuthContext(orgId string, roles ...string) context.Context
+func (s *MetadataBasedAuthorizer) GetAuthContext(orgId string, roles ...string) context.Context
 ```
 
 
 
 <a name="MetadataBasedAuthorizer.GetDefaultOrgAdminContext"></a>
-### func \(MetadataBasedAuthorizer\) [GetDefaultOrgAdminContext](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/metadata_authorizer.go#L89>)
+### func \(\*MetadataBasedAuthorizer\) [GetDefaultOrgAdminContext](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/metadata_authorizer.go#L124>)
 
 ```go
-func (s MetadataBasedAuthorizer) GetDefaultOrgAdminContext() context.Context
+func (s *MetadataBasedAuthorizer) GetDefaultOrgAdminContext() context.Context
 ```
 
 
 
 <a name="MetadataBasedAuthorizer.GetMatchingDbRole"></a>
-### func \(MetadataBasedAuthorizer\) [GetMatchingDbRole](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/metadata_authorizer.go#L58>)
+### func \(\*MetadataBasedAuthorizer\) [GetMatchingDbRole](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/metadata_authorizer.go#L60>)
 
 ```go
-func (s MetadataBasedAuthorizer) GetMatchingDbRole(ctx context.Context, _ ...string) (dbrole.DbRole, error)
+func (s *MetadataBasedAuthorizer) GetMatchingDbRole(ctx context.Context, tableNames ...string) (dbrole.DbRole, error)
 ```
 
 
 
 <a name="MetadataBasedAuthorizer.GetOrgFromContext"></a>
-### func \(MetadataBasedAuthorizer\) [GetOrgFromContext](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/metadata_authorizer.go#L44>)
+### func \(\*MetadataBasedAuthorizer\) [GetOrgFromContext](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/metadata_authorizer.go#L46>)
 
 ```go
-func (s MetadataBasedAuthorizer) GetOrgFromContext(ctx context.Context) (string, error)
+func (s *MetadataBasedAuthorizer) GetOrgFromContext(ctx context.Context) (string, error)
 ```
 
 
@@ -394,7 +396,7 @@ var TRACE = func(format string, v ...any) {
 ```
 
 <a name="DBCreate"></a>
-## func [DBCreate](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/helper.go#L231>)
+## func [DBCreate](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/helper.go#L232>)
 
 ```go
 func DBCreate(cfg DBConfig) error
@@ -403,7 +405,7 @@ func DBCreate(cfg DBConfig) error
 Create a Postgres DB using the provided config if it doesn't exist.
 
 <a name="DBExists"></a>
-## func [DBExists](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/helper.go#L253>)
+## func [DBExists](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/helper.go#L254>)
 
 ```go
 func DBExists(cfg DBConfig) bool
@@ -421,7 +423,7 @@ func GetCompLogger() *logrus.Entry
 
 
 <a name="GetFieldValue"></a>
-## func [GetFieldValue](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L399>)
+## func [GetFieldValue](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L400>)
 
 ```go
 func GetFieldValue(record Record, fieldName, columnName string) (string, bool)
@@ -439,7 +441,7 @@ func GetGormLogger(l *logrus.Entry) logger.Interface
 
 
 <a name="GetInstanceId"></a>
-## func [GetInstanceId](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L387>)
+## func [GetInstanceId](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L388>)
 
 ```go
 func GetInstanceId(record Record) (string, bool)
@@ -466,7 +468,7 @@ func GetLogger() *logrus.Logger
 
 
 <a name="GetOrgId"></a>
-## func [GetOrgId](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L379>)
+## func [GetOrgId](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L380>)
 
 ```go
 func GetOrgId(record Record) (string, bool)
@@ -538,7 +540,7 @@ func IsRowLevelSecurityRequired(record Record, tableName string, instancerConfig
 Row Level Security to used to partition tables for multi\-tenancy and multi\-instance support.
 
 <a name="SetFieldValue"></a>
-## func [SetFieldValue](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L420>)
+## func [SetFieldValue](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L421>)
 
 ```go
 func SetFieldValue(record Record, fieldName, columnName, value string) bool
@@ -547,7 +549,7 @@ func SetFieldValue(record Record, fieldName, columnName, value string) bool
 
 
 <a name="SetInstanceId"></a>
-## func [SetInstanceId](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L391>)
+## func [SetInstanceId](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/datastore/sql_struct.go#L392>)
 
 ```go
 func SetInstanceId(record Record, value string) bool
@@ -659,7 +661,7 @@ func main() {
 
 	SERVICE_ADMIN := "service_admin"
 	SERVICE_AUDITOR := "service_auditor"
-	mdAuthorizer := authorizer.MetadataBasedAuthorizer{}
+	mdAuthorizer := &authorizer.MetadataBasedAuthorizer{}
 	instancer := authorizer.SimpleInstancer{}
 
 	ServiceAdminCtx := mdAuthorizer.GetAuthContext("", SERVICE_ADMIN)
@@ -782,7 +784,7 @@ func main() {
 
 	TENANT_ADMIN := "tenant_admin"
 	TENANT_AUDITOR := "tenant_auditor"
-	mdAuthorizer := authorizer.MetadataBasedAuthorizer{}
+	mdAuthorizer := &authorizer.MetadataBasedAuthorizer{}
 	CokeOrgCtx := mdAuthorizer.GetAuthContext("Coke", TENANT_ADMIN)
 	PepsiOrgCtx := mdAuthorizer.GetAuthContext("Pepsi", TENANT_ADMIN)
 
@@ -1001,18 +1003,22 @@ import "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
 DAL uses 4 database roles/users to perform all operations,
 
 - \`TENANT\_READER\` \- has read access to its tenant's data
-
 - \`READER\` \- has read access to all tenants' data
-
 - \`TENANT\_WRITER\` \- has read & write access to its tenant's data
-
 - \`WRITER\` \- has read & write access to all tenants' data
-  
-  DAL allows to map a user's service role to the DB role that will be used for that user. If a user has multiple service roles which map to several DB roles, the DB role with the most extensive privileges will be used \(see \`DbRoles\(\)\` for reference to ordered list of DbRoles.
+
+Corresponding \*INSTANCE\_\* roles access is determined by the Instancer's configuration, allowing it to access records exclusively with a specific instance.
+
+DAL allows to map a user's service role to the DB role that will be used for that user. If a user has multiple service roles which map to several DB roles, the DB role with the most extensive privileges will be used \(see \`DbRoles\(\)\` for reference to ordered list of DbRoles.
 
 ## Index
 
 - [type DbRole](<#DbRole>)
+  - [func Max\(dbRoles \[\]DbRole\) DbRole](<#Max>)
+  - [func Min\(dbRoles \[\]DbRole\) DbRole](<#Min>)
+  - [func \(dbRole DbRole\) GetRoleWithInstancer\(\) DbRole](<#DbRole.GetRoleWithInstancer>)
+  - [func \(dbRole DbRole\) GetRoleWithoutTenancy\(\) DbRole](<#DbRole.GetRoleWithoutTenancy>)
+  - [func \(dbRole DbRole\) IsDbRoleInstanceScoped\(\) bool](<#DbRole.IsDbRoleInstanceScoped>)
   - [func \(dbRole DbRole\) IsDbRoleTenantScoped\(\) bool](<#DbRole.IsDbRoleTenantScoped>)
 - [type DbRoleSlice](<#DbRoleSlice>)
   - [func DbRoles\(\) DbRoleSlice](<#DbRoles>)
@@ -1022,7 +1028,7 @@ DAL uses 4 database roles/users to perform all operations,
 
 
 <a name="DbRole"></a>
-## type [DbRole](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L33>)
+## type [DbRole](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L38>)
 
 DbRole Database roles/users.
 
@@ -1035,17 +1041,66 @@ type DbRole string
 ```go
 const (
     // NO_ROLE DB Roles.
-    NO_ROLE       DbRole = ""
-    TENANT_READER DbRole = "tenant_reader"
-    READER        DbRole = "reader"
-    TENANT_WRITER DbRole = "tenant_writer"
-    WRITER        DbRole = "writer"
-    MAIN          DbRole = "main"
+    NO_ROLE                DbRole = ""
+    TENANT_INSTANCE_READER DbRole = "tenant_instance_reader"
+    TENANT_READER          DbRole = "tenant_reader"
+    INSTANCE_READER        DbRole = "instance_reader"
+    READER                 DbRole = "reader"
+    TENANT_INSTANCE_WRITER DbRole = "tenant_instance_writer"
+    TENANT_WRITER          DbRole = "tenant_writer"
+    INSTANCE_WRITER        DbRole = "instance_writer"
+    WRITER                 DbRole = "writer"
+    MAIN                   DbRole = "main"
 )
 ```
 
+<a name="Max"></a>
+### func [Max](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L133>)
+
+```go
+func Max(dbRoles []DbRole) DbRole
+```
+
+
+
+<a name="Min"></a>
+### func [Min](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L138>)
+
+```go
+func Min(dbRoles []DbRole) DbRole
+```
+
+
+
+<a name="DbRole.GetRoleWithInstancer"></a>
+### func \(DbRole\) [GetRoleWithInstancer](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L82>)
+
+```go
+func (dbRole DbRole) GetRoleWithInstancer() DbRole
+```
+
+Map roles to instancer based when Instancer is set.
+
+<a name="DbRole.GetRoleWithoutTenancy"></a>
+### func \(DbRole\) [GetRoleWithoutTenancy](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L98>)
+
+```go
+func (dbRole DbRole) GetRoleWithoutTenancy() DbRole
+```
+
+Map roles to non\-tenancy when tenant column is not configured.
+
+<a name="DbRole.IsDbRoleInstanceScoped"></a>
+### func \(DbRole\) [IsDbRoleInstanceScoped](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L77>)
+
+```go
+func (dbRole DbRole) IsDbRoleInstanceScoped() bool
+```
+
+
+
 <a name="DbRole.IsDbRoleTenantScoped"></a>
-### func \(DbRole\) [IsDbRoleTenantScoped](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L66>)
+### func \(DbRole\) [IsDbRoleTenantScoped](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L73>)
 
 ```go
 func (dbRole DbRole) IsDbRoleTenantScoped() bool
@@ -1054,7 +1109,7 @@ func (dbRole DbRole) IsDbRoleTenantScoped() bool
 
 
 <a name="DbRoleSlice"></a>
-## type [DbRoleSlice](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L61>)
+## type [DbRoleSlice](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L123>)
 
 
 
@@ -1063,16 +1118,16 @@ type DbRoleSlice []DbRole // Needed for sorting records
 ```
 
 <a name="DbRoles"></a>
-### func [DbRoles](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L50>)
+### func [DbRoles](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L58>)
 
 ```go
 func DbRoles() DbRoleSlice
 ```
 
-Returns \*Ordered\* slice of DbRoles. A reader role is always considered to have fewer permissions than a writer role. and a tenant\-specific reader/writer role is always considered to have fewer permissions, than a non\-tenant specific reader/writer role, respectively. NO\_ROLE \< TENANT\_READER \< READER \< TENANT\_WRITER \< WRITER.
+Returns \*Ordered\* slice of DbRoles. A reader role is always considered to have fewer permissions than a writer role. and a tenant\-specific reader/writer role is always considered to have fewer permissions, than a non\-tenant specific reader/writer role, respectively.
 
 <a name="DbRoleSlice.Len"></a>
-### func \(DbRoleSlice\) [Len](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L62>)
+### func \(DbRoleSlice\) [Len](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L131>)
 
 ```go
 func (a DbRoleSlice) Len() int
@@ -1081,7 +1136,7 @@ func (a DbRoleSlice) Len() int
 
 
 <a name="DbRoleSlice.Less"></a>
-### func \(DbRoleSlice\) [Less](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L83>)
+### func \(DbRoleSlice\) [Less](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L127>)
 
 ```go
 func (a DbRoleSlice) Less(i, j int) bool
@@ -1090,7 +1145,7 @@ func (a DbRoleSlice) Less(i, j int) bool
 Returns true if the first role has fewer permissions than the second role, and true if the two roles are the same or the second role has more permissions.
 
 <a name="DbRoleSlice.Swap"></a>
-### func \(DbRoleSlice\) [Swap](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L87>)
+### func \(DbRoleSlice\) [Swap](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/dbrole/dbrole.go#L129>)
 
 ```go
 func (a DbRoleSlice) Swap(i, j int)
@@ -1418,7 +1473,7 @@ import (
 func main() {
 	// Initialize protostore with proper logger, authorizer and datastore
 	myLogger := datastore.GetCompLogger()
-	mdAuthorizer := authorizer.MetadataBasedAuthorizer{}
+	mdAuthorizer := &authorizer.MetadataBasedAuthorizer{}
 	myDatastore, _ := datastore.FromEnvWithDB(myLogger, mdAuthorizer, nil, "ExampleProtoStore")
 	defer myDatastore.Reset()
 	ctx := mdAuthorizer.GetAuthContext("Coke", "service_admin")

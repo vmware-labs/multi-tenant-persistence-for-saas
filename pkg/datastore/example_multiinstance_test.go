@@ -31,7 +31,7 @@ func ExampleDataStore_multiInstance() {
 
 	SERVICE_ADMIN := "service_admin"
 	SERVICE_AUDITOR := "service_auditor"
-	mdAuthorizer := authorizer.MetadataBasedAuthorizer{}
+	mdAuthorizer := &authorizer.MetadataBasedAuthorizer{}
 	instancer := authorizer.SimpleInstancer{}
 
 	ServiceAdminCtx := mdAuthorizer.GetAuthContext("", SERVICE_ADMIN)

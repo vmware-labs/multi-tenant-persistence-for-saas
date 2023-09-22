@@ -151,6 +151,7 @@ func (db *relationalDb) GetTransaction(ctx context.Context, records ...Record) (
 // If the table is multi-instanced, the record is expected to have the InstanceId properly configured, based on
 // context.
 func (db *relationalDb) ValidateTenancyScope(tenancyInfo TenancyInfo, record Record, tableName string) error {
+	// Disable Tenancy based role if record is not MultiTenanted
 	if tenancyInfo.DbRole.IsDbRoleTenantScoped() && IsMultiTenanted(record, tableName) {
 		orgIdCol, _ := GetOrgId(record)
 		if orgIdCol != "" && orgIdCol != tenancyInfo.OrgId {
@@ -159,6 +160,7 @@ func (db *relationalDb) ValidateTenancyScope(tenancyInfo TenancyInfo, record Rec
 			return err
 		}
 	}
+	// Enable Instancer based role if instancer is set
 	if IsMultiInstanced(record, tableName, db.instancer != nil) {
 		instanceIdCol, _ := GetInstanceId(record)
 		if instanceIdCol != "" && instanceIdCol != tenancyInfo.InstanceId {
@@ -187,12 +189,17 @@ func (db *relationalDb) configureTxWithTenancyScope(tenancyInfo TenancyInfo) (*g
 		TRACE("Skipping tenant scoping for %+v", tenancyInfo)
 	}
 
-	// Set config view scoped to InstanceId
-	stmt := getSetConfigStmt(DbConfigInstanceId, tenancyInfo.InstanceId)
-	if err = tx.Exec(stmt).Error; err != nil {
-		db.logger.Debug(err)
-		return nil, ErrExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, stmt).WithValue(DB_NAME, db.dbName)
+	if tenancyInfo.DbRole.IsDbRoleInstanceScoped() {
+		// Set config view scoped to InstanceId
+		stmt := getSetConfigStmt(DbConfigInstanceId, tenancyInfo.InstanceId)
+		if err = tx.Exec(stmt).Error; err != nil {
+			db.logger.Debug(err)
+			return nil, ErrExecutingSqlStmt.Wrap(err).WithValue(SQL_STMT, stmt).WithValue(DB_NAME, db.dbName)
+		}
+	} else {
+		TRACE("Skipping instance scoping for %+v", tenancyInfo)
 	}
+
 	return tx, nil
 }
 
@@ -206,7 +213,7 @@ func (db *relationalDb) Reset() {
 		}
 	}
 	db.gormDBMap = make(map[dbrole.DbRole]*gorm.DB)
-	db.authorizer = authorizer.MetadataBasedAuthorizer{}
+	// db.authorizer = authorizer.MetadataBasedAuthorizer{}
 }
 
 // Find Finds a single record that has the same values as non-zero fields in the record.
@@ -549,7 +556,17 @@ func (db *relationalDb) UpdateInTable(ctx context.Context, tableName string, rec
 // Registers a struct with DAL. See RegisterHelper() for more info.
 func (db *relationalDb) Register(ctx context.Context, roleMapping map[string]dbrole.DbRole, records ...Record) error {
 	for _, record := range records {
-		err := db.RegisterHelper(ctx, roleMapping, GetTableName(record), record)
+		tableName := GetTableName(record)
+		for serviceRole, dbRole := range roleMapping {
+			if !IsMultiTenanted(record, tableName) {
+				if dbRole.IsDbRoleTenantScoped() {
+					return fmt.Errorf("Cannot configure service role %s to db role %s in non multi-tenanted table %s",
+						serviceRole, dbRole, tableName)
+				}
+			}
+		}
+
+		err := db.RegisterHelper(ctx, roleMapping, tableName, record)
 		if err != nil {
 			return err
 		}
@@ -600,7 +617,9 @@ func (db *relationalDb) RegisterHelper(_ context.Context, roleMapping map[string
 	}
 
 	// Create users, grant privileges for current table, setup RLS-policies (if multi-tenant)
-	users := getDbUsers(tableName, IsMultiTenanted(record, tableName), IsMultiInstanced(record, tableName, db.instancer != nil))
+	users := getDbUsers(tableName,
+		IsMultiTenanted(record, tableName),
+		IsMultiInstanced(record, tableName, db.instancer != nil))
 	for _, dbUserSpec := range users {
 		if err = db.grantPrivileges(dbUserSpec, tableName, record); err != nil {
 			err = ErrRegisteringStruct.Wrap(err).WithMap(map[ErrorContextKey]string{
@@ -704,11 +723,17 @@ func (db *relationalDb) getTenancyInfoFromCtx(ctx context.Context, tableNames ..
 	if err != nil {
 		return err, tenancyInfo
 	}
+
+	// FIXME: If Instancer is configure and the role mappings are not instance based,
+	// but the records are instancer based, we are elevating the role to instance based
 	if db.instancer != nil {
 		tenancyInfo.InstanceId, err = db.instancer.GetInstanceId(ctx)
 		if err != nil {
 			TRACE("Skipping instance id for %+v", ctx)
 			err = nil
+		} else {
+			TRACE("Enabling instancer check for %+v", ctx)
+			tenancyInfo.DbRole = tenancyInfo.DbRole.GetRoleWithInstancer()
 		}
 	}
 	db.logger.Debugf("Tenancy Info from Context: %+v", tenancyInfo)

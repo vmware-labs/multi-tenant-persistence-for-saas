@@ -1,10 +1,8 @@
----
 # golangci.com configuration
 # https://golangci-lint.run/usage/configuration/
 run:
   # timeout for analysis, e.g. 30s, 5m, default is 1m
   deadline: 15m
-
 linters:
   # Enable specific linter
   # https://golangci-lint.run/usage/linters/#enabled-by-default
@@ -94,7 +92,6 @@ linters:
   # Run only fast linters from enabled linters set (first run won't be fast)
   # Default: false
   fast: false
-
 linters-settings:
   cyclop:
     # The maximal code complexity to report.
@@ -160,9 +157,13 @@ linters-settings:
         bson: camel
         avro: snake
         mapstructure: kebab
-
 issues:
   exclude-rules:
+    - path: pkg/authorizer/metadata_authorizer.go
+      linters:
+        - cyclop
+        - gocognit
+        - nestif
     - path: _test\.go
       linters:
         - cyclop

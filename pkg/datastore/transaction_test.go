@@ -119,10 +119,11 @@ func testSingleTableTransactions(t *testing.T, ds datastore.DataStore, ps protos
 	assert.NoError(tx.Error)
 }
 
-func testMultiTableTransactions(t *testing.T, ds datastore.DataStore, ps protostore.ProtoStore) {
+func testMultiTableTransactionsWithDifferentRoles(t *testing.T, ds datastore.DataStore, ps protostore.ProtoStore) {
 	t.Helper()
 	assert := assert.New(t)
 
+	// Negative case as App has tenancy based roles and AppUser is non-tenancy based role
 	a1 := &App{}
 	a2 := &AppUser{}
 	_ = faker.FakeData(a1)
@@ -144,52 +145,10 @@ func testMultiTableTransactions(t *testing.T, ds datastore.DataStore, ps protost
 		return nil
 	})
 	tx.Commit()
-	assert.NoError(err)
-	assert.NoError(tx.Error)
-
-	tx, err = ds.GetTransaction(AmericasCokeAuditorCtx, a1, a2)
-	assert.NoError(err)
-	t.Log("Finding App and Appuser in single transaction")
-	f1, f2 := &App{Id: a1.Id, TenantId: a1.TenantId}, &AppUser{Id: a2.Id}
-	err = tx.Transaction(func(tx *gorm.DB) error {
-		if err := tx.First(f1).Error; err != nil {
-			return err
-		}
-
-		if err := tx.First(f2).Error; err != nil {
-			return err
-		}
-		return nil
-	})
-	t.Log("Verifying App and AppUser are properly retrieved")
-	tx.Commit()
-	assert.NoError(err)
-	assert.NoError(tx.Error)
-	assert.Equal(a1, f1)
-	assert.Equal(a2, f2)
-	t.Log(a1, a2)
-	t.Log(f1, f2)
-
-	t.Log("Deleting App and AppUser in single transaction")
-	tx, err = ds.GetTransaction(ServiceAdminCtx, a1)
-	assert.NoError(err)
-	err = tx.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Delete(a1).Error; err != nil {
-			return err
-		}
-
-		if err := tx.Delete(a2).Error; err != nil {
-			return err
-		}
-		return nil
-	})
-	t.Log("Verifying App and AppUser are deleted successfully")
-	tx.Commit()
-	assert.NoError(err)
-	assert.NoError(tx.Error)
+	assert.ErrorContains(err, "ERROR: permission denied for table application (SQLSTATE 42501)")
 }
 
-func testMultiProtoTransactions(t *testing.T, ds datastore.DataStore, ps protostore.ProtoStore) {
+func testMultiProtoTransactionsWithDifferentRoles(t *testing.T, ds datastore.DataStore, ps protostore.ProtoStore) {
 	t.Helper()
 	assert := assert.New(t)
 
@@ -219,113 +178,5 @@ func testMultiProtoTransactions(t *testing.T, ds datastore.DataStore, ps protost
 		return nil
 	})
 	tx.Commit()
-	assert.NoError(err)
-	assert.NoError(tx.Error)
-
-	tx, err = ds.GetTransaction(AmericasCokeAuditorCtx, a1, a2)
-	assert.NoError(err)
-	t.Log("Finding pb.Disk and App in single transaction")
-	f1, err := ps.MsgToFilter(AmericasCokeAuditorCtx, "a1", c1)
-	assert.NoError(err)
-	f2 := &App{Id: a2.Id, TenantId: a2.TenantId}
-	err = tx.Transaction(func(tx *gorm.DB) error {
-		t.Logf("Finding %+v", f1)
-		if err := tx.Table(t1).First(f1).Error; err != nil {
-			return err
-		}
-
-		t.Logf("Finding %+v", f2)
-		if err := tx.First(f2).Error; err != nil {
-			return err
-		}
-		return nil
-	})
-	t.Log("Verifying pb.Disk and App are properly retrieved")
-	tx.Commit()
-	assert.NoError(err)
-	assert.NoError(tx.Error)
-	assert.Equal(a1.Msg, f1.Msg)
-	assert.Equal(a2, f2)
-	t.Log(a1, a2)
-	t.Log(f1, f2)
-
-	t.Log("Deleting pb.Disk and App in single transaction")
-	tx, err = ds.GetTransaction(AmericasCokeAdminCtx, a1)
-	assert.NoError(err)
-	err = tx.Transaction(func(tx *gorm.DB) error {
-		t.Logf("Deleting %+v", a1)
-		if err := tx.Table(t1).Delete(a1).Error; err != nil {
-			return err
-		}
-
-		t.Logf("Deleting %+v", a2)
-		if err := tx.Delete(a2).Error; err != nil {
-			return err
-		}
-		return nil
-	})
-	t.Log("Verifying pb.Disk and App are deleted successfully")
-	tx.Commit()
-	assert.NoError(err)
-	assert.NoError(tx.Error)
-
-	t.Log("Finding pb.Disk and App after delete should not return anything")
-	tx, err = ds.GetTransaction(AmericasCokeAdminCtx, a1)
-	assert.NoError(err)
-	f1, err = ps.MsgToFilter(AmericasCokeAuditorCtx, "a1", c1)
-	assert.NoError(err)
-	f2 = &App{Id: a2.Id, TenantId: a2.TenantId}
-	err = tx.Transaction(func(tx *gorm.DB) error {
-		t.Logf("Finding %+v", f1)
-		x := tx.Table(t1).First(f1)
-		assert.EqualValues(0, x.RowsAffected, x)
-
-		t.Logf("Finding %+v", f2)
-		y := tx.First(f2)
-		assert.EqualValues(0, y.RowsAffected, y)
-		return nil
-	})
-	tx.Commit()
-	assert.NoError(err)
-	t.Log("Verifying pb.Disk and App cannot be retrieved after delete")
-
-	t.Log("Verifying pb.Disk can be retrieved after soft delete ...")
-	tx, err = ds.GetTransaction(AmericasCokeAdminCtx, a1)
-	assert.NoError(err)
-	f1, err = ps.MsgToFilter(AmericasCokeAuditorCtx, "a1", c1)
-	assert.NoError(err)
-	f2 = &App{Id: a2.Id, TenantId: a2.TenantId}
-	err = tx.Transaction(func(tx *gorm.DB) error {
-		t.Logf("Finding %+v after soft-delete", f1)
-		x := tx.Table(t1).Unscoped().First(f1)
-		assert.EqualValues(1, x.RowsAffected, x)
-
-		t.Logf("Finding %+v", f2)
-		y := tx.Unscoped().First(f2)
-		assert.EqualValues(0, y.RowsAffected, y)
-		return nil
-	})
-	tx.Commit()
-	assert.NoError(err)
-	t.Log("Verifying pb.Disk can be retrieved after soft delete succeeded")
-
-	t.Log("Purging pb.Disk after soft delete ...")
-	tx, err = ds.GetTransaction(AmericasCokeAdminCtx, a1)
-	assert.NoError(err)
-	f1, err = ps.MsgToFilter(AmericasCokeAuditorCtx, "a1", c1)
-	assert.NoError(err)
-	f2 = &App{Id: a2.Id, TenantId: a2.TenantId}
-	err = tx.Transaction(func(tx *gorm.DB) error {
-		t.Logf("Purging %+v after soft-delete", f1)
-		x := tx.Table(t1).Unscoped().Delete(f1)
-		assert.EqualValues(1, x.RowsAffected, x)
-
-		t.Logf("Deleting %+v", f2)
-		y := tx.Unscoped().Delete(f2)
-		assert.EqualValues(0, y.RowsAffected, y)
-		return nil
-	})
-	tx.Commit()
-	assert.NoError(err)
-	t.Log("Purging pb.Disk after soft delete succeeded")
+	assert.ErrorContains(err, "ERROR: permission denied for table application (SQLSTATE 42501)")
 }

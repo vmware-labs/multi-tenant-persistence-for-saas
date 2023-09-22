@@ -48,7 +48,7 @@ var LOG *logrus.Entry
 func TestHasTable(t *testing.T) {
 	assert := assert.New(t)
 
-	ds, _ := SetupDataStore("TestTruncate")
+	ds, _ := SetupDataStore("TestHasTable")
 	defer ds.Reset()
 	_, _, _ = SetupDbTables(ds)
 
@@ -424,7 +424,7 @@ func TestDeleteWithMultipleCSPRoles(t *testing.T) {
 	customCtx := ds.GetAuthorizer().GetAuthContext(COKE, APP_ADMIN, SERVICE_ADMIN)
 
 	// The custom admin will have a read access being an app admin and read & write access being a service admin
-	roleMapping := map[string]dbrole.DbRole{APP_ADMIN: dbrole.READER, SERVICE_ADMIN: dbrole.WRITER}
+	roleMapping := map[string]dbrole.DbRole{APP_ADMIN: dbrole.TENANT_READER, SERVICE_ADMIN: dbrole.TENANT_WRITER}
 	err := ds.Register(customCtx, roleMapping, App{})
 	if err != nil {
 		assert.FailNow("Failed to setup the test case for the following reason:\n")
@@ -618,8 +618,8 @@ func TestRevision(t *testing.T) {
 		assert.FailNow("Failed to drop DB tables for the following reason:\n" + err.Error())
 	}
 	roleMapping := map[string]dbrole.DbRole{
-		TENANT_AUDITOR:  dbrole.TENANT_READER,
-		TENANT_ADMIN:    dbrole.TENANT_WRITER,
+		TENANT_AUDITOR:  dbrole.READER,
+		TENANT_ADMIN:    dbrole.WRITER,
 		SERVICE_AUDITOR: dbrole.READER,
 		SERVICE_ADMIN:   dbrole.WRITER,
 	}
@@ -729,6 +729,6 @@ func TestTransactions(t *testing.T) {
 	assert.NoError(err)
 
 	testSingleTableTransactions(t, ds, ps)
-	testMultiTableTransactions(t, ds, ps)
-	testMultiProtoTransactions(t, ds, ps)
+	testMultiTableTransactionsWithDifferentRoles(t, ds, ps)
+	testMultiProtoTransactionsWithDifferentRoles(t, ds, ps)
 }

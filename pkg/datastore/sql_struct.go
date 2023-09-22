@@ -252,7 +252,8 @@ func GetTableName(x interface{}) (tableName string) {
 
 // Generates RLS-policy name based on database role/user and table name.
 func getRlsPolicyName(username string, tableName string) string {
-	policyName := strings.ToLower(username + "_" + tableName + "_policy")
+	// v2 added support generic policies of instance roles too
+	policyName := strings.ToLower(username + "_" + tableName + "_v2")
 	policyName = strings.ReplaceAll(policyName, "\"", "")
 	return policyName
 }

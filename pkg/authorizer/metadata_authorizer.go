@@ -39,9 +39,11 @@ const (
 	METADATA_ROLE_AUDITOR         = "auditor" // can be tenant_auditor, *_auditor
 )
 
-type MetadataBasedAuthorizer struct{}
+type MetadataBasedAuthorizer struct {
+	roleMapping map[string]map[string]dbrole.DbRole // Maps DB table to its service roles and matching DB roles
+}
 
-func (s MetadataBasedAuthorizer) GetOrgFromContext(ctx context.Context) (string, error) {
+func (s *MetadataBasedAuthorizer) GetOrgFromContext(ctx context.Context) (string, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		return "", ErrFetchingMetadata
@@ -55,21 +57,46 @@ func (s MetadataBasedAuthorizer) GetOrgFromContext(ctx context.Context) (string,
 	return orgIds[len(orgIds)-1], nil
 }
 
-func (s MetadataBasedAuthorizer) GetMatchingDbRole(ctx context.Context, _ ...string) (dbrole.DbRole, error) {
+func (s *MetadataBasedAuthorizer) GetMatchingDbRole(ctx context.Context, tableNames ...string) (dbrole.DbRole, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		return dbrole.NO_ROLE, ErrFetchingMetadata
 	}
 
-	role := md[METADATA_KEY_ROLE]
-	if len(role) > 0 {
-		switch role[len(role)-1] {
+	// Returns the min role across tables and max within a table for given serviceRoles
+	serviceRoles := md[METADATA_KEY_ROLE]
+	if len(serviceRoles) > 0 {
+		// Use roleMapping if configured
+		if s.roleMapping != nil {
+			allTableRoles := make([]dbrole.DbRole, 0)
+			for _, tableName := range tableNames {
+				dbRoles := make([]dbrole.DbRole, 0)
+				for _, serviceRole := range serviceRoles {
+					if rMapping, ok := s.roleMapping[tableName]; ok {
+						if dbRole, ok := rMapping[serviceRole]; ok {
+							dbRoles = append(dbRoles, dbRole)
+						}
+					}
+				}
+				if len(dbRoles) > 0 {
+					allTableRoles = append(allTableRoles, dbrole.Max(dbRoles))
+				} else {
+					break
+				}
+			}
+			if len(allTableRoles) > 0 {
+				return dbrole.Min(allTableRoles), nil
+			}
+		}
+
+		serviceRole := serviceRoles[len(serviceRoles)-1]
+		switch serviceRole {
 		case METADATA_ROLE_SERVICE_ADMIN:
 			return dbrole.WRITER, nil
 		case METADATA_ROLE_SERVICE_AUDITOR:
 			return dbrole.READER, nil
 		default:
-			if strings.HasSuffix(role[len(role)-1], METADATA_ROLE_ADMIN) {
+			if strings.HasSuffix(serviceRole, METADATA_ROLE_ADMIN) {
 				return dbrole.TENANT_WRITER, nil
 			}
 		}
@@ -77,15 +104,23 @@ func (s MetadataBasedAuthorizer) GetMatchingDbRole(ctx context.Context, _ ...str
 	return dbrole.TENANT_READER, nil
 }
 
-func (s MetadataBasedAuthorizer) Configure(_ string, _ map[string]dbrole.DbRole) {
-	// TODO - Set "service role" to DB role mapping here"
-	// Currently MetadataBasedAuthorizer, doesn't support service to DB role mapping
+func (s *MetadataBasedAuthorizer) Configure(tableName string, roleMapping map[string]dbrole.DbRole) {
+	if s.roleMapping == nil {
+		// TRACE("RoleMapping: setting to NEWMAP")
+		s.roleMapping = make(map[string]map[string]dbrole.DbRole)
+	}
+	s.roleMapping[tableName] = roleMapping
+	// TRACE("RoleMapping: configured for table %s: %+v", tableName, s.roleMapping)
 }
 
-func (s MetadataBasedAuthorizer) GetAuthContext(orgId string, roles ...string) context.Context {
-	return metadata.NewIncomingContext(context.Background(), metadata.Pairs(METADATA_KEY_ORGID, orgId, METADATA_KEY_ROLE, roles[0]))
+func (s *MetadataBasedAuthorizer) GetAuthContext(orgId string, roles ...string) context.Context {
+	md := metadata.Pairs(METADATA_KEY_ORGID, orgId)
+	for _, role := range roles {
+		md.Append(METADATA_KEY_ROLE, role)
+	}
+	return metadata.NewIncomingContext(context.Background(), md)
 }
 
-func (s MetadataBasedAuthorizer) GetDefaultOrgAdminContext() context.Context {
+func (s *MetadataBasedAuthorizer) GetDefaultOrgAdminContext() context.Context {
 	return s.GetAuthContext(GLOBAL_DEFAULT_ORG_ID, METADATA_ROLE_ADMIN)
 }
