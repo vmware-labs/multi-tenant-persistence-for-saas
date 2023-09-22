@@ -213,11 +213,11 @@ func (db *relationalDb) Reset() {
 // record argument must be a pointer to a struct and will be modified in-place.
 // Returns ErrRecordNotFound if a record could not be found.
 func (db *relationalDb) Find(ctx context.Context, record Record) error {
-	return db.FindInTable(ctx, GetTableName(record), record)
+	return db.findInTable(ctx, GetTableName(record), record, false)
 }
 
 func (db *relationalDb) FindSoftDeleted(ctx context.Context, record Record) error {
-	return db.FindSoftDeletedInTable(ctx, GetTableName(record), record)
+	return db.findInTable(ctx, GetTableName(record), record, true)
 }
 
 func rollbackTx(tx *gorm.DB, db *relationalDb) {
@@ -226,17 +226,9 @@ func rollbackTx(tx *gorm.DB, db *relationalDb) {
 	}
 }
 
-func (db *relationalDb) FindSoftDeletedInTable(ctx context.Context, tableName string, record Record) (err error) {
-	return db.findInTable(ctx, tableName, record, true)
-}
-
 // Finds a single record that has the same values as non-zero fields in the record.
 // record argument must be a pointer to a struct and will be modified in-place.
 // Returns ErrRecordNotFound if a record could not be found.
-func (db *relationalDb) FindInTable(ctx context.Context, tableName string, record Record) (err error) {
-	return db.findInTable(ctx, tableName, record, false)
-}
-
 func (db *relationalDb) findInTable(ctx context.Context, tableName string, record Record, softDelete bool) (err error) {
 	var tx *gorm.DB
 	if tx, err = db.GetDBTransaction(ctx, tableName, record); err != nil {
@@ -278,6 +270,14 @@ func (db *relationalDb) findInTable(ctx context.Context, tableName string, recor
 // Finds all records in a DB table.
 // records must be a pointer to a slice of structs and will be modified in-place.
 func (db *relationalDb) FindAll(ctx context.Context, records interface{}, pagination *Pagination) error {
+	return db.findAll(ctx, records, pagination, false)
+}
+
+func (db *relationalDb) FindAllIncludingSoftDeleted(ctx context.Context, records interface{}, pagination *Pagination) error {
+	return db.findAll(ctx, records, pagination, true)
+}
+
+func (db *relationalDb) findAll(ctx context.Context, records interface{}, pagination *Pagination, softDelete bool) error {
 	if reflect.TypeOf(records).Kind() != reflect.Ptr || reflect.TypeOf(records).Elem().Kind() != reflect.Slice {
 		errMsg := "\"records\" argument has to be a pointer to a slice of structs implementing \"Record\" interface"
 		err := ErrNotPtrToStructSlice.Wrap(fmt.Errorf(errMsg))
@@ -286,7 +286,11 @@ func (db *relationalDb) FindAll(ctx context.Context, records interface{}, pagina
 	}
 
 	tableName := GetTableName(records)
-	return db.FindAllInTable(ctx, tableName, records, pagination)
+	if softDelete {
+		return db.FindAllInTableIncludingSoftDeleted(ctx, tableName, records, pagination)
+	} else {
+		return db.FindAllInTable(ctx, tableName, records, pagination)
+	}
 }
 
 // FindAllInTable Finds all records in DB table tableName.
@@ -316,40 +320,14 @@ func (db *relationalDb) FindWithFilterIncludingSoftDeleted(ctx context.Context, 
 // If record argument is non-empty, uses the non-empty fields as criteria in a query.
 // records must be a pointer to a slice of structs and will be modified in-place.
 func (db *relationalDb) FindWithFilterInTable(ctx context.Context, tableName string, record Record, records interface{}, pagination *Pagination) (err error) {
-	if reflect.TypeOf(records).Kind() != reflect.Ptr || reflect.TypeOf(records).Elem().Kind() != reflect.Slice {
-		return ErrNotPtrToStruct.WithValue(TYPE, TypeName(records))
-	}
-
-	var tx *gorm.DB
-	if tx, err = db.getDBTransaction(ctx, tableName, record); err != nil {
-		return err
-	}
-
-	if err = tx.Table(tableName).Where(record).Error; err != nil {
-		db.logger.Debug(err)
-		return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
-	}
-	if pagination != nil {
-		tx.Offset(pagination.Offset).Limit(pagination.Limit)
-		if pagination.SortBy != "" {
-			tx.Order(pagination.SortBy)
-		}
-	}
-	if err = tx.Find(records).Error; err != nil {
-		db.logger.Debug(err)
-		return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
-	}
-
-	if !db.txFetcher.IsTransactionCtx(ctx) {
-		if err = tx.Commit().Error; err != nil {
-			db.logger.Debug(err)
-			return ErrExecutingSqlStmt.Wrap(err)
-		}
-	}
-	return nil
+	return db.findWithFilterInTable(ctx, tableName, record, records, pagination, false)
 }
 
 func (db *relationalDb) FindWithFilterInTableIncludingSoftDeleted(ctx context.Context, tableName string, record Record, records interface{}, pagination *Pagination) (err error) {
+	return db.findWithFilterInTable(ctx, tableName, record, records, pagination, true)
+}
+
+func (db *relationalDb) findWithFilterInTable(ctx context.Context, tableName string, record Record, records interface{}, pagination *Pagination, softDelete bool) (err error) {
 	if reflect.TypeOf(records).Kind() != reflect.Ptr || reflect.TypeOf(records).Elem().Kind() != reflect.Slice {
 		return ErrNotPtrToStruct.WithValue(TYPE, TypeName(records))
 	}
@@ -359,19 +337,35 @@ func (db *relationalDb) FindWithFilterInTableIncludingSoftDeleted(ctx context.Co
 		return err
 	}
 
-	if err = tx.Unscoped().Table(tableName).Where(record).Error; err != nil {
-		db.logger.Debug(err)
-		return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
+	if softDelete {
+		if err = tx.Unscoped().Table(tableName).Where(record).Error; err != nil {
+			db.logger.Debug(err)
+			return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
+		}
+	} else {
+		if err = tx.Table(tableName).Where(record).Error; err != nil {
+			db.logger.Debug(err)
+			return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
+		}
 	}
+
 	if pagination != nil {
 		tx.Offset(pagination.Offset).Limit(pagination.Limit)
 		if pagination.SortBy != "" {
 			tx.Order(pagination.SortBy)
 		}
 	}
-	if err = tx.Unscoped().Find(records).Error; err != nil {
-		db.logger.Debug(err)
-		return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
+
+	if softDelete {
+		if err = tx.Unscoped().Find(records).Error; err != nil {
+			db.logger.Debug(err)
+			return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
+		}
+	} else {
+		if err = tx.Find(records).Error; err != nil {
+			db.logger.Debug(err)
+			return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
+		}
 	}
 
 	if !db.txFetcher.IsTransactionCtx(ctx) {

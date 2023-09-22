@@ -60,6 +60,7 @@ type ProtoStore interface {
 	UpsertWithMetadata(ctx context.Context, id string, msg proto.Message, metadata Metadata) (rowsAffected int64, md Metadata, err error)
 
 	GetMetadata(ctx context.Context, id string, msg proto.Message) (md Metadata, err error)
+	GetSoftDeletedMetadata(ctx context.Context, id string, msg proto.Message) (md Metadata, err error)
 	GetRevision(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, err error)
 
 	MsgToFilter(ctx context.Context, id string, msg proto.Message) (pMsg *ProtoStoreMsg, err error)
@@ -275,31 +276,31 @@ func (p ProtobufDataStore) UpsertWithMetadata(ctx context.Context, id string, ms
 // Finds a Protobuf message by ID.
 // If metadata arg. is non-nil, fills it with the metadata (parent ID & revision) of the Protobuf message that was found.
 func (p ProtobufDataStore) FindById(ctx context.Context, id string, msg proto.Message, metadata *Metadata) error {
-	protoStoreMsg, err := p.MsgToFilter(ctx, id, msg)
-	if err != nil {
-		return err
-	}
-
-	err = p.ds.Find(ctx, protoStoreMsg)
-	if err != nil {
-		return err
-	}
-	if metadata != nil {
-		*metadata = MetadataFrom(*protoStoreMsg)
-	}
-	return FromBytes(protoStoreMsg.Msg, msg)
+	return p.findById(ctx, id, msg, metadata, false)
 }
 
 func (p ProtobufDataStore) FindByIdIncludingSoftDeleted(ctx context.Context, id string, msg proto.Message, metadata *Metadata) error {
+	return p.findById(ctx, id, msg, metadata, true)
+}
+
+func (p ProtobufDataStore) findById(ctx context.Context, id string, msg proto.Message, metadata *Metadata, softDelete bool) error {
 	protoStoreMsg, err := p.MsgToFilter(ctx, id, msg)
 	if err != nil {
 		return err
 	}
 
-	err = p.ds.FindSoftDeleted(ctx, protoStoreMsg)
-	if err != nil {
-		return err
+	if softDelete {
+		err = p.ds.FindSoftDeleted(ctx, protoStoreMsg)
+		if err != nil {
+			return err
+		}
+	} else {
+		err = p.ds.Find(ctx, protoStoreMsg)
+		if err != nil {
+			return err
+		}
 	}
+
 	if metadata != nil {
 		*metadata = MetadataFrom(*protoStoreMsg)
 	}
@@ -307,20 +308,23 @@ func (p ProtobufDataStore) FindByIdIncludingSoftDeleted(ctx context.Context, id 
 }
 
 func (p ProtobufDataStore) GetMetadata(ctx context.Context, id string, msg proto.Message) (md Metadata, err error) {
-	protoStoreMsg, err := p.MsgToFilter(ctx, id, msg)
-	if err != nil {
-		return md, err
-	}
-	err = p.ds.Find(ctx, protoStoreMsg)
-	return MetadataFrom(*protoStoreMsg), err
+	return p.getMetadata(ctx, id, msg, false)
 }
 
 func (p ProtobufDataStore) GetSoftDeletedMetadata(ctx context.Context, id string, msg proto.Message) (md Metadata, err error) {
+	return p.getMetadata(ctx, id, msg, true)
+}
+
+func (p ProtobufDataStore) getMetadata(ctx context.Context, id string, msg proto.Message, softDelete bool) (md Metadata, err error) {
 	protoStoreMsg, err := p.MsgToFilter(ctx, id, msg)
 	if err != nil {
 		return md, err
 	}
-	err = p.ds.FindSoftDeleted(ctx, protoStoreMsg)
+	if softDelete {
+		err = p.ds.FindSoftDeleted(ctx, protoStoreMsg)
+	} else {
+		err = p.ds.Find(ctx, protoStoreMsg)
+	}
 	return MetadataFrom(*protoStoreMsg), err
 }
 
