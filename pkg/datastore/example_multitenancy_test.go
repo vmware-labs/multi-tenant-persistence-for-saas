@@ -31,7 +31,7 @@ func ExampleDataStore_multiTenancy() {
 
 	TENANT_ADMIN := "tenant_admin"
 	TENANT_AUDITOR := "tenant_auditor"
-	mdAuthorizer := authorizer.MetadataBasedAuthorizer{}
+	mdAuthorizer := &authorizer.MetadataBasedAuthorizer{}
 	CokeOrgCtx := mdAuthorizer.GetAuthContext("Coke", TENANT_ADMIN)
 	PepsiOrgCtx := mdAuthorizer.GetAuthContext("Pepsi", TENANT_ADMIN)
 

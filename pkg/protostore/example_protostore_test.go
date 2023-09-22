@@ -14,7 +14,7 @@ import (
 func ExampleProtoStore() {
 	// Initialize protostore with proper logger, authorizer and datastore
 	myLogger := datastore.GetCompLogger()
-	mdAuthorizer := authorizer.MetadataBasedAuthorizer{}
+	mdAuthorizer := &authorizer.MetadataBasedAuthorizer{}
 	myDatastore, _ := datastore.FromEnvWithDB(myLogger, mdAuthorizer, nil, "ExampleProtoStore")
 	defer myDatastore.Reset()
 	ctx := mdAuthorizer.GetAuthContext("Coke", "service_admin")

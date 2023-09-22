@@ -41,7 +41,7 @@ const (
 
 type MetadataBasedAuthorizer struct{}
 
-func (s MetadataBasedAuthorizer) GetOrgFromContext(ctx context.Context) (string, error) {
+func (s *MetadataBasedAuthorizer) GetOrgFromContext(ctx context.Context) (string, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		return "", ErrFetchingMetadata
@@ -55,7 +55,7 @@ func (s MetadataBasedAuthorizer) GetOrgFromContext(ctx context.Context) (string,
 	return orgIds[len(orgIds)-1], nil
 }
 
-func (s MetadataBasedAuthorizer) GetMatchingDbRole(ctx context.Context, _ ...string) (dbrole.DbRole, error) {
+func (s *MetadataBasedAuthorizer) GetMatchingDbRole(ctx context.Context, tableNames ...string) (dbrole.DbRole, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		return dbrole.NO_ROLE, ErrFetchingMetadata
@@ -86,6 +86,6 @@ func (s MetadataBasedAuthorizer) GetAuthContext(orgId string, roles ...string) c
 	return metadata.NewIncomingContext(context.Background(), metadata.Pairs(METADATA_KEY_ORGID, orgId, METADATA_KEY_ROLE, roles[0]))
 }
 
-func (s MetadataBasedAuthorizer) GetDefaultOrgAdminContext() context.Context {
+func (s *MetadataBasedAuthorizer) GetDefaultOrgAdminContext() context.Context {
 	return s.GetAuthContext(GLOBAL_DEFAULT_ORG_ID, METADATA_ROLE_ADMIN)
 }

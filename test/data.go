@@ -47,8 +47,8 @@ const (
 
 var (
 	RANDOM_ID              string = uuid.New().String()
-	TestMetadataAuthorizer        = authorizer.MetadataBasedAuthorizer{}
-	TestInstancer                 = authorizer.SimpleInstancer{}
+	TestMetadataAuthorizer        = &authorizer.MetadataBasedAuthorizer{}
+	TestInstancer                 = &authorizer.SimpleInstancer{}
 	ServiceAdminCtx               = TestMetadataAuthorizer.GetAuthContext("", SERVICE_ADMIN)
 	ServiceAuditorCtx             = TestMetadataAuthorizer.GetAuthContext("", SERVICE_AUDITOR)
 	CokeAdminCtx                  = TestMetadataAuthorizer.GetAuthContext(COKE, TENANT_ADMIN)

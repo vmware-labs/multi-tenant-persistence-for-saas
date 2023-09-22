@@ -20,13 +20,13 @@ type Instancer interface {
 
 type SimpleInstancer struct{}
 
-func (s SimpleInstancer) GetInstanceId(ctx context.Context) (string, error) {
+func (s *SimpleInstancer) GetInstanceId(ctx context.Context) (string, error) {
 	if v := ctx.Value(INSTANCE_ID); v != nil {
 		return fmt.Sprintf("%s", v), nil
 	}
 	return "", ErrMissingInstanceId
 }
 
-func (s SimpleInstancer) WithInstanceId(ctx context.Context, instanceId string) context.Context {
+func (s *SimpleInstancer) WithInstanceId(ctx context.Context, instanceId string) context.Context {
 	return context.WithValue(ctx, INSTANCE_ID, instanceId)
 }
