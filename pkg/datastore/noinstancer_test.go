@@ -35,8 +35,8 @@ func TestDataStoreWithoutInstancer(t *testing.T) {
 	p2 := &xUser{uId, "John", 36, "Prod"}
 	p3 := &xUser{"P3", "Pat", 39, "Dev"}
 
-	mdAuthorizer := authorizer.MetadataBasedAuthorizer{}
-	instancer := authorizer.SimpleInstancer{}
+	mdAuthorizer := &authorizer.MetadataBasedAuthorizer{}
+	instancer := &authorizer.SimpleInstancer{}
 
 	DevInstanceCtx := instancer.WithInstanceId(ServiceAdminCtx, "Dev")
 	ProdInstanceCtx := instancer.WithInstanceId(ServiceAdminCtx, "Prod")

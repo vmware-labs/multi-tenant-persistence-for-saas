@@ -206,7 +206,6 @@ func (db *relationalDb) Reset() {
 		}
 	}
 	db.gormDBMap = make(map[dbrole.DbRole]*gorm.DB)
-	db.authorizer = authorizer.MetadataBasedAuthorizer{}
 }
 
 // Find Finds a single record that has the same values as non-zero fields in the record.

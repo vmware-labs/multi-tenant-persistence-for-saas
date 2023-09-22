@@ -52,14 +52,14 @@ func testGettingOrgFromContext(t *testing.T, authorizer Authorizer) {
 }
 
 func TestGettingOrgFromContextWithMetadataAuthorizer(t *testing.T) {
-	testGettingOrgFromContext(t, MetadataBasedAuthorizer{})
+	testGettingOrgFromContext(t, &MetadataBasedAuthorizer{})
 }
 
 // Positive test case.
 func TestGettingMatchingDbRoleWithMetadataBasedAuthorizer(t *testing.T) {
 	assert := assert.New(t)
 
-	authorizer := MetadataBasedAuthorizer{}
+	authorizer := &MetadataBasedAuthorizer{}
 
 	gCtx := authorizer.GetDefaultOrgAdminContext()
 	dbRole, err := authorizer.GetMatchingDbRole(gCtx, "appUser", "app")
@@ -91,7 +91,7 @@ func TestGettingMatchingDbRoleWithMetadataBasedAuthorizer(t *testing.T) {
 Checks if updating role mapping in MetadataBasedAuthorizer works.
 */
 func TestConfiguringMetadataBasedAuthorizer(t *testing.T) {
-	authorizer := MetadataBasedAuthorizer{}
+	authorizer := &MetadataBasedAuthorizer{}
 
 	newRoleMapping := map[string]map[string]dbrole.DbRole{
 		"app": {
