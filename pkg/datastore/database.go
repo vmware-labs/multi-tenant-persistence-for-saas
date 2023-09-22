@@ -342,26 +342,27 @@ func (db *relationalDb) findWithFilterInTable(ctx context.Context, tableName str
 			db.logger.Debug(err)
 			return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 		}
-	} else {
-		if err = tx.Table(tableName).Where(record).Error; err != nil {
-			db.logger.Debug(err)
-			return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
+		if pagination != nil {
+			tx.Offset(pagination.Offset).Limit(pagination.Limit)
+			if pagination.SortBy != "" {
+				tx.Order(pagination.SortBy)
+			}
 		}
-	}
-
-	if pagination != nil {
-		tx.Offset(pagination.Offset).Limit(pagination.Limit)
-		if pagination.SortBy != "" {
-			tx.Order(pagination.SortBy)
-		}
-	}
-
-	if softDelete {
 		if err = tx.Unscoped().Find(records).Error; err != nil {
 			db.logger.Debug(err)
 			return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 		}
 	} else {
+		if err = tx.Table(tableName).Where(record).Error; err != nil {
+			db.logger.Debug(err)
+			return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
+		}
+		if pagination != nil {
+			tx.Offset(pagination.Offset).Limit(pagination.Limit)
+			if pagination.SortBy != "" {
+				tx.Order(pagination.SortBy)
+			}
+		}
 		if err = tx.Find(records).Error; err != nil {
 			db.logger.Debug(err)
 			return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
