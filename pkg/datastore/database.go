@@ -209,6 +209,16 @@ func (db *relationalDb) Reset() {
 	db.authorizer = authorizer.MetadataBasedAuthorizer{}
 }
 
+func (db *relationalDb) commitWhenTxNotInsideCtx(ctx context.Context, tx *gorm.DB) error {
+	if !db.txFetcher.IsTransactionCtx(ctx) {
+		if err := tx.Commit().Error; err != nil {
+			db.logger.Debug(err)
+			return ErrExecutingSqlStmt.Wrap(err)
+		}
+	}
+	return nil
+}
+
 // Find Finds a single record that has the same values as non-zero fields in the record.
 // record argument must be a pointer to a struct and will be modified in-place.
 // Returns ErrRecordNotFound if a record could not be found.
@@ -258,13 +268,7 @@ func (db *relationalDb) find(ctx context.Context, tableName string, record Recor
 			return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 		}
 	}
-	if !db.txFetcher.IsTransactionCtx(ctx) {
-		if err = tx.Commit().Error; err != nil {
-			db.logger.Debug(err)
-			return ErrExecutingSqlStmt.Wrap(err)
-		}
-	}
-	return nil
+	return db.commitWhenTxNotInsideCtx(ctx, tx)
 }
 
 // Finds all records in a DB table.
@@ -342,40 +346,33 @@ func (db *relationalDb) findWithFilterInTable(ctx context.Context, tableName str
 			db.logger.Debug(err)
 			return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 		}
-		if pagination != nil {
-			tx.Offset(pagination.Offset).Limit(pagination.Limit)
-			if pagination.SortBy != "" {
-				tx.Order(pagination.SortBy)
-			}
-		}
-		if err = tx.Unscoped().Find(records).Error; err != nil {
-			db.logger.Debug(err)
-			return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
-		}
 	} else {
 		if err = tx.Table(tableName).Where(record).Error; err != nil {
 			db.logger.Debug(err)
 			return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 		}
-		if pagination != nil {
-			tx.Offset(pagination.Offset).Limit(pagination.Limit)
-			if pagination.SortBy != "" {
-				tx.Order(pagination.SortBy)
-			}
+	}
+
+	if pagination != nil {
+		tx.Offset(pagination.Offset).Limit(pagination.Limit)
+		if pagination.SortBy != "" {
+			tx.Order(pagination.SortBy)
 		}
+	}
+
+	if softDelete {
+		if err = tx.Unscoped().Find(records).Error; err != nil {
+			db.logger.Debug(err)
+			return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
+		}
+	} else {
 		if err = tx.Find(records).Error; err != nil {
 			db.logger.Debug(err)
 			return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 		}
 	}
 
-	if !db.txFetcher.IsTransactionCtx(ctx) {
-		if err = tx.Commit().Error; err != nil {
-			db.logger.Debug(err)
-			return ErrExecutingSqlStmt.Wrap(err)
-		}
-	}
-	return nil
+	return db.commitWhenTxNotInsideCtx(ctx, tx)
 }
 
 /*
@@ -404,11 +401,9 @@ func (db *relationalDb) InsertInTable(ctx context.Context, tableName string, rec
 		db.logger.Debug(err)
 		return 0, ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 	}
-	if !db.txFetcher.IsTransactionCtx(ctx) {
-		if err = tx.Commit().Error; err != nil {
-			db.logger.Debug(err)
-			return 0, ErrExecutingSqlStmt.Wrap(err)
-		}
+	err = db.commitWhenTxNotInsideCtx(ctx, tx)
+	if err != nil {
+		return 0, err
 	}
 	return tx.RowsAffected, nil
 }
@@ -464,11 +459,9 @@ func (db *relationalDb) delete(ctx context.Context, tableName string, record Rec
 			return 0, ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 		}
 	}
-	if !db.txFetcher.IsTransactionCtx(ctx) {
-		if err = tx.Commit().Error; err != nil {
-			db.logger.Debug(err)
-			return 0, ErrExecutingSqlStmt.Wrap(err)
-		}
+	err = db.commitWhenTxNotInsideCtx(ctx, tx)
+	if err != nil {
+		return 0, err
 	}
 	return tx.RowsAffected, nil
 }
@@ -563,11 +556,9 @@ func (db *relationalDb) UpsertInTable(ctx context.Context, tableName string, rec
 			return 0, ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 		}
 	}
-	if !db.txFetcher.IsTransactionCtx(ctx) {
-		if err = tx.Commit().Error; err != nil {
-			db.logger.Debug(err)
-			return 0, ErrExecutingSqlStmt.Wrap(err)
-		}
+	err = db.commitWhenTxNotInsideCtx(ctx, tx)
+	if err != nil {
+		return 0, err
 	}
 	return tx.RowsAffected, nil
 }
@@ -597,11 +588,9 @@ func (db *relationalDb) UpdateInTable(ctx context.Context, tableName string, rec
 			return 0, err
 		}
 	}
-	if !db.txFetcher.IsTransactionCtx(ctx) {
-		if err = tx.Commit().Error; err != nil {
-			db.logger.Debug(err)
-			return 0, ErrExecutingSqlStmt.Wrap(err)
-		}
+	err = db.commitWhenTxNotInsideCtx(ctx, tx)
+	if err != nil {
+		return 0, err
 	}
 	return tx.RowsAffected, nil
 }
