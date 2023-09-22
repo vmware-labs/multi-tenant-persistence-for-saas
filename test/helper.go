@@ -40,6 +40,20 @@ func SetupDataStore(dbName string) (datastore.DataStore, protostore.ProtoStore) 
 	return ds, ps
 }
 
+func SetupDataStoreNoInstancer(dbName string) (datastore.DataStore, protostore.ProtoStore) {
+	cfg := datastore.ConfigFromEnv(dbName)
+	err := datastore.DBCreate(cfg)
+	if err != nil {
+		log.Fatalf("Failed to create database from cfg %+v", cfg)
+	}
+	ds, err := datastore.FromConfig(datastore.GetCompLogger(), TestMetadataAuthorizer, nil /* instancer */, cfg)
+	if err != nil {
+		log.Fatalf("Failed to initialize datastore from cfg %+v", cfg)
+	}
+	ps := protostore.GetProtoStore(datastore.GetCompLogger(), ds)
+	return ds, ps
+}
+
 func DropAllTables(ds datastore.DataStore) {
 	if err := ds.TestHelper().DropTables(&App{}, &AppUser{}, &Group{}); err != nil {
 		log.Fatalf("Failed to drop DB tables: %+v", err)
