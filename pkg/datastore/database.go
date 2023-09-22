@@ -213,11 +213,11 @@ func (db *relationalDb) Reset() {
 // record argument must be a pointer to a struct and will be modified in-place.
 // Returns ErrRecordNotFound if a record could not be found.
 func (db *relationalDb) Find(ctx context.Context, record Record) error {
-	return db.findInTable(ctx, GetTableName(record), record, false)
+	return db.find(ctx, GetTableName(record), record, false)
 }
 
 func (db *relationalDb) FindSoftDeleted(ctx context.Context, record Record) error {
-	return db.findInTable(ctx, GetTableName(record), record, true)
+	return db.find(ctx, GetTableName(record), record, true)
 }
 
 func rollbackTx(tx *gorm.DB, db *relationalDb) {
@@ -229,7 +229,7 @@ func rollbackTx(tx *gorm.DB, db *relationalDb) {
 // Finds a single record that has the same values as non-zero fields in the record.
 // record argument must be a pointer to a struct and will be modified in-place.
 // Returns ErrRecordNotFound if a record could not be found.
-func (db *relationalDb) findInTable(ctx context.Context, tableName string, record Record, softDelete bool) (err error) {
+func (db *relationalDb) find(ctx context.Context, tableName string, record Record, softDelete bool) (err error) {
 	var tx *gorm.DB
 	if tx, err = db.GetDBTransaction(ctx, tableName, record); err != nil {
 		return err
