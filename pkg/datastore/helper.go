@@ -134,7 +134,7 @@ func FromConfig(l *logrus.Entry, a authorizer.Authorizer, instancer authorizer.I
 			}
 
 			// Create Users when the MAIN connection to DB is established
-			for _, dbUserSpec := range getAllDbUsers() {
+			for _, dbUserSpec := range getAllDbUsers("ANY") {
 				stmt := getCreateUserStmt(string(dbUserSpec.username), dbUserSpec.password)
 				if tx := db.gormDBMap[dbrole.MAIN].Exec(stmt); tx.Error != nil {
 					err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt).WithValue(DB_NAME, db.dbName)

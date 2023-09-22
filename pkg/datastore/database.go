@@ -140,6 +140,9 @@ func (db *relationalDb) GetTransaction(ctx context.Context, records ...Record) (
 		if err != nil {
 			return nil, err
 		}
+		if IsMultiInstanced(record, tableName, db.instancer != nil) {
+			tenancyInfo.DbRole = tenancyInfo.DbRole.GetRoleWithInstancer()
+		}
 	}
 	return db.configureTxWithTenancyScope(tenancyInfo)
 }
@@ -599,7 +602,17 @@ func (db *relationalDb) RegisterHelper(_ context.Context, roleMapping map[string
 	}
 
 	// Create users, grant privileges for current table, setup RLS-policies (if multi-tenant)
-	users := getDbUsers(tableName, IsMultiTenanted(record, tableName), IsMultiInstanced(record, tableName, db.instancer != nil))
+	users := getDbUsers(tableName, false, false)
+	if IsMultiTenanted(record, tableName) {
+		users = append(users, getDbUsers(tableName, true, false)...)
+		if IsMultiInstanced(record, tableName, db.instancer != nil) {
+			users = append(users, getDbUsers(tableName, true, true)...)
+		}
+	} else {
+		if IsMultiInstanced(record, tableName, db.instancer != nil) {
+			users = append(users, getDbUsers(tableName, false, true)...)
+		}
+	}
 	for _, dbUserSpec := range users {
 		if err = db.grantPrivileges(dbUserSpec, tableName, record); err != nil {
 			err = ErrRegisteringStruct.Wrap(err).WithMap(map[ErrorContextKey]string{
@@ -710,7 +723,7 @@ func (db *relationalDb) getTenancyInfoFromCtx(ctx context.Context, tableNames ..
 			err = nil
 		}
 	}
-	db.logger.Debugf("Tenancy Info from Context: %+v", tenancyInfo)
+	db.logger.Debugf("Tenancy Info from context for %+v: %+v ", tableNames, tenancyInfo)
 	return err, tenancyInfo
 }
 
