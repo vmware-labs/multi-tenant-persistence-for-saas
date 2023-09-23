@@ -16,15 +16,19 @@
 // specific language governing permissions and limitations
 // under the License.
 
-//	DAL uses 4 database roles/users to perform all operations,
+//	DAL uses following database roles/users to perform all operations,
 //
 //	  - `TENANT_READER` - has read access to its tenant's data
 //	  - `READER` - has read access to all tenants' data
 //	  - `TENANT_WRITER` - has read & write access to its tenant's data
 //	  - `WRITER` - has read & write access to all tenants' data
-//
+
 // Corresponding *INSTANCE_* roles access is determined by the Instancer's configuration,
 // allowing it to access records exclusively with a specific instance.
+//   - `TENANT_INSTANCE_READER` - has read access to its tenant instance's data
+//   - `INSTANCE_READER` - has read access to specific instance data
+//   - `TENANT_INSTANCE_WRITER` - has read & write access to its tenant instance's data
+//   - `INSTANCE_WRITER` - has read & write access to specific instance data
 //
 // DAL allows to map a user's service role to the DB role that will be used for
 // that user. If a user has multiple service roles which map to several DB roles,
@@ -79,6 +83,8 @@ func (dbRole DbRole) IsDbRoleInstanceScoped() bool {
 }
 
 // Map roles to instancer based when Instancer is set.
+// Useful for backward compatibility when role Mapping do not reference *INSTANCE* roles,
+// but an Instancer is configured to limit the access to an instance.
 func (dbRole DbRole) GetRoleWithInstancer() DbRole {
 	switch dbRole {
 	case READER:
@@ -88,22 +94,6 @@ func (dbRole DbRole) GetRoleWithInstancer() DbRole {
 	case TENANT_READER:
 		return TENANT_INSTANCE_READER
 	case TENANT_WRITER:
-		return TENANT_INSTANCE_WRITER
-	default:
-		return dbRole
-	}
-}
-
-// Map roles to tenancy based roles as tenant column is configured.
-func (dbRole DbRole) GetRoleWithTenancy() DbRole {
-	switch dbRole {
-	case READER:
-		return TENANT_READER
-	case WRITER:
-		return TENANT_WRITER
-	case INSTANCE_READER:
-		return TENANT_INSTANCE_READER
-	case INSTANCE_WRITER:
 		return TENANT_INSTANCE_WRITER
 	default:
 		return dbRole

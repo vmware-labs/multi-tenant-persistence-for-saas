@@ -163,6 +163,11 @@ linters-settings:
 
 issues:
   exclude-rules:
+    - path: pkg/authorizer/metadata_authorizer.go
+      linters:
+        - cyclop
+        - gocognit
+        - nestif
     - path: _test\.go
       linters:
         - cyclop

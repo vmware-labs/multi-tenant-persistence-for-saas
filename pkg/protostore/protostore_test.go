@@ -171,7 +171,7 @@ func setupDbContext(t *testing.T, dbName string) protostore.ProtoStore {
 	return p
 }
 
-// setupDbContext creates ProtoStore that uses MetadataAuthorizer and SimpleInstancer
+// setupDbContext creates ProtoStore that uses MetadataAuthorizer and SimpleInstancer.
 func setupDbContextWithInstancer(t *testing.T, dbName string, dropTables bool) protostore.ProtoStore {
 	t.Helper()
 	assert := assert.New(t)
@@ -198,7 +198,7 @@ func setupDbContextWithInstancer(t *testing.T, dbName string, dropTables bool) p
 	return p
 }
 
-// setupDbContext creates ProtoStore that uses MetadataAuthorizer
+// setupDbContext creates ProtoStore that uses MetadataAuthorizer.
 func setupDbContextNoInstancer(t *testing.T, dbName string, dropTables bool) protostore.ProtoStore {
 	t.Helper()
 	assert := assert.New(t)
@@ -332,8 +332,9 @@ func TestProtoStoreInDbFindAll_DifferentProducerConsumer_InitConsumerFirst(t *te
 // (ProtoStore instance that writes data has instancer enabled; ProtoStore instance that reads data does not have instancer enabled).
 
 // testProtoStoreInDbFindAll_DifferentProducerConsumer checks if a ProtoStore instance that has no instancer configured is able to
-// read the data from the DB that was written to the DB by a ProtoStore instance that did have instancer enabled
+// read the data from the DB that was written to the DB by a ProtoStore instance that did have instancer enabled.
 func testProtoStoreInDbFindAll_DifferentProducerConsumer(t *testing.T, pNoInstancer, pWithInstancer protostore.ProtoStore) {
+	t.Helper()
 	assert := assert.New(t)
 
 	t.Log("====================START OF UNIT TEST====================")
@@ -368,7 +369,6 @@ func testProtoStoreInDbFindAll_DifferentProducerConsumer(t *testing.T, pNoInstan
 	sort.Sort(actualQueryResults)
 	assert.Equal(expectedMemoryQueryResults[0].String(), actualQueryResults[0].String())
 	assert.Equal(expectedMemoryQueryResults[1].String(), actualQueryResults[1].String())
-
 }
 
 /*
