@@ -622,15 +622,15 @@ func (db *relationalDb) RegisterHelper(_ context.Context, roleMapping map[string
 // This function considers multi-tenancy and multi-instance configurations to determine
 // the users relevant to the given table.
 func (db *relationalDb) GetDbUsers(record Record, tableName string) []dbUserSpec {
-	users := getDbUsers(tableName, false, false)
-	if IsMultiTenanted(record, tableName) {
-		users = append(users, getDbUsers(tableName, true, false)...)
-		if IsMultiInstanced(record, tableName, db.instancer != nil) {
-			users = append(users, getDbUsers(tableName, true, true)...)
-		}
-	} else if IsMultiInstanced(record, tableName, db.instancer != nil) {
-		users = append(users, getDbUsers(tableName, false, true)...)
-	}
+	tableTenanted := IsMultiTenanted(record, tableName)
+	tableInstanced := IsMultiInstanced(record, tableName, db.instancer != nil)
+	// Create all users but with conditions set based on the role and the table configurations
+	// Tenant role without tenant column would not set the condition for tenant
+	// Insntacer role without instance column would not set the condition for instancer
+	users := getDbUsers(tableName, false, false, false, false)
+	users = append(users, getDbUsers(tableName, true, false, tableTenanted, false)...)
+	users = append(users, getDbUsers(tableName, false, true, false, tableInstanced)...)
+	users = append(users, getDbUsers(tableName, true, true, tableTenanted, tableInstanced)...)
 	return users
 }
 

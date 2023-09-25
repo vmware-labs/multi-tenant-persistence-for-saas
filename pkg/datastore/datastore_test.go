@@ -729,6 +729,6 @@ func TestTransactions(t *testing.T) {
 	assert.NoError(err)
 
 	testSingleTableTransactions(t, ds, ps)
-	// testMultiTableTransactions(t, ds, ps)
-	// testMultiProtoTransactions(t, ds, ps)
+	testMultiTableTransactions(t, ds, ps)
+	testMultiProtoTransactions(t, ds, ps)
 }

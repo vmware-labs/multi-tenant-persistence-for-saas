@@ -73,7 +73,7 @@ func (spec dbUserSpec) String() string {
 }
 
 func getDbUser(dbRole dbrole.DbRole) dbUserSpec {
-	for _, spec := range getAllDbUsers("ANY") {
+	for _, spec := range getAllDbUsers() {
 		if spec.username == dbRole {
 			return spec
 		}
@@ -86,9 +86,9 @@ Generates specifications of 2 DB users:
 - user with read-only access (to specific org/instance)
 - user with read-write access (to specific org/instance)
 All the users have additional conditions to restrict access to records
-belonging to specific instance, if withInstanceIdCheck is set.
+belonging to specific instance, if instancerRole is set.
 */
-func getDbUsers(tableName string, withTenantIdCheck, withInstanceIdCheck bool) []dbUserSpec {
+func getDbUsers(tableName string, tenantRole, instancerRole bool, isTableTenanted, isTableInstanced bool) []dbUserSpec {
 	readerCommands := []string{"SELECT"}
 	writerCommands := []string{"SELECT", "INSERT", "UPDATE", "DELETE"}
 
@@ -96,23 +96,28 @@ func getDbUsers(tableName string, withTenantIdCheck, withInstanceIdCheck bool) [
 	instanceCond := COLUMN_INSTANCEID + " = current_setting('" + DbConfigInstanceId + "')"
 	tenantInstanceCond := tenantCond + " AND " + instanceCond
 
-	cond := "true"
 	rwUser := dbrole.WRITER
 	rUser := dbrole.READER
-
 	switch {
-	case withInstanceIdCheck && withTenantIdCheck:
-		cond = tenantInstanceCond
+	case tenantRole && instancerRole:
 		rwUser = dbrole.TENANT_INSTANCE_WRITER
 		rUser = dbrole.TENANT_INSTANCE_READER
-	case withTenantIdCheck:
-		cond = tenantCond
+	case tenantRole:
 		rwUser = dbrole.TENANT_WRITER
 		rUser = dbrole.TENANT_READER
-	case withInstanceIdCheck:
-		cond = instanceCond
+	case instancerRole:
 		rwUser = dbrole.INSTANCE_WRITER
 		rUser = dbrole.INSTANCE_READER
+	}
+
+	cond := "true"
+	switch {
+	case isTableInstanced && isTableTenanted:
+		cond = tenantInstanceCond
+	case isTableTenanted:
+		cond = tenantCond
+	case isTableInstanced:
+		cond = instanceCond
 	}
 
 	writer := dbUserSpec{
@@ -134,8 +139,8 @@ func getDbUsers(tableName string, withTenantIdCheck, withInstanceIdCheck bool) [
 		dbUsers[i].password = getPassword(string(dbUsers[i].username))
 		dbUsers[i].policyName = getRlsPolicyName(string(dbUsers[i].username), tableName)
 	}
-	TRACE("Returning DB user specs for table %q:\n\twithTenantIdCheck - %t\n\twithInstanceIdCheck -  %t\n\tdbUsers - %+v\n",
-		tableName, withTenantIdCheck, withInstanceIdCheck, dbUsers)
+	TRACE("Returning DB user specs for table %q:\n\t[roleT=%s, roleI=%s, tableT=%s, tableI=%s]\n\tdbUsers - %+v\n",
+		tableName, tenantRole, instancerRole, isTableTenanted, isTableInstanced, dbUsers)
 	return dbUsers
 }
 
@@ -147,11 +152,12 @@ func getPassword(username string) string {
 	return strconv.FormatInt(int64(h.Sum32()), 16)
 }
 
-func getAllDbUsers(tableName string) []dbUserSpec {
+func getAllDbUsers() []dbUserSpec {
+	tableName := "ANY" // The returned user specs are for creating users only not policies
 	allDbUsers := make([]dbUserSpec, 0)
-	allDbUsers = append(allDbUsers, getDbUsers(tableName, false, false)...)
-	allDbUsers = append(allDbUsers, getDbUsers(tableName, false, true)...)
-	allDbUsers = append(allDbUsers, getDbUsers(tableName, true, false)...)
-	allDbUsers = append(allDbUsers, getDbUsers(tableName, true, true)...)
+	allDbUsers = append(allDbUsers, getDbUsers(tableName, false, false, true, true)...)
+	allDbUsers = append(allDbUsers, getDbUsers(tableName, false, true, false, true)...)
+	allDbUsers = append(allDbUsers, getDbUsers(tableName, true, false, true, false)...)
+	allDbUsers = append(allDbUsers, getDbUsers(tableName, true, true, true, true)...)
 	return allDbUsers
 }
