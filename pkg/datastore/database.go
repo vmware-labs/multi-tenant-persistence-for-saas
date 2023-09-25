@@ -219,6 +219,12 @@ func (db *relationalDb) commitWhenTxNotInsideCtx(ctx context.Context, tx *gorm.D
 	return nil
 }
 
+func rollbackTx(tx *gorm.DB, db *relationalDb) {
+	if err := tx.Rollback().Error; err != nil && err != sql.ErrTxDone {
+		db.logger.Debug(err)
+	}
+}
+
 // Find Finds a single record that has the same values as non-zero fields in the record.
 // record argument must be a pointer to a struct and will be modified in-place.
 // Returns ErrRecordNotFound if a record could not be found.
@@ -228,12 +234,6 @@ func (db *relationalDb) Find(ctx context.Context, record Record) error {
 
 func (db *relationalDb) FindSoftDeleted(ctx context.Context, record Record) error {
 	return db.find(ctx, GetTableName(record), record, true)
-}
-
-func rollbackTx(tx *gorm.DB, db *relationalDb) {
-	if err := tx.Rollback().Error; err != nil && err != sql.ErrTxDone {
-		db.logger.Debug(err)
-	}
 }
 
 // Finds a single record that has the same values as non-zero fields in the record.
