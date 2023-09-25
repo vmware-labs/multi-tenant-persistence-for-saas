@@ -206,7 +206,6 @@ func (db *relationalDb) Reset() {
 		}
 	}
 	db.gormDBMap = make(map[dbrole.DbRole]*gorm.DB)
-	db.authorizer = authorizer.MetadataBasedAuthorizer{}
 }
 
 func (db *relationalDb) commitWhenTxNotInsideCtx(ctx context.Context, tx *gorm.DB) error {

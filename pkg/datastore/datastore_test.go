@@ -558,7 +558,7 @@ func TestWithMissingEnvVar(t *testing.T) {
 	} {
 		defer os.Setenv(envVar, os.Getenv(envVar))
 		os.Unsetenv(envVar)
-		assert.Panics(func() { _, _ = datastore.FromEnv(LOG, TestMetadataAuthorizer, authorizer.SimpleInstancer{}) })
+		assert.Panics(func() { _, _ = datastore.FromEnv(LOG, TestMetadataAuthorizer, &authorizer.SimpleInstancer{}) })
 	}
 }
 
@@ -571,7 +571,7 @@ func TestWithEmptyEnvVar(t *testing.T) {
 	} {
 		defer os.Setenv(envVar, os.Getenv(envVar))
 		os.Setenv(envVar, "")
-		assert.Panics(func() { _, _ = datastore.FromEnv(LOG, TestMetadataAuthorizer, authorizer.SimpleInstancer{}) })
+		assert.Panics(func() { _, _ = datastore.FromEnv(LOG, TestMetadataAuthorizer, &authorizer.SimpleInstancer{}) })
 	}
 }
 
@@ -584,7 +584,7 @@ func TestWithBlankEnvVar(t *testing.T) {
 	} {
 		defer os.Setenv(envVar, os.Getenv(envVar))
 		os.Setenv(envVar, "    ")
-		assert.Panics(func() { _, _ = datastore.FromEnv(LOG, TestMetadataAuthorizer, authorizer.SimpleInstancer{}) })
+		assert.Panics(func() { _, _ = datastore.FromEnv(LOG, TestMetadataAuthorizer, &authorizer.SimpleInstancer{}) })
 	}
 }
 
