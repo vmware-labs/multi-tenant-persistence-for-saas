@@ -252,7 +252,7 @@ func GetTableName(x interface{}) (tableName string) {
 
 // Generates RLS-policy name based on database role/user and table name.
 func getRlsPolicyName(username string, tableName string) string {
-	policyName := strings.ToLower(username + "_" + tableName + "_policy")
+	policyName := strings.ToLower(username + "_" + tableName + "_policy_v2")
 	policyName = strings.ReplaceAll(policyName, "\"", "")
 	return policyName
 }

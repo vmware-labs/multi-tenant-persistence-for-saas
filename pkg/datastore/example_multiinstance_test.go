@@ -47,8 +47,8 @@ func ExampleDataStore_multiInstance() {
 
 	// Registers the necessary structs with their corresponding role mappings.
 	roleMapping := map[string]dbrole.DbRole{
-		SERVICE_AUDITOR: dbrole.READER,
-		SERVICE_ADMIN:   dbrole.WRITER,
+		SERVICE_AUDITOR: dbrole.INSTANCE_READER,
+		SERVICE_ADMIN:   dbrole.INSTANCE_WRITER,
 	}
 	if err = ds.Register(context.TODO(), roleMapping, &Person{}); err != nil {
 		log.Fatalf("Failed to create DB tables: %+v", err)

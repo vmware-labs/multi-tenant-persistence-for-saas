@@ -40,6 +40,20 @@ func SetupDataStore(dbName string) (datastore.DataStore, protostore.ProtoStore) 
 	return ds, ps
 }
 
+func SetupDataStoreNoInstancer(dbName string) (datastore.DataStore, protostore.ProtoStore) {
+	cfg := datastore.ConfigFromEnv(dbName)
+	err := datastore.DBCreate(cfg)
+	if err != nil {
+		log.Fatalf("Failed to create database from cfg %+v", cfg)
+	}
+	ds, err := datastore.FromConfig(datastore.GetCompLogger(), TestMetadataAuthorizer, nil /* instancer */, cfg)
+	if err != nil {
+		log.Fatalf("Failed to initialize datastore from cfg %+v", cfg)
+	}
+	ps := protostore.GetProtoStore(datastore.GetCompLogger(), ds)
+	return ds, ps
+}
+
 func DropAllTables(ds datastore.DataStore) {
 	if err := ds.TestHelper().DropTables(&App{}, &AppUser{}, &Group{}); err != nil {
 		log.Fatalf("Failed to drop DB tables: %+v", err)
@@ -55,7 +69,20 @@ func RecreateAllTables(ds datastore.DataStore) {
 		SERVICE_ADMIN:   dbrole.WRITER,
 	}
 
-	for _, record := range []datastore.Record{&App{}, &AppUser{}, &Group{}} {
+	for _, record := range []datastore.Record{&App{}} {
+		if err := ds.Register(ServiceAdminCtx, roleMapping, record); err != nil {
+			log.Fatalf("Failed to create DB tables: %+v", err)
+		}
+	}
+
+	roleMapping = map[string]dbrole.DbRole{
+		TENANT_AUDITOR:  dbrole.READER,
+		TENANT_ADMIN:    dbrole.WRITER,
+		SERVICE_AUDITOR: dbrole.READER,
+		SERVICE_ADMIN:   dbrole.WRITER,
+	}
+
+	for _, record := range []datastore.Record{&AppUser{}, &Group{}} {
 		if err := ds.Register(ServiceAdminCtx, roleMapping, record); err != nil {
 			log.Fatalf("Failed to create DB tables: %+v", err)
 		}

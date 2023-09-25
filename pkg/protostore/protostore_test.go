@@ -171,6 +171,60 @@ func setupDbContext(t *testing.T, dbName string) protostore.ProtoStore {
 	return p
 }
 
+// setupDbContext creates ProtoStore that uses MetadataAuthorizer and SimpleInstancer.
+func setupDbContextWithInstancer(t *testing.T, dbName string, dropTables bool) protostore.ProtoStore {
+	t.Helper()
+	assert := assert.New(t)
+	_, p := SetupDataStore(dbName)
+	protoMsgs := []proto.Message{
+		&pb.CPU{},
+		&pb.Memory{},
+	}
+
+	if dropTables {
+		if err := p.DropTables(protoMsgs...); err != nil {
+			assert.FailNow("Dropping tables failed with error: " + err.Error())
+		}
+	}
+
+	roleMapping := map[string]dbrole.DbRole{
+		TENANT_AUDITOR:  dbrole.TENANT_READER,
+		TENANT_ADMIN:    dbrole.TENANT_WRITER,
+		SERVICE_AUDITOR: dbrole.READER,
+		SERVICE_ADMIN:   dbrole.WRITER,
+	}
+	err := p.Register(context.TODO(), roleMapping, protoMsgs...)
+	assert.NoError(err)
+	return p
+}
+
+// setupDbContext creates ProtoStore that uses MetadataAuthorizer.
+func setupDbContextNoInstancer(t *testing.T, dbName string, dropTables bool) protostore.ProtoStore {
+	t.Helper()
+	assert := assert.New(t)
+	_, p := SetupDataStoreNoInstancer(dbName)
+	protoMsgs := []proto.Message{
+		&pb.CPU{},
+		&pb.Memory{},
+	}
+
+	if dropTables {
+		if err := p.DropTables(protoMsgs...); err != nil {
+			assert.FailNow("Dropping tables failed with error: " + err.Error())
+		}
+	}
+
+	roleMapping := map[string]dbrole.DbRole{
+		TENANT_AUDITOR:  dbrole.TENANT_READER,
+		TENANT_ADMIN:    dbrole.TENANT_WRITER,
+		SERVICE_AUDITOR: dbrole.READER,
+		SERVICE_ADMIN:   dbrole.WRITER,
+	}
+	err := p.Register(context.TODO(), roleMapping, protoMsgs...)
+	assert.NoError(err)
+	return p
+}
+
 func TestProtoStoreInDbFindWithInvalidParams(t *testing.T) {
 	p := setupDbContext(t, "TestProtoStoreInDbFindWithInvalidParams")
 	testProtoStoreFindWithInvalidParams(t, p, AmericasPepsiAdminCtx)
@@ -239,6 +293,82 @@ func testProtoStoreFindWithInvalidParams(t *testing.T, p protostore.ProtoStore, 
 			assert.NoError(err)
 		}
 	}
+}
+
+/*
+TestProtoStoreInDbFindAll_DifferentProducerConsumer_InitProducerFirst checks if the "consumer" (who uses ProtoStore instance
+with instancer DISABLED) is able to read data written to the DB by the "producer" (who uses ProtoStore instance with
+instancer ENABLED). The producer will insert Protobuf messages into the DB and fill out instance_id column of the table.
+
+The test case will first initialize "producer's" ProtoStore instance and later "consumer's" one.
+*/
+func TestProtoStoreInDbFindAll_DifferentProducerConsumer_InitProducerFirst(t *testing.T) {
+	const dbName = "TestProtoStoreInDbFindAll_DifferentProducerConsumer"
+	t.Log("Dropping all DB tables...")
+	t.Log("Creating producer's ProtoStore instance (instancer ENABLED)")
+	pNoInstancer := setupDbContextNoInstancer(t, dbName, true /* dropTables */)
+
+	t.Log("Creating consumer's ProtoStore instance (instancer DISABLED)")
+	pWithInstancer := setupDbContextWithInstancer(t, dbName, false /* dropTables */)
+
+	testProtoStoreInDbFindAll_DifferentProducerConsumer(t, pNoInstancer, pWithInstancer)
+}
+
+// Same as TestProtoStoreInDbFindAll_DifferentProducerConsumer_InitProducerFirst, but "consumer's" ProtoStore instance
+// is initialized first.
+func TestProtoStoreInDbFindAll_DifferentProducerConsumer_InitConsumerFirst(t *testing.T) {
+	const dbName = "TestProtoStoreInDbFindAll_DifferentProducerConsumer"
+	t.Log("Dropping all DB tables...")
+	t.Log("Creating consumer's ProtoStore instance (instancer DISABLED)")
+	pWithInstancer := setupDbContextWithInstancer(t, dbName, true /* dropTables */)
+
+	t.Log("Creating producer's ProtoStore instance (instancer ENABLED)")
+	pNoInstancer := setupDbContextNoInstancer(t, dbName, false /* dropTables */)
+
+	testProtoStoreInDbFindAll_DifferentProducerConsumer(t, pNoInstancer, pWithInstancer)
+}
+
+// Same as TestProtoStoreInDbFindAll, but different ProtoStore instances are used to read and write data
+// (ProtoStore instance that writes data has instancer enabled; ProtoStore instance that reads data does not have instancer enabled).
+
+// testProtoStoreInDbFindAll_DifferentProducerConsumer checks if a ProtoStore instance that has no instancer configured is able to
+// read the data from the DB that was written to the DB by a ProtoStore instance that did have instancer enabled.
+func testProtoStoreInDbFindAll_DifferentProducerConsumer(t *testing.T, pNoInstancer, pWithInstancer protostore.ProtoStore) {
+	t.Helper()
+	assert := assert.New(t)
+
+	t.Log("====================START OF UNIT TEST====================")
+	memMsg1, memMsg2 := pb.Memory{}, pb.Memory{}
+	for _, protoMsg := range []proto.Message{&memMsg1, &memMsg2} {
+		_ = faker.FakeData(protoMsg)
+	}
+
+	t.Log("Inserting Pepsi's data into DB under Americas instance")
+	rowsAffected, md, err := pWithInstancer.Insert(AmericasPepsiAdminCtx, P1, &memMsg1)
+	assert.NoError(err)
+	assert.Equal(int64(1), rowsAffected)
+	assert.Equal(P1, md.Id)
+	assert.Equal(int64(1), md.Revision)
+
+	rowsAffected, md, err = pWithInstancer.Insert(AmericasPepsiAdminCtx, P2, &memMsg2)
+	assert.NoError(err)
+	assert.Equal(int64(1), rowsAffected)
+	assert.Equal(P2, md.Id)
+	assert.Equal(int64(1), md.Revision)
+
+	t.Log("Checking if Pepsi's data is visible to Pepsi admin (no instancer configured)")
+	var expectedMemoryQueryResults MemoryPtrSlice = []*pb.Memory{&memMsg1, &memMsg2}
+	sort.Sort(expectedMemoryQueryResults)
+	var actualQueryResults MemorySlice = make([]pb.Memory, 0)
+
+	metadataMap, err := pNoInstancer.FindAll(PepsiAdminCtx, &actualQueryResults, datastore.NoPagination())
+	assert.NoError(err)
+	assert.Len(actualQueryResults, 2)
+	assert.Len(metadataMap, 2)
+
+	sort.Sort(actualQueryResults)
+	assert.Equal(expectedMemoryQueryResults[0].String(), actualQueryResults[0].String())
+	assert.Equal(expectedMemoryQueryResults[1].String(), actualQueryResults[1].String())
 }
 
 /*
