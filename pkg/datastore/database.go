@@ -49,6 +49,7 @@ import (
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
 	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/errors"
+	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/logutils"
 )
 
 const (

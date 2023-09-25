@@ -23,6 +23,7 @@ import (
 
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/datastore"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/logutils"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/protostore"
 )
 
@@ -32,11 +33,11 @@ func SetupDataStore(dbName string) (datastore.DataStore, protostore.ProtoStore) 
 	if err != nil {
 		log.Fatalf("Failed to create database from cfg %+v", cfg)
 	}
-	ds, err := datastore.FromConfig(datastore.GetCompLogger(), TestMetadataAuthorizer, TestInstancer, cfg)
+	ds, err := datastore.FromConfig(logutils.GetCompLogger(), TestMetadataAuthorizer, TestInstancer, cfg)
 	if err != nil {
 		log.Fatalf("Failed to initialize datastore from cfg %+v", cfg)
 	}
-	ps := protostore.GetProtoStore(datastore.GetCompLogger(), ds)
+	ps := protostore.GetProtoStore(logutils.GetCompLogger(), ds)
 	return ds, ps
 }
 
@@ -46,11 +47,11 @@ func SetupDataStoreNoInstancer(dbName string) (datastore.DataStore, protostore.P
 	if err != nil {
 		log.Fatalf("Failed to create database from cfg %+v", cfg)
 	}
-	ds, err := datastore.FromConfig(datastore.GetCompLogger(), TestMetadataAuthorizer, nil /* instancer */, cfg)
+	ds, err := datastore.FromConfig(logutils.GetCompLogger(), TestMetadataAuthorizer, nil /* instancer */, cfg)
 	if err != nil {
 		log.Fatalf("Failed to initialize datastore from cfg %+v", cfg)
 	}
-	ps := protostore.GetProtoStore(datastore.GetCompLogger(), ds)
+	ps := protostore.GetProtoStore(logutils.GetCompLogger(), ds)
 	return ds, ps
 }
 

@@ -13,6 +13,7 @@ import (
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/datastore"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/logutils"
 	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/test"
 )
 
@@ -41,7 +42,7 @@ func TestDataStoreWithoutInstancer(t *testing.T) {
 	DevInstanceCtx := instancer.WithInstanceId(ServiceAdminCtx, "Dev")
 	ProdInstanceCtx := instancer.WithInstanceId(ServiceAdminCtx, "Prod")
 
-	ds, _ := datastore.FromEnv(datastore.GetCompLogger(), mdAuthorizer, nil)
+	ds, _ := datastore.FromEnvWithDB(logutils.GetCompLogger(), mdAuthorizer, nil, "TestDataStoreWithoutInstancer")
 	defer ds.Reset()
 	roleMapping := map[string]dbrole.DbRole{
 		SERVICE_AUDITOR: dbrole.READER,
