@@ -25,6 +25,7 @@ import (
 	"strconv"
 
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
+	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/logutils"
 )
 
 // Specifications for database user.
@@ -139,7 +140,7 @@ func getDbUsers(tableName string, tenantRole, instancerRole bool, isTableTenante
 		dbUsers[i].password = getPassword(string(dbUsers[i].username))
 		dbUsers[i].policyName = getRlsPolicyName(string(dbUsers[i].username), tableName)
 	}
-	TRACE("Returning DB user specs for table %q:\n\t[roleT=%s, roleI=%s, tableT=%s, tableI=%s]\n\tdbUsers - %+v\n",
+	TRACE("Returning DB user specs for table %q:\n\t[tenantRole=%t, instancerRole=%t, isTableTenanted=%t, isTableInstanced=%t]\n\n\tdbUsers - %+v\n",
 		tableName, tenantRole, instancerRole, isTableTenanted, isTableInstanced, dbUsers)
 	return dbUsers
 }

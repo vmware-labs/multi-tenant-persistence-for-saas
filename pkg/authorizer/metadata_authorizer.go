@@ -26,6 +26,7 @@ import (
 
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
 	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/errors"
+	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/logutils"
 )
 
 const (
@@ -106,11 +107,11 @@ func (s *MetadataBasedAuthorizer) GetMatchingDbRole(ctx context.Context, tableNa
 
 func (s *MetadataBasedAuthorizer) Configure(tableName string, roleMapping map[string]dbrole.DbRole) {
 	if s.roleMapping == nil {
-		// TRACE("RoleMapping: setting to NEWMAP")
+		TRACE("RoleMapping: setting to NEWMAP")
 		s.roleMapping = make(map[string]map[string]dbrole.DbRole)
 	}
 	s.roleMapping[tableName] = roleMapping
-	// TRACE("RoleMapping: configured for table %s: %+v", tableName, s.roleMapping)
+	TRACE("RoleMapping: configured for table %s: %+v", tableName, s.roleMapping)
 }
 
 func (s *MetadataBasedAuthorizer) GetAuthContext(orgId string, roles ...string) context.Context {

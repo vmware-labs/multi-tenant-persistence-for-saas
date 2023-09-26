@@ -304,7 +304,6 @@ The test case will first initialize "producer's" ProtoStore instance and later "
 */
 func TestProtoStoreInDbFindAll_DifferentProducerConsumer_InitProducerFirst(t *testing.T) {
 	const dbName = "TestProtoStoreInDbFindAll_DifferentProducerConsumer"
-	t.Log("Dropping all DB tables...")
 	t.Log("Creating producer's ProtoStore instance (instancer ENABLED)")
 	pNoInstancer := setupDbContextNoInstancer(t, dbName, true /* dropTables */)
 
@@ -318,7 +317,6 @@ func TestProtoStoreInDbFindAll_DifferentProducerConsumer_InitProducerFirst(t *te
 // is initialized first.
 func TestProtoStoreInDbFindAll_DifferentProducerConsumer_InitConsumerFirst(t *testing.T) {
 	const dbName = "TestProtoStoreInDbFindAll_DifferentProducerConsumer"
-	t.Log("Dropping all DB tables...")
 	t.Log("Creating consumer's ProtoStore instance (instancer DISABLED)")
 	pWithInstancer := setupDbContextWithInstancer(t, dbName, true /* dropTables */)
 
@@ -337,7 +335,6 @@ func testProtoStoreInDbFindAll_DifferentProducerConsumer(t *testing.T, pNoInstan
 	t.Helper()
 	assert := assert.New(t)
 
-	t.Log("====================START OF UNIT TEST====================")
 	memMsg1, memMsg2 := pb.Memory{}, pb.Memory{}
 	for _, protoMsg := range []proto.Message{&memMsg1, &memMsg2} {
 		_ = faker.FakeData(protoMsg)

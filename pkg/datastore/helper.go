@@ -33,6 +33,7 @@ import (
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
 	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/errors"
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/logutils"
 )
 
 const (
@@ -113,7 +114,7 @@ func FromEnvWithDB(l *logrus.Entry, a authorizer.Authorizer, instancer authorize
 }
 
 func FromConfig(l *logrus.Entry, a authorizer.Authorizer, instancer authorizer.Instancer, cfg DBConfig) (d DataStore, err error) {
-	gl := GetGormLogger(l)
+	gl := logutils.GetGormLogger(l)
 	dbConnInitializer := func(db *relationalDb, dbRole dbrole.DbRole) error {
 		db.Lock()
 		defer db.Unlock()

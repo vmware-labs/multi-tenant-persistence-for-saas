@@ -24,6 +24,8 @@ import (
 	"sync"
 
 	"gorm.io/gorm/schema"
+
+	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/logutils"
 )
 
 // Library processing all the golang tags in the struct into SQL domain

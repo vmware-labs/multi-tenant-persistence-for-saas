@@ -31,6 +31,7 @@ import (
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/datastore"
 	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/errors"
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/logutils"
 	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/test"
 )
 
@@ -123,10 +124,10 @@ func testTxCrud(t *testing.T, ds datastore.DataStore, ctx context.Context, user1
 }
 
 func BenchmarkTxCrud(b *testing.B) {
-	logger := datastore.GetLogger()
+	logger := logutils.GetLogger()
 	logger.SetLevel(logrus.FatalLevel)
 	logger.SetOutput(io.Discard)
-	LOG = logger.WithField(datastore.COMP, datastore.SAAS_PERSISTENCE)
+	LOG = logger.WithField(logutils.COMP, logutils.SAAS_PERSISTENCE)
 
 	var t testing.T
 	ds, _ := SetupDataStore("BenchmarkTxCrud")
