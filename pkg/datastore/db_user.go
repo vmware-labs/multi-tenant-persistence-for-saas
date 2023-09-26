@@ -25,6 +25,7 @@ import (
 	"strconv"
 
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
+	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/logutils"
 )
 
 // Specifications for database user.
@@ -82,67 +83,65 @@ func getDbUser(dbRole dbrole.DbRole) dbUserSpec {
 }
 
 /*
-Generates specifications of 4 DB users:
-- user with read-only access to his org
-- user with read & write access to his org
-- user with read-only access to all orgs
-- user with read & write access to all orgs.
+Generates specifications of 2 DB users:
+- user with read-only access (to specific org/instance)
+- user with read-write access (to specific org/instance)
 All the users have additional conditions to restrict access to records
-belonging to specific instance, if withInstanceIdCheck is set.
+belonging to specific instance, if instancerRole is set.
 */
-func getDbUsers(tableName string, withTenantIdCheck, withInstanceIdCheck bool) []dbUserSpec {
+func getDbUsers(tableName string, tenantRole, instancerRole bool, isTableTenanted, isTableInstanced bool) []dbUserSpec {
+	readerCommands := []string{"SELECT"}
+	writerCommands := []string{"SELECT", "INSERT", "UPDATE", "DELETE"}
+
+	tenantCond := COLUMN_ORGID + " = current_setting('" + DbConfigOrgId + "')"
+	instanceCond := COLUMN_INSTANCEID + " = current_setting('" + DbConfigInstanceId + "')"
+	tenantInstanceCond := tenantCond + " AND " + instanceCond
+
+	rwUser := dbrole.WRITER
+	rUser := dbrole.READER
+	switch {
+	case tenantRole && instancerRole:
+		rwUser = dbrole.TENANT_INSTANCE_WRITER
+		rUser = dbrole.TENANT_INSTANCE_READER
+	case tenantRole:
+		rwUser = dbrole.TENANT_WRITER
+		rUser = dbrole.TENANT_READER
+	case instancerRole:
+		rwUser = dbrole.INSTANCE_WRITER
+		rUser = dbrole.INSTANCE_READER
+	}
+
 	cond := "true"
-	if withInstanceIdCheck {
-		cond = COLUMN_INSTANCEID + " = current_setting('" + DbConfigInstanceId + "')"
+	switch {
+	case isTableInstanced && isTableTenanted:
+		cond = tenantInstanceCond
+	case isTableTenanted:
+		cond = tenantCond
+	case isTableInstanced:
+		cond = instanceCond
 	}
 
 	writer := dbUserSpec{
-		username:         dbrole.WRITER,
-		commands:         []string{"SELECT", "INSERT", "UPDATE", "DELETE"},
+		username:         rwUser,
+		commands:         writerCommands,
 		existingRowsCond: cond, // Allow access to all existing records
 		newRowsCond:      cond, // Allow inserting or updating records
 	}
 
 	reader := dbUserSpec{
-		username:         dbrole.READER,
-		commands:         []string{"SELECT"}, // Allow to perform SELECT on all records
-		existingRowsCond: cond,               // Allow access to all existing records
-		newRowsCond:      "false",            // Prevent inserting or updating records
+		username:         rUser,
+		commands:         readerCommands,
+		existingRowsCond: cond,    // Allow access to all existing records
+		newRowsCond:      "false", // Prevent inserting or updating records
 	}
 
-	rlsCond := "true"
-	if withTenantIdCheck && withInstanceIdCheck {
-		rlsCond = COLUMN_ORGID + " = current_setting('" + DbConfigOrgId + "')"
-		rlsCond += " AND " + COLUMN_INSTANCEID + " = current_setting('" + DbConfigInstanceId + "')"
-	}
-	if !withTenantIdCheck && withInstanceIdCheck {
-		rlsCond = COLUMN_INSTANCEID + " = current_setting('" + DbConfigInstanceId + "')"
-	}
-	if withTenantIdCheck && !withInstanceIdCheck {
-		rlsCond = COLUMN_ORGID + " = current_setting('" + DbConfigOrgId + "')"
-	}
-
-	tenantWriter := dbUserSpec{
-		username:         dbrole.TENANT_WRITER,
-		commands:         []string{"SELECT", "INSERT", "UPDATE", "DELETE"},
-		existingRowsCond: rlsCond, // Allow access only to its tenant's records
-		newRowsCond:      rlsCond, // Allow inserting for or updating records of its own tenant
-	}
-
-	tenantReader := dbUserSpec{
-		username:         dbrole.TENANT_READER,
-		commands:         []string{"SELECT"}, // Allow to perform SELECT on its tenant's records
-		existingRowsCond: rlsCond,            // Allow access only to its tenant's records
-		newRowsCond:      "false",            // Prevent inserting or updating records
-	}
-
-	dbUsers := []dbUserSpec{writer, reader, tenantWriter, tenantReader}
+	dbUsers := []dbUserSpec{writer, reader}
 	for i := 0; i < len(dbUsers); i++ {
 		dbUsers[i].password = getPassword(string(dbUsers[i].username))
 		dbUsers[i].policyName = getRlsPolicyName(string(dbUsers[i].username), tableName)
 	}
-	TRACE("Returning DB user specs for table %q:\n\twithTenantIdCheck - %t\n\twithInstanceIdCheck -  %t\n\tdbUsers - %+v\n",
-		tableName, withTenantIdCheck, withInstanceIdCheck, dbUsers)
+	TRACE("Returning DB user specs for table %q:\n\t[tenantRole=%t, instancerRole=%t, isTableTenanted=%t, isTableInstanced=%t]\n\n\tdbUsers - %+v\n",
+		tableName, tenantRole, instancerRole, isTableTenanted, isTableInstanced, dbUsers)
 	return dbUsers
 }
 
@@ -155,5 +154,11 @@ func getPassword(username string) string {
 }
 
 func getAllDbUsers() []dbUserSpec {
-	return getDbUsers("ANY", false, false) // Used for creating users only
+	tableName := "ANY" // The returned user specs are for creating users only not policies
+	allDbUsers := make([]dbUserSpec, 0)
+	allDbUsers = append(allDbUsers, getDbUsers(tableName, false, false, true, true)...)
+	allDbUsers = append(allDbUsers, getDbUsers(tableName, false, true, false, true)...)
+	allDbUsers = append(allDbUsers, getDbUsers(tableName, true, false, true, false)...)
+	allDbUsers = append(allDbUsers, getDbUsers(tableName, true, true, true, true)...)
+	return allDbUsers
 }

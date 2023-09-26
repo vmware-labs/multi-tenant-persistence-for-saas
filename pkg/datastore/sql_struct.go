@@ -24,6 +24,8 @@ import (
 	"sync"
 
 	"gorm.io/gorm/schema"
+
+	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/logutils"
 )
 
 // Library processing all the golang tags in the struct into SQL domain
@@ -252,7 +254,7 @@ func GetTableName(x interface{}) (tableName string) {
 
 // Generates RLS-policy name based on database role/user and table name.
 func getRlsPolicyName(username string, tableName string) string {
-	policyName := strings.ToLower(username + "_" + tableName + "_policy")
+	policyName := strings.ToLower(username + "_" + tableName + "_policy_v2")
 	policyName = strings.ReplaceAll(policyName, "\"", "")
 	return policyName
 }

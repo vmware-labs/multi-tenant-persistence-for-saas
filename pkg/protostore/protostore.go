@@ -488,7 +488,7 @@ func (p ProtobufDataStore) DeleteById(ctx context.Context, id string, msg proto.
 func (p ProtobufDataStore) DropTables(msgs ...proto.Message) error {
 	for _, msg := range msgs {
 		tableName := datastore.GetTableName(msg)
-		p.logger.Infof("Dropping Table for %s", tableName)
+		p.logger.Debugf("Dropping Table for %s", tableName)
 		err := p.ds.TestHelper().DropTables(tableName)
 		if err != nil {
 			return err

@@ -37,6 +37,7 @@ import (
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/datastore"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
 	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/errors"
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/logutils"
 	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/test"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/test/pb"
 )
@@ -179,17 +180,17 @@ func testCrud(t *testing.T, ds datastore.DataStore, ctx context.Context, myCokeA
 }
 
 func TestMain(m *testing.M) {
-	LOG = datastore.GetCompLogger()
+	LOG = logutils.GetCompLogger()
 
 	code := m.Run()
 	os.Exit(code)
 }
 
 func BenchmarkCrud(b *testing.B) {
-	logger := datastore.GetLogger()
+	logger := logutils.GetLogger()
 	logger.SetLevel(logrus.FatalLevel)
 	logger.SetOutput(io.Discard)
-	LOG = logger.WithField(datastore.COMP, datastore.SAAS_PERSISTENCE)
+	LOG = logger.WithField(logutils.COMP, logutils.SAAS_PERSISTENCE)
 
 	var t testing.T
 	ds, _ := SetupDataStore("BenchmarkCrud")
@@ -618,10 +619,10 @@ func TestRevision(t *testing.T) {
 		assert.FailNow("Failed to drop DB tables for the following reason:\n" + err.Error())
 	}
 	roleMapping := map[string]dbrole.DbRole{
-		TENANT_AUDITOR:  dbrole.TENANT_READER,
-		TENANT_ADMIN:    dbrole.TENANT_WRITER,
-		SERVICE_AUDITOR: dbrole.READER,
-		SERVICE_ADMIN:   dbrole.WRITER,
+		TENANT_AUDITOR:  dbrole.INSTANCE_READER,
+		TENANT_ADMIN:    dbrole.INSTANCE_WRITER,
+		SERVICE_AUDITOR: dbrole.INSTANCE_READER,
+		SERVICE_ADMIN:   dbrole.INSTANCE_WRITER,
 	}
 
 	err := ds.Register(CokeAdminCtx, roleMapping, Group{})

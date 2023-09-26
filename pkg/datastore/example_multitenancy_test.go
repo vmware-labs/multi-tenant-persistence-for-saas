@@ -8,6 +8,7 @@ import (
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/datastore"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/logutils"
 )
 
 type User struct {
@@ -36,7 +37,7 @@ func ExampleDataStore_multiTenancy() {
 	PepsiOrgCtx := mdAuthorizer.GetAuthContext("Pepsi", TENANT_ADMIN)
 
 	// Initializes the Datastore using the metadata authorizer and connection details obtained from the ENV variables.
-	ds, err := datastore.FromEnvWithDB(datastore.GetCompLogger(), mdAuthorizer, nil, "ExampleDataStore_multiTenancy")
+	ds, err := datastore.FromEnvWithDB(logutils.GetCompLogger(), mdAuthorizer, nil, "ExampleDataStore_multiTenancy")
 	defer ds.Reset()
 	if err != nil {
 		log.Fatalf("datastore initialization from env errored: %s", err)

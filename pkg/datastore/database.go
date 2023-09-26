@@ -49,6 +49,7 @@ import (
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
 	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/errors"
+	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/logutils"
 )
 
 const (
@@ -139,6 +140,9 @@ func (db *relationalDb) GetTransaction(ctx context.Context, records ...Record) (
 		err := db.ValidateTenancyScope(tenancyInfo, record, tableName)
 		if err != nil {
 			return nil, err
+		}
+		if IsMultiInstanced(record, tableName, db.instancer != nil) {
+			tenancyInfo.DbRole = tenancyInfo.DbRole.GetRoleWithInstancer()
 		}
 	}
 	return db.configureTxWithTenancyScope(tenancyInfo)
@@ -624,7 +628,7 @@ func (db *relationalDb) RegisterHelper(_ context.Context, roleMapping map[string
 
 	// Set up trigger on revision column for tables that need it
 	if IsRevisioned(record, tableName) {
-		if err = db.enforceRevisioning(tableName); err != nil {
+		if err = db.createMostRecentRevisionTrigger(tableName); err != nil {
 			return err
 		}
 	}
@@ -648,7 +652,7 @@ func (db *relationalDb) RegisterHelper(_ context.Context, roleMapping map[string
 	}
 
 	// Create users, grant privileges for current table, setup RLS-policies (if multi-tenant)
-	users := getDbUsers(tableName, IsMultiTenanted(record, tableName), IsMultiInstanced(record, tableName, db.instancer != nil))
+	users := db.GetDbUsers(record, tableName)
 	for _, dbUserSpec := range users {
 		if err = db.grantPrivileges(dbUserSpec, tableName, record); err != nil {
 			err = ErrRegisteringStruct.Wrap(err).WithMap(map[ErrorContextKey]string{
@@ -663,11 +667,26 @@ func (db *relationalDb) RegisterHelper(_ context.Context, roleMapping map[string
 	return nil
 }
 
-/*
-Creates a Postgres trigger that checks if a record being updated contains the most recent revision.
-If not, update is rejected.
-*/
-func (db *relationalDb) enforceRevisioning(tableName string) (err error) {
+// GetDbUsers retrieves a list of users associated with the specified table.
+//
+// This function considers multi-tenancy and multi-instance configurations to determine
+// the users relevant to the given table.
+func (db *relationalDb) GetDbUsers(record Record, tableName string) []dbUserSpec {
+	tableTenanted := IsMultiTenanted(record, tableName)
+	tableInstanced := IsMultiInstanced(record, tableName, db.instancer != nil)
+	// Create all users but with conditions set based on the role and the table configurations
+	// Tenant role without tenant column would not set the condition for tenant
+	// Insntacer role without instance column would not set the condition for instancer
+	users := getDbUsers(tableName, false, false, false, false)
+	users = append(users, getDbUsers(tableName, true, false, tableTenanted, false)...)
+	users = append(users, getDbUsers(tableName, false, true, false, tableInstanced)...)
+	users = append(users, getDbUsers(tableName, true, true, tableTenanted, tableInstanced)...)
+	return users
+}
+
+// createMostRecentRevisionTrigger creates a PostgreSQL trigger that checks if an updated record
+// contains the most recent revision. If the revision is not the most recent, the update is rejected.
+func (db *relationalDb) createMostRecentRevisionTrigger(tableName string) (err error) {
 	functionName, _ := getCheckAndUpdateRevisionFunc()
 
 	var tx *gorm.DB
@@ -759,7 +778,7 @@ func (db *relationalDb) getTenancyInfoFromCtx(ctx context.Context, tableNames ..
 			err = nil
 		}
 	}
-	db.logger.Debugf("Tenancy Info from Context: %+v", tenancyInfo)
+	db.logger.Debugf("Tenancy Info from context for %+v: %+v ", tableNames, tenancyInfo)
 	return err, tenancyInfo
 }
 

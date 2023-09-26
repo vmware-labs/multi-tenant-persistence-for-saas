@@ -8,6 +8,7 @@ import (
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/datastore"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/logutils"
 )
 
 type Person struct {
@@ -39,7 +40,7 @@ func ExampleDataStore_multiInstance() {
 	ProdInstanceCtx := instancer.WithInstanceId(ServiceAdminCtx, "Prod")
 
 	// Initializes the Datastore using the metadata authorizer and connection details obtained from the ENV variables.
-	ds, err := datastore.FromEnvWithDB(datastore.GetCompLogger(), mdAuthorizer, instancer, "ExampleDataStore_multiInstance")
+	ds, err := datastore.FromEnvWithDB(logutils.GetCompLogger(), mdAuthorizer, instancer, "ExampleDataStore_multiInstance")
 	defer ds.Reset()
 	if err != nil {
 		log.Fatalf("datastore initialization from env errored: %s", err)
@@ -47,8 +48,8 @@ func ExampleDataStore_multiInstance() {
 
 	// Registers the necessary structs with their corresponding role mappings.
 	roleMapping := map[string]dbrole.DbRole{
-		SERVICE_AUDITOR: dbrole.READER,
-		SERVICE_ADMIN:   dbrole.WRITER,
+		SERVICE_AUDITOR: dbrole.INSTANCE_READER,
+		SERVICE_ADMIN:   dbrole.INSTANCE_WRITER,
 	}
 	if err = ds.Register(context.TODO(), roleMapping, &Person{}); err != nil {
 		log.Fatalf("Failed to create DB tables: %+v", err)

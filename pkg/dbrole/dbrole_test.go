@@ -49,6 +49,10 @@ func TestIsDbRoleTenantScoped(t *testing.T) {
 	assert.False(dbrole.NO_ROLE.IsDbRoleTenantScoped())
 	assert.False(dbrole.READER.IsDbRoleTenantScoped())
 	assert.False(dbrole.WRITER.IsDbRoleTenantScoped())
+	assert.False(dbrole.INSTANCE_READER.IsDbRoleTenantScoped())
+	assert.False(dbrole.INSTANCE_WRITER.IsDbRoleTenantScoped())
+	assert.True(dbrole.TENANT_INSTANCE_READER.IsDbRoleTenantScoped())
 	assert.True(dbrole.TENANT_READER.IsDbRoleTenantScoped())
+	assert.True(dbrole.TENANT_INSTANCE_WRITER.IsDbRoleTenantScoped())
 	assert.True(dbrole.TENANT_WRITER.IsDbRoleTenantScoped())
 }

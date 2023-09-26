@@ -7,13 +7,14 @@ import (
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/datastore"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/logutils"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/protostore"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/test/pb"
 )
 
 func ExampleProtoStore() {
 	// Initialize protostore with proper logger, authorizer and datastore
-	myLogger := datastore.GetCompLogger()
+	myLogger := logutils.GetCompLogger()
 	mdAuthorizer := &authorizer.MetadataBasedAuthorizer{}
 	myDatastore, _ := datastore.FromEnvWithDB(myLogger, mdAuthorizer, nil, "ExampleProtoStore")
 	defer myDatastore.Reset()

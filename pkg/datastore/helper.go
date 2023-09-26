@@ -33,6 +33,7 @@ import (
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
 	. "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/errors"
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/logutils"
 )
 
 const (
@@ -113,7 +114,7 @@ func FromEnvWithDB(l *logrus.Entry, a authorizer.Authorizer, instancer authorize
 }
 
 func FromConfig(l *logrus.Entry, a authorizer.Authorizer, instancer authorizer.Instancer, cfg DBConfig) (d DataStore, err error) {
-	gl := GetGormLogger(l)
+	gl := logutils.GetGormLogger(l)
 	dbConnInitializer := func(db *relationalDb, dbRole dbrole.DbRole) error {
 		db.Lock()
 		defer db.Unlock()
@@ -142,7 +143,7 @@ func FromConfig(l *logrus.Entry, a authorizer.Authorizer, instancer authorizer.I
 					// ERROR: duplicate key value violates unique constraint
 					// "pg_authid_rolname_index" (SQLSTATE 23505)
 					if strings.Contains(tx.Error.Error(), ERROR_DUPLICATE_KEY) {
-						db.logger.Infoln(tx.Error)
+						db.logger.Debugln(tx.Error)
 						return nil
 					}
 					db.logger.Errorln(err)
@@ -156,7 +157,7 @@ func FromConfig(l *logrus.Entry, a authorizer.Authorizer, instancer authorizer.I
 				// ERROR: duplicate key value violates unique constraint
 				// "pg_authid_rolname_index" (SQLSTATE 23505)
 				if strings.Contains(tx.Error.Error(), ERROR_DUPLICATE_KEY) {
-					db.logger.Infoln(tx.Error)
+					db.logger.Debugln(tx.Error)
 					return nil
 				}
 				err = ErrExecutingSqlStmt.Wrap(tx.Error).WithValue(SQL_STMT, stmt).WithValue(DB_NAME, db.dbName)
@@ -170,7 +171,7 @@ func FromConfig(l *logrus.Entry, a authorizer.Authorizer, instancer authorizer.I
 		if _, ok := db.gormDBMap[dbUserSpec.username]; ok {
 			return nil
 		}
-		db.logger.Infof("Connecting to database %s@%s:%d[%s] ...", dbUserSpec.username, cfg.host, cfg.port, cfg.dbName)
+		db.logger.Debugf("Connecting to database %s@%s:%d[%s] ...", dbUserSpec.username, cfg.host, cfg.port, cfg.dbName)
 		db.gormDBMap[dbUserSpec.username], err = openDb(gl, cfg.host, cfg.port, string(dbUserSpec.username), dbUserSpec.password, cfg.dbName, cfg.sslMode)
 		if err != nil {
 			args := map[ErrorContextKey]string{
@@ -184,7 +185,7 @@ func FromConfig(l *logrus.Entry, a authorizer.Authorizer, instancer authorizer.I
 			db.logger.Error(err)
 			return err
 		}
-		db.logger.Infof("Connecting to database %s@%s:%d[%s] succeeded",
+		db.logger.Debugf("Connecting to database %s@%s:%d[%s] succeeded",
 			dbUserSpec.username, cfg.host, cfg.port, cfg.dbName)
 
 		return nil
