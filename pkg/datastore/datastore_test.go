@@ -328,14 +328,14 @@ func TestFindWithCriteria(t *testing.T) {
 		err := ds.FindWithFilter(CokeAdminCtx, user, &queryResults, datastore.NoPagination())
 		assert.NoError(err)
 		assert.Len(queryResults, 1)
-		assert.Equal(user, &queryResults[0])
+		cmp.Equal(user, &queryResults[0], cmpopts.IgnoreFields(AppUser{}, "CreatedAt", "UpdatedAt", "DeletedAt"))
 
 		// Search only by name
 		queryResults = make([]AppUser, 0)
 		err = ds.FindWithFilter(CokeAdminCtx, &AppUser{Name: user.Name}, &queryResults, datastore.NoPagination())
 		assert.NoError(err)
 		assert.Len(queryResults, 1)
-		assert.Equal(user, &queryResults[0])
+		cmp.Equal(user, &queryResults[0], cmpopts.IgnoreFields(AppUser{}, "CreatedAt", "UpdatedAt", "DeletedAt"))
 	}
 
 	// soft delete all(two) records, then should still able to retrieve them
