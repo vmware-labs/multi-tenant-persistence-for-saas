@@ -21,6 +21,7 @@ package datastore_test
 import (
 	"context"
 	"database/sql"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"io"
 	"testing"
 
@@ -58,14 +59,7 @@ func testTxCrud(t *testing.T, ds datastore.DataStore, ctx context.Context, user1
 		queryResult := AppUser{Id: record.Id}
 		err = ds.Find(txCtx, &queryResult)
 		assert.NoError(err)
-		assert.Equal(record.Id, queryResult.Id)
-		assert.Equal(record.Name, queryResult.Name)
-		assert.Equal(record.Email, queryResult.Email)
-		assert.Equal(record.EmailConfirmed, queryResult.EmailConfirmed)
-		assert.Equal(record.NumFollowing, queryResult.NumFollowing)
-		assert.Equal(record.NumFollowers, queryResult.NumFollowers)
-		assert.Equal(record.AppId, queryResult.AppId)
-		assert.Equal(record.Msg, queryResult.Msg)
+		assert.Equal(record, &queryResult, cmpopts.IgnoreFields(AppUser{}, "CreatedAt", "UpdatedAt", "DeletedAt"))
 	}
 	assert.NoError(tx.Commit().Error)
 
@@ -90,14 +84,7 @@ func testTxCrud(t *testing.T, ds datastore.DataStore, ctx context.Context, user1
 		queryResult := &AppUser{Id: record.Id}
 		err = ds.Find(txCtx, queryResult)
 		assert.NoError(err)
-		assert.Equal(record.Id, queryResult.Id)
-		assert.Equal(record.Name, queryResult.Name)
-		assert.Equal(record.Email, queryResult.Email)
-		assert.Equal(record.EmailConfirmed, queryResult.EmailConfirmed)
-		assert.Equal(record.NumFollowing, queryResult.NumFollowing)
-		assert.Equal(record.NumFollowers, queryResult.NumFollowers)
-		assert.Equal(record.AppId, queryResult.AppId)
-		assert.Equal(record.Msg, queryResult.Msg)
+		assert.Equal(record, &queryResult, cmpopts.IgnoreFields(AppUser{}, "CreatedAt", "UpdatedAt", "DeletedAt"))
 	}
 	assert.NoError(tx.Commit().Error)
 
@@ -116,14 +103,7 @@ func testTxCrud(t *testing.T, ds datastore.DataStore, ctx context.Context, user1
 		queryResult := &AppUser{Id: record.Id}
 		err = ds.Find(txCtx, queryResult)
 		assert.NoError(err)
-		assert.Equal(record.Id, queryResult.Id)
-		assert.Equal(record.Name, queryResult.Name)
-		assert.Equal(record.Email, queryResult.Email)
-		assert.Equal(record.EmailConfirmed, queryResult.EmailConfirmed)
-		assert.Equal(record.NumFollowing, queryResult.NumFollowing)
-		assert.Equal(record.NumFollowers, queryResult.NumFollowers)
-		assert.Equal(record.AppId, queryResult.AppId)
-		assert.Equal(record.Msg, queryResult.Msg)
+		assert.Equal(record, &queryResult, cmpopts.IgnoreFields(AppUser{}, "CreatedAt", "UpdatedAt", "DeletedAt"))
 	}
 	assert.NoError(tx.Commit().Error)
 
@@ -186,14 +166,7 @@ func TestSingleTxCrud(t *testing.T) {
 		queryResult := AppUser{Id: record.Id}
 		err = ds.Find(txCtx, &queryResult)
 		assert.NoError(err)
-		assert.Equal(record.Id, queryResult.Id)
-		assert.Equal(record.Name, queryResult.Name)
-		assert.Equal(record.Email, queryResult.Email)
-		assert.Equal(record.EmailConfirmed, queryResult.EmailConfirmed)
-		assert.Equal(record.NumFollowing, queryResult.NumFollowing)
-		assert.Equal(record.NumFollowers, queryResult.NumFollowers)
-		assert.Equal(record.AppId, queryResult.AppId)
-		assert.Equal(record.Msg, queryResult.Msg)
+		assert.Equal(record, &queryResult, cmpopts.IgnoreFields(AppUser{}, "CreatedAt", "UpdatedAt", "DeletedAt"))
 	}
 
 	t.Log("Verifying update and find in same transaction")
@@ -217,14 +190,7 @@ func TestSingleTxCrud(t *testing.T) {
 		queryResult := &AppUser{Id: record.Id}
 		err = ds.Find(txCtx, queryResult)
 		assert.NoError(err)
-		assert.Equal(record.Id, queryResult.Id)
-		assert.Equal(record.Name, queryResult.Name)
-		assert.Equal(record.Email, queryResult.Email)
-		assert.Equal(record.EmailConfirmed, queryResult.EmailConfirmed)
-		assert.Equal(record.NumFollowing, queryResult.NumFollowing)
-		assert.Equal(record.NumFollowers, queryResult.NumFollowers)
-		assert.Equal(record.AppId, queryResult.AppId)
-		assert.Equal(record.Msg, queryResult.Msg)
+		assert.Equal(record, &queryResult, cmpopts.IgnoreFields(AppUser{}, "CreatedAt", "UpdatedAt", "DeletedAt"))
 	}
 
 	t.Log("Verifying upsert and find in same transaction")
@@ -238,14 +204,7 @@ func TestSingleTxCrud(t *testing.T) {
 		queryResult := &AppUser{Id: record.Id}
 		err = ds.Find(txCtx, queryResult)
 		assert.NoError(err)
-		assert.Equal(record.Id, queryResult.Id)
-		assert.Equal(record.Name, queryResult.Name)
-		assert.Equal(record.Email, queryResult.Email)
-		assert.Equal(record.EmailConfirmed, queryResult.EmailConfirmed)
-		assert.Equal(record.NumFollowing, queryResult.NumFollowing)
-		assert.Equal(record.NumFollowers, queryResult.NumFollowers)
-		assert.Equal(record.AppId, queryResult.AppId)
-		assert.Equal(record.Msg, queryResult.Msg)
+		assert.Equal(record, &queryResult, cmpopts.IgnoreFields(AppUser{}, "CreatedAt", "UpdatedAt", "DeletedAt"))
 	}
 
 	t.Log("Verifying deletion and find in same transaction")
