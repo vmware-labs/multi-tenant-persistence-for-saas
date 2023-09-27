@@ -133,7 +133,14 @@ func testCrud(t *testing.T, ds datastore.DataStore, ctx context.Context, myCokeA
 		queryResult := AppUser{Id: record.Id}
 		err = ds.Find(ctx, &queryResult)
 		assert.NoError(err)
-		assert.Equal(record, &queryResult)
+		assert.Equal(record.Id, queryResult.Id)
+		assert.Equal(record.Name, queryResult.Name)
+		assert.Equal(record.Email, queryResult.Email)
+		assert.Equal(record.EmailConfirmed, queryResult.EmailConfirmed)
+		assert.Equal(record.NumFollowing, queryResult.NumFollowing)
+		assert.Equal(record.NumFollowers, queryResult.NumFollowers)
+		assert.Equal(record.AppId, queryResult.AppId)
+		assert.Equal(record.Msg, queryResult.Msg)
 	}
 
 	// Updating non-key fields in a record should succeed
@@ -152,7 +159,14 @@ func testCrud(t *testing.T, ds datastore.DataStore, ctx context.Context, myCokeA
 		queryResult := &AppUser{Id: record.Id}
 		err = ds.Find(ctx, queryResult)
 		assert.NoError(err)
-		assert.Equal(record, queryResult)
+		assert.Equal(record.Id, queryResult.Id)
+		assert.Equal(record.Name, queryResult.Name)
+		assert.Equal(record.Email, queryResult.Email)
+		assert.Equal(record.EmailConfirmed, queryResult.EmailConfirmed)
+		assert.Equal(record.NumFollowing, queryResult.NumFollowing)
+		assert.Equal(record.NumFollowers, queryResult.NumFollowers)
+		assert.Equal(record.AppId, queryResult.AppId)
+		assert.Equal(record.Msg, queryResult.Msg)
 	}
 
 	// Upsert operation should be an update for already existing records
@@ -165,7 +179,14 @@ func testCrud(t *testing.T, ds datastore.DataStore, ctx context.Context, myCokeA
 		queryResult := &AppUser{Id: record.Id}
 		err = ds.Find(ctx, queryResult)
 		assert.NoError(err)
-		assert.Equal(record, queryResult)
+		assert.Equal(record.Id, queryResult.Id)
+		assert.Equal(record.Name, queryResult.Name)
+		assert.Equal(record.Email, queryResult.Email)
+		assert.Equal(record.EmailConfirmed, queryResult.EmailConfirmed)
+		assert.Equal(record.NumFollowing, queryResult.NumFollowing)
+		assert.Equal(record.NumFollowers, queryResult.NumFollowers)
+		assert.Equal(record.AppId, queryResult.AppId)
+		assert.Equal(record.Msg, queryResult.Msg)
 	}
 
 	for _, record := range []*AppUser{user1, user2} {

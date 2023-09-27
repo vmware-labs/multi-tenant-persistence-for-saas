@@ -58,7 +58,14 @@ func testTxCrud(t *testing.T, ds datastore.DataStore, ctx context.Context, user1
 		queryResult := AppUser{Id: record.Id}
 		err = ds.Find(txCtx, &queryResult)
 		assert.NoError(err)
-		assert.Equal(record, &queryResult)
+		assert.Equal(record.Id, queryResult.Id)
+		assert.Equal(record.Name, queryResult.Name)
+		assert.Equal(record.Email, queryResult.Email)
+		assert.Equal(record.EmailConfirmed, queryResult.EmailConfirmed)
+		assert.Equal(record.NumFollowing, queryResult.NumFollowing)
+		assert.Equal(record.NumFollowers, queryResult.NumFollowers)
+		assert.Equal(record.AppId, queryResult.AppId)
+		assert.Equal(record.Msg, queryResult.Msg)
 	}
 	assert.NoError(tx.Commit().Error)
 
@@ -83,7 +90,14 @@ func testTxCrud(t *testing.T, ds datastore.DataStore, ctx context.Context, user1
 		queryResult := &AppUser{Id: record.Id}
 		err = ds.Find(txCtx, queryResult)
 		assert.NoError(err)
-		assert.Equal(record, queryResult)
+		assert.Equal(record.Id, queryResult.Id)
+		assert.Equal(record.Name, queryResult.Name)
+		assert.Equal(record.Email, queryResult.Email)
+		assert.Equal(record.EmailConfirmed, queryResult.EmailConfirmed)
+		assert.Equal(record.NumFollowing, queryResult.NumFollowing)
+		assert.Equal(record.NumFollowers, queryResult.NumFollowers)
+		assert.Equal(record.AppId, queryResult.AppId)
+		assert.Equal(record.Msg, queryResult.Msg)
 	}
 	assert.NoError(tx.Commit().Error)
 
@@ -172,7 +186,14 @@ func TestSingleTxCrud(t *testing.T) {
 		queryResult := AppUser{Id: record.Id}
 		err = ds.Find(txCtx, &queryResult)
 		assert.NoError(err)
-		assert.Equal(record, &queryResult)
+		assert.Equal(record.Id, queryResult.Id)
+		assert.Equal(record.Name, queryResult.Name)
+		assert.Equal(record.Email, queryResult.Email)
+		assert.Equal(record.EmailConfirmed, queryResult.EmailConfirmed)
+		assert.Equal(record.NumFollowing, queryResult.NumFollowing)
+		assert.Equal(record.NumFollowers, queryResult.NumFollowers)
+		assert.Equal(record.AppId, queryResult.AppId)
+		assert.Equal(record.Msg, queryResult.Msg)
 	}
 
 	t.Log("Verifying update and find in same transaction")
@@ -196,7 +217,14 @@ func TestSingleTxCrud(t *testing.T) {
 		queryResult := &AppUser{Id: record.Id}
 		err = ds.Find(txCtx, queryResult)
 		assert.NoError(err)
-		assert.Equal(record, queryResult)
+		assert.Equal(record.Id, queryResult.Id)
+		assert.Equal(record.Name, queryResult.Name)
+		assert.Equal(record.Email, queryResult.Email)
+		assert.Equal(record.EmailConfirmed, queryResult.EmailConfirmed)
+		assert.Equal(record.NumFollowing, queryResult.NumFollowing)
+		assert.Equal(record.NumFollowers, queryResult.NumFollowers)
+		assert.Equal(record.AppId, queryResult.AppId)
+		assert.Equal(record.Msg, queryResult.Msg)
 	}
 
 	t.Log("Verifying upsert and find in same transaction")
