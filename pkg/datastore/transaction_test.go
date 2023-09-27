@@ -19,6 +19,7 @@
 package datastore_test
 
 import (
+	"github.com/bxcodec/faker/v4/pkg/options"
 	"testing"
 
 	"github.com/bxcodec/faker/v4"
@@ -125,8 +126,9 @@ func testMultiTableTransactions(t *testing.T, ds datastore.DataStore, ps protost
 
 	a1 := &App{}
 	a2 := &AppUser{}
-	_ = faker.FakeData(a1)
-	_ = faker.FakeData(a2)
+	_ = faker.FakeData(a1, options.WithFieldsToIgnore("CreatedAt", "UpdatedAt", "DeletedAt"))
+	_ = faker.FakeData(a2, options.WithFieldsToIgnore("CreatedAt", "UpdatedAt", "DeletedAt"))
+
 	a1.TenantId = COKE
 
 	t.Log("Getting DBTransaction for creating App and AppUser")
@@ -196,7 +198,7 @@ func testMultiProtoTransactions(t *testing.T, ds datastore.DataStore, ps protost
 	c1 := &pb.Disk{}
 	a2 := &App{}
 	_ = faker.FakeData(c1)
-	_ = faker.FakeData(a2)
+	_ = faker.FakeData(a2, options.WithFieldsToIgnore("CreatedAt", "UpdatedAt", "DeletedAt"))
 	a1, err := ps.MsgToPersist(AmericasCokeAdminCtx, "a1", c1, protostore.Metadata{})
 	assert.NoError(err)
 	a2.TenantId = COKE
@@ -249,16 +251,16 @@ func testMultiProtoTransactions(t *testing.T, ds datastore.DataStore, ps protost
 	t.Log(a1, a2)
 	t.Log(f1, f2)
 
-	t.Log("Deleting pb.Disk and App in single transaction")
+	t.Log("Soft deleting pb.Disk and App in single transaction")
 	tx, err = ds.GetTransaction(AmericasCokeAdminCtx, a1)
 	assert.NoError(err)
 	err = tx.Transaction(func(tx *gorm.DB) error {
-		t.Logf("Deleting %+v", a1)
+		t.Logf("Soft deleting %+v", a1)
 		if err := tx.Table(t1).Delete(a1).Error; err != nil {
 			return err
 		}
 
-		t.Logf("Deleting %+v", a2)
+		t.Logf("Soft deleting %+v", a2)
 		if err := tx.Delete(a2).Error; err != nil {
 			return err
 		}
@@ -269,7 +271,7 @@ func testMultiProtoTransactions(t *testing.T, ds datastore.DataStore, ps protost
 	assert.NoError(err)
 	assert.NoError(tx.Error)
 
-	t.Log("Finding pb.Disk and App after delete should not return anything")
+	t.Log("Finding pb.Disk and App after soft delete should not return anything")
 	tx, err = ds.GetTransaction(AmericasCokeAdminCtx, a1)
 	assert.NoError(err)
 	f1, err = ps.MsgToFilter(AmericasCokeAuditorCtx, "a1", c1)
@@ -287,9 +289,8 @@ func testMultiProtoTransactions(t *testing.T, ds datastore.DataStore, ps protost
 	})
 	tx.Commit()
 	assert.NoError(err)
-	t.Log("Verifying pb.Disk and App cannot be retrieved after delete")
 
-	t.Log("Verifying pb.Disk can be retrieved after soft delete ...")
+	t.Log("Verifying pb.Disk and App can be retrieved after soft delete ...")
 	tx, err = ds.GetTransaction(AmericasCokeAdminCtx, a1)
 	assert.NoError(err)
 	f1, err = ps.MsgToFilter(AmericasCokeAuditorCtx, "a1", c1)
@@ -302,7 +303,7 @@ func testMultiProtoTransactions(t *testing.T, ds datastore.DataStore, ps protost
 
 		t.Logf("Finding %+v", f2)
 		y := tx.Unscoped().First(f2)
-		assert.EqualValues(0, y.RowsAffected, y)
+		assert.EqualValues(1, y.RowsAffected, y)
 		return nil
 	})
 	tx.Commit()
@@ -320,9 +321,9 @@ func testMultiProtoTransactions(t *testing.T, ds datastore.DataStore, ps protost
 		x := tx.Table(t1).Unscoped().Delete(f1)
 		assert.EqualValues(1, x.RowsAffected, x)
 
-		t.Logf("Deleting %+v", f2)
+		t.Logf("Purging %+v after soft-delete", f2)
 		y := tx.Unscoped().Delete(f2)
-		assert.EqualValues(0, y.RowsAffected, y)
+		assert.EqualValues(1, y.RowsAffected, y)
 		return nil
 	})
 	tx.Commit()

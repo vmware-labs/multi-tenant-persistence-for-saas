@@ -20,6 +20,8 @@ package test
 
 import (
 	"encoding/json"
+	"gorm.io/gorm"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/uuid"
@@ -72,6 +74,9 @@ type AppUser struct {
 	NumFollowers   int64
 	AppId          string
 	Msg            []byte
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	DeletedAt      gorm.DeletedAt
 }
 
 type AppUserSlice []AppUser // Needed for sorting
@@ -85,9 +90,12 @@ func (a AppUserSlice) Less(x, y int) bool {
 func (a AppUserSlice) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 
 type App struct {
-	Id       string `gorm:"primaryKey;column:application_id"`
-	Name     string
-	TenantId string `gorm:"primaryKey;column:org_id"`
+	Id        string `gorm:"primaryKey;column:application_id"`
+	Name      string
+	TenantId  string `gorm:"primaryKey;column:org_id"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt gorm.DeletedAt
 }
 
 func (a App) TableName() string {

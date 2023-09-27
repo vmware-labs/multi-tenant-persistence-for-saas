@@ -21,6 +21,8 @@ package datastore_test
 import (
 	"context"
 	"fmt"
+	"github.com/bxcodec/faker/v4"
+	"github.com/bxcodec/faker/v4/pkg/options"
 	"io"
 	"math/rand"
 	"os"
@@ -29,7 +31,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bxcodec/faker/v4"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
@@ -167,6 +168,18 @@ func testCrud(t *testing.T, ds datastore.DataStore, ctx context.Context, myCokeA
 		assert.Equal(record, queryResult)
 	}
 
+	for _, record := range []*AppUser{user1, user2} {
+		rowsAffected, err := ds.SoftDelete(ctx, record)
+		assert.NoError(err)
+		assert.EqualValues(1, rowsAffected)
+		queryResult := &AppUser{Id: record.Id}
+		err = ds.Find(ctx, queryResult)
+		assert.ErrorIs(err, ErrRecordNotFound)
+		assert.True(queryResult.AreNonKeyFieldsEmpty())
+		err = ds.FindSoftDeleted(ctx, queryResult)
+		assert.NoError(err)
+	}
+
 	// Deletion of existing records should not fail, and the records should no longer be found in the DB
 	for _, record := range []*AppUser{user1, user2} {
 		rowsAffected, err := ds.Delete(ctx, record)
@@ -174,6 +187,9 @@ func testCrud(t *testing.T, ds datastore.DataStore, ctx context.Context, myCokeA
 		assert.EqualValues(1, rowsAffected)
 		queryResult := AppUser{Id: record.Id}
 		err = ds.Find(ctx, &queryResult)
+		assert.ErrorIs(err, ErrRecordNotFound)
+		assert.True(queryResult.AreNonKeyFieldsEmpty())
+		err = ds.FindSoftDeleted(ctx, &queryResult)
 		assert.ErrorIs(err, ErrRecordNotFound)
 		assert.True(queryResult.AreNonKeyFieldsEmpty())
 	}
@@ -226,6 +242,26 @@ func TestFindAll(t *testing.T) {
 	for i := 0; i < len(queryResults); i++ {
 		assert.Equal(expected[i], &queryResults[i])
 	}
+
+	// soft delete all(two) records, then should still able to retrieve them
+	rowsAffected, err := ds.SoftDelete(CokeAdminCtx, user1)
+	assert.NoError(err)
+	assert.Equal(int64(1), rowsAffected)
+	rowsAffected, err = ds.SoftDelete(CokeAdminCtx, user2)
+	assert.NoError(err)
+	assert.Equal(int64(1), rowsAffected)
+
+	queryResults = make([]AppUser, 0)
+	err = ds.FindAllIncludingSoftDeleted(CokeAdminCtx, &queryResults, datastore.DefaultPagination())
+	sort.Sort(AppUserSlice(queryResults))
+	assert.NoError(err)
+	assert.Len(queryResults, 2)
+
+	expected = []*AppUser{user1, user2}
+
+	for i := 0; i < len(queryResults); i++ {
+		assert.Equal(expected[i], &queryResults[i])
+	}
 }
 
 func myID(i int) string {
@@ -240,7 +276,7 @@ func TestFindAllWithPagination(t *testing.T) {
 
 	a1 := &App{}
 	for i := 0; i < 100; i++ {
-		_ = faker.FakeData(a1)
+		_ = faker.FakeData(a1, options.WithFieldsToIgnore("CreatedAt", "UpdatedAt", "DeletedAt"))
 		a1.Id = myID(i)
 		a1.TenantId = COKE
 		rowsAffected, err := ds.Insert(CokeAdminCtx, a1)
@@ -295,6 +331,31 @@ func TestFindWithCriteria(t *testing.T) {
 		// Search only by name
 		queryResults = make([]AppUser, 0)
 		err = ds.FindWithFilter(CokeAdminCtx, &AppUser{Name: user.Name}, &queryResults, datastore.NoPagination())
+		assert.NoError(err)
+		assert.Len(queryResults, 1)
+		assert.Equal(user, &queryResults[0])
+	}
+
+	// soft delete all(two) records, then should still able to retrieve them
+	rowsAffected, err := ds.SoftDelete(CokeAdminCtx, user1)
+	assert.NoError(err)
+	assert.Equal(int64(1), rowsAffected)
+	rowsAffected, err = ds.SoftDelete(CokeAdminCtx, user2)
+	assert.NoError(err)
+	assert.Equal(int64(1), rowsAffected)
+
+	// Pass filtering criteria
+	for _, user := range expected {
+		// Search by all fields
+		queryResults := make([]AppUser, 0)
+		err := ds.FindWithFilterIncludingSoftDeleted(CokeAdminCtx, user, &queryResults, datastore.NoPagination())
+		assert.NoError(err)
+		assert.Len(queryResults, 1)
+		assert.Equal(user, &queryResults[0])
+
+		// Search only by name
+		queryResults = make([]AppUser, 0)
+		err = ds.FindWithFilterIncludingSoftDeleted(CokeAdminCtx, &AppUser{Name: user.Name}, &queryResults, datastore.NoPagination())
 		assert.NoError(err)
 		assert.Len(queryResults, 1)
 		assert.Equal(user, &queryResults[0])
