@@ -3,7 +3,7 @@ module github.com/vmware-labs/multi-tenant-persistence-for-saas
 go 1.18
 
 require (
-	github.com/bxcodec/faker/v3 v3.8.0
+	github.com/bxcodec/faker/v3 v3.8.1
 	github.com/bxcodec/faker/v4 v4.0.0-beta.3
 	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.1
