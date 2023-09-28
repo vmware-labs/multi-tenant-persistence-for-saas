@@ -169,8 +169,8 @@ func testMultiTableTransactions(t *testing.T, ds datastore.DataStore, ps protost
 	tx.Commit()
 	assert.NoError(err)
 	assert.NoError(tx.Error)
-	cmp.Equal(a1, f1, cmpopts.IgnoreFields(App{}, "CreatedAt", "UpdatedAt", "DeletedAt"))
-	cmp.Equal(a2, f2, cmpopts.IgnoreFields(App{}, "CreatedAt", "UpdatedAt", "DeletedAt"))
+	assert.True(cmp.Equal(a1, f1, cmpopts.IgnoreFields(App{}, "CreatedAt", "UpdatedAt", "DeletedAt")))
+	assert.True(cmp.Equal(a2, f2, cmpopts.IgnoreFields(App{}, "CreatedAt", "UpdatedAt", "DeletedAt")))
 	t.Log(a1, a2)
 	t.Log(f1, f2)
 
@@ -249,7 +249,7 @@ func testMultiProtoTransactions(t *testing.T, ds datastore.DataStore, ps protost
 	assert.NoError(err)
 	assert.NoError(tx.Error)
 	assert.Equal(a1.Msg, f1.Msg)
-	cmp.Equal(a2, f2, cmpopts.IgnoreFields(App{}, "CreatedAt", "UpdatedAt", "DeletedAt"))
+	assert.True(cmp.Equal(a2, f2, cmpopts.IgnoreFields(App{}, "CreatedAt", "UpdatedAt", "DeletedAt")))
 	t.Log(a1, a2)
 	t.Log(f1, f2)
 
