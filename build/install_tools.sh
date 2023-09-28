@@ -14,6 +14,7 @@ GOMRK_VERSION=${GOMRK_VERSION:=1.1.0}
 SHFMT_VERSION=${SHFMT_VERSION:=3.6.0}
 GOIMP_VERSION=${GOIMP_VERSION:=0.5.0}
 GOIMPORTS_REVISER_VERSION=${GOIMPORTS_REVISER_VERSION:=3.4.2}
+GOJQ_VERSION=${GOJQ_VERSION:=0.12.13}
 TYPOS_VERSION=${TYPOS_VERSION:=1.13.6}
 ADDLICENSE_VERSION=${ADDLICENSE_VERSION:=1.1.1}
 CODEOWNERS_VALIDATOR_VERSION=${CODEOWNERS_VALIDATOR_VERSION:=0.7.4}
@@ -34,6 +35,7 @@ go version | grep '1.19\|1.20\|1.21' || (
   exit 1
 )
 go_install "dlv version" ${GODLV_VERSION} github.com/go-delve/delve/cmd/dlv
+go_install "gojq --version" ${GOJQ_VERSION} github.com/itchyny/gojq/cmd/gojq
 go_install "golangci-lint version" ${GOLNT_VERSION} github.com/golangci/golangci-lint/cmd/golangci-lint
 go_install "gomarkdoc --version" ${GOMRK_VERSION} github.com/princjef/gomarkdoc/cmd/gomarkdoc
 go_install "shfmt -version" ${SHFMT_VERSION} mvdan.cc/sh/v3/cmd/shfmt

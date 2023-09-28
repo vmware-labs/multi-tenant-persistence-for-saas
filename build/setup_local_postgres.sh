@@ -33,7 +33,7 @@ elif [[ $(uname -s) == "Darwin" ]]; then
     brew install postgresql@14
     brew services restart postgresql@14
     sleep 5
-    brew services info postgresql@14 --json | jq '.[0].running' | grep true
+    brew services info postgresql@14 --json | gojq '.[0].running' | grep true
     echo "postgresql: Installation successful"
   fi
   dropdb tmp_db --if-exists
