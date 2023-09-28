@@ -78,8 +78,8 @@ type DataStore interface {
 }
 
 type Helper interface {
-	FindInTable(ctx context.Context, record Record, softDelete bool) (err error)
-	FindAllInTable(ctx context.Context, records interface{}, pagination *Pagination, softDelete bool) error
+	FindInTable(ctx context.Context, tableName string, record Record, softDelete bool) (err error)
+	FindAllInTable(ctx context.Context, tableName string, records interface{}, pagination *Pagination, softDelete bool) error
 	FindWithFilterInTable(ctx context.Context, tableName string, record Record, records interface{}, pagination *Pagination, softDelete bool) (err error)
 	GetDBTransaction(ctx context.Context, tableName string, record Record) (tx *gorm.DB, err error)
 

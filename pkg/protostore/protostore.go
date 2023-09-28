@@ -291,7 +291,7 @@ func (p ProtobufDataStore) findById(ctx context.Context, id string, msg proto.Me
 		return err
 	}
 
-	err = p.ds.Helper().FindInTable(ctx, protoStoreMsg, softDelete)
+	err = p.ds.Helper().FindInTable(ctx, datastore.GetTableName(protoStoreMsg), protoStoreMsg, softDelete)
 	if err != nil {
 		return err
 	}
@@ -315,7 +315,7 @@ func (p ProtobufDataStore) getMetadata(ctx context.Context, id string, msg proto
 	if err != nil {
 		return md, err
 	}
-	err = p.ds.Helper().FindInTable(ctx, protoStoreMsg, softDelete)
+	err = p.ds.Helper().FindInTable(ctx, datastore.GetTableName(protoStoreMsg), protoStoreMsg, softDelete)
 	return MetadataFrom(*protoStoreMsg), err
 }
 
@@ -352,10 +352,11 @@ func (p ProtobufDataStore) FindAllAsMap(ctx context.Context, msgsMap interface{}
 		return nil, err
 	}
 
+	tableName := datastore.GetTableName(reflect.New(elemType).Interface())
 	protoStoreMsgs := make([]ProtoStoreMsg, 0)
 
 	// soft delete flag is false
-	err = p.ds.Helper().FindAllInTable(ctx, &protoStoreMsgs, pagination, false)
+	err = p.ds.Helper().FindAllInTable(ctx, tableName, &protoStoreMsgs, pagination, false)
 	if err != nil {
 		return nil, err
 	}
@@ -396,10 +397,11 @@ func (p ProtobufDataStore) findAll(ctx context.Context, msgs interface{}, pagina
 	// True if msgs is a pointer to a slice of pointers to structs
 	// False if msgs is a pointer to a slice of structs
 	isSlicePtrToStructs := reflect.TypeOf(msgs).Elem().Elem().Kind() == reflect.Ptr
+	tableName := datastore.GetTableName(msgs)
 
 	protoStoreMsgs := make([]ProtoStoreMsg, 0)
 
-	err = p.ds.Helper().FindAllInTable(ctx, &protoStoreMsgs, pagination, softDelete)
+	err = p.ds.Helper().FindAllInTable(ctx, tableName, &protoStoreMsgs, pagination, softDelete)
 	if err != nil {
 		return nil, err
 	}
