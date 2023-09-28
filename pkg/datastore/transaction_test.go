@@ -19,12 +19,12 @@
 package datastore_test
 
 import (
-	"github.com/bxcodec/faker/v4/pkg/options"
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"testing"
 
 	"github.com/bxcodec/faker/v4"
+	"github.com/bxcodec/faker/v4/pkg/options"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 

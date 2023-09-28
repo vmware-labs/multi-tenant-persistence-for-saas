@@ -21,10 +21,6 @@ package datastore_test
 import (
 	"context"
 	"fmt"
-	"github.com/bxcodec/faker/v4"
-	"github.com/bxcodec/faker/v4/pkg/options"
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"io"
 	"math/rand"
 	"os"
@@ -33,6 +29,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bxcodec/faker/v4"
+	"github.com/bxcodec/faker/v4/pkg/options"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 

@@ -20,11 +20,11 @@ package test
 
 import (
 	"encoding/json"
-	"gorm.io/gorm"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
 )
