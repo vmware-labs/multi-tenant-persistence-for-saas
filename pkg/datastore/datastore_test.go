@@ -132,10 +132,10 @@ func testCrud(t *testing.T, ds datastore.DataStore, ctx context.Context, myCokeA
 
 	// Querying of previously inserted records should succeed
 	for _, record := range []*AppUser{user1, user2} {
-		queryResult := AppUser{Id: record.Id}
-		err = ds.Find(ctx, &queryResult)
+		queryResult := &AppUser{Id: record.Id}
+		err = ds.Find(ctx, queryResult)
 		assert.NoError(err)
-		assert.True(cmp.Equal(record, &queryResult, cmpopts.IgnoreFields(AppUser{}, "CreatedAt", "UpdatedAt", "DeletedAt")))
+		assert.True(cmp.Equal(record, queryResult, cmpopts.IgnoreFields(AppUser{}, "CreatedAt", "UpdatedAt", "DeletedAt")))
 	}
 
 	// Updating non-key fields in a record should succeed
@@ -180,6 +180,7 @@ func testCrud(t *testing.T, ds datastore.DataStore, ctx context.Context, myCokeA
 		assert.True(queryResult.AreNonKeyFieldsEmpty())
 		err = ds.FindSoftDeleted(ctx, queryResult)
 		assert.NoError(err)
+		assert.True(cmp.Equal(record, queryResult, cmpopts.IgnoreFields(AppUser{}, "CreatedAt", "UpdatedAt", "DeletedAt")))
 	}
 
 	// Deletion of existing records should not fail, and the records should no longer be found in the DB

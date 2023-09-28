@@ -57,10 +57,10 @@ func testTxCrud(t *testing.T, ds datastore.DataStore, ctx context.Context, user1
 	defer rollbackTx(t, tx)
 	txCtx := txFetcher.WithTransactionCtx(ctx, tx)
 	for _, record := range []*AppUser{user1, user2} {
-		queryResult := AppUser{Id: record.Id}
-		err = ds.Find(txCtx, &queryResult)
+		queryResult := &AppUser{Id: record.Id}
+		err = ds.Find(txCtx, queryResult)
 		assert.NoError(err)
-		assert.True(cmp.Equal(record, &queryResult, cmpopts.IgnoreFields(AppUser{}, "CreatedAt", "UpdatedAt", "DeletedAt")))
+		assert.True(cmp.Equal(record, queryResult, cmpopts.IgnoreFields(AppUser{}, "CreatedAt", "UpdatedAt", "DeletedAt")))
 	}
 	assert.NoError(tx.Commit().Error)
 
@@ -164,10 +164,10 @@ func TestSingleTxCrud(t *testing.T) {
 
 	t.Log("Querying created records in same transaction")
 	for _, record := range []*AppUser{user1, user2} {
-		queryResult := AppUser{Id: record.Id}
-		err = ds.Find(txCtx, &queryResult)
+		queryResult := &AppUser{Id: record.Id}
+		err = ds.Find(txCtx, queryResult)
 		assert.NoError(err)
-		assert.True(cmp.Equal(record, &queryResult, cmpopts.IgnoreFields(AppUser{}, "CreatedAt", "UpdatedAt", "DeletedAt")))
+		assert.True(cmp.Equal(record, queryResult, cmpopts.IgnoreFields(AppUser{}, "CreatedAt", "UpdatedAt", "DeletedAt")))
 	}
 
 	t.Log("Verifying update and find in same transaction")
