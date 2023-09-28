@@ -47,8 +47,11 @@ import (
 
 type DataStore interface {
 	Find(ctx context.Context, record Record) error
+	FindSoftDeleted(ctx context.Context, record Record) error
 	FindAll(ctx context.Context, records interface{}, pagination *Pagination) error
+	FindAllIncludingSoftDeleted(ctx context.Context, records interface{}, pagination *Pagination) error
 	FindWithFilter(ctx context.Context, filter Record, records interface{}, pagination *Pagination) error
+	FindWithFilterIncludingSoftDeleted(ctx context.Context, filter Record, records interface{}, pagination *Pagination) error
 	Insert(ctx context.Context, record Record) (int64, error)
 	SoftDelete(ctx context.Context, record Record) (int64, error)
 	Delete(ctx context.Context, record Record) (int64, error)
@@ -75,8 +78,9 @@ type DataStore interface {
 }
 
 type Helper interface {
-	FindAllInTable(ctx context.Context, tableName string, records interface{}, pagination *Pagination) error
-	FindWithFilterInTable(ctx context.Context, tableName string, record Record, records interface{}, pagination *Pagination) error
+	FindInTable(ctx context.Context, tableName string, record Record, softDelete bool) (err error)
+	FindAllInTable(ctx context.Context, tableName string, records interface{}, pagination *Pagination, softDelete bool) error
+	FindWithFilterInTable(ctx context.Context, tableName string, record Record, records interface{}, pagination *Pagination, softDelete bool) (err error)
 	GetDBTransaction(ctx context.Context, tableName string, record Record) (tx *gorm.DB, err error)
 
 	RegisterHelper(ctx context.Context, roleMapping map[string]dbrole.DbRole, tableName string, record Record) error

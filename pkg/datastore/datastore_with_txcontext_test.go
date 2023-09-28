@@ -24,6 +24,8 @@ import (
 	"io"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
@@ -55,10 +57,10 @@ func testTxCrud(t *testing.T, ds datastore.DataStore, ctx context.Context, user1
 	defer rollbackTx(t, tx)
 	txCtx := txFetcher.WithTransactionCtx(ctx, tx)
 	for _, record := range []*AppUser{user1, user2} {
-		queryResult := AppUser{Id: record.Id}
-		err = ds.Find(txCtx, &queryResult)
+		queryResult := &AppUser{Id: record.Id}
+		err = ds.Find(txCtx, queryResult)
 		assert.NoError(err)
-		assert.Equal(record, &queryResult)
+		assert.True(cmp.Equal(record, queryResult, cmpopts.IgnoreFields(AppUser{}, "CreatedAt", "UpdatedAt", "DeletedAt")))
 	}
 	assert.NoError(tx.Commit().Error)
 
@@ -83,7 +85,7 @@ func testTxCrud(t *testing.T, ds datastore.DataStore, ctx context.Context, user1
 		queryResult := &AppUser{Id: record.Id}
 		err = ds.Find(txCtx, queryResult)
 		assert.NoError(err)
-		assert.Equal(record, queryResult)
+		assert.True(cmp.Equal(record, queryResult, cmpopts.IgnoreFields(AppUser{}, "CreatedAt", "UpdatedAt", "DeletedAt")))
 	}
 	assert.NoError(tx.Commit().Error)
 
@@ -102,7 +104,7 @@ func testTxCrud(t *testing.T, ds datastore.DataStore, ctx context.Context, user1
 		queryResult := &AppUser{Id: record.Id}
 		err = ds.Find(txCtx, queryResult)
 		assert.NoError(err)
-		assert.Equal(record, queryResult)
+		assert.True(cmp.Equal(record, queryResult, cmpopts.IgnoreFields(AppUser{}, "CreatedAt", "UpdatedAt", "DeletedAt")))
 	}
 	assert.NoError(tx.Commit().Error)
 
@@ -162,10 +164,10 @@ func TestSingleTxCrud(t *testing.T) {
 
 	t.Log("Querying created records in same transaction")
 	for _, record := range []*AppUser{user1, user2} {
-		queryResult := AppUser{Id: record.Id}
-		err = ds.Find(txCtx, &queryResult)
+		queryResult := &AppUser{Id: record.Id}
+		err = ds.Find(txCtx, queryResult)
 		assert.NoError(err)
-		assert.Equal(record, &queryResult)
+		assert.True(cmp.Equal(record, queryResult, cmpopts.IgnoreFields(AppUser{}, "CreatedAt", "UpdatedAt", "DeletedAt")))
 	}
 
 	t.Log("Verifying update and find in same transaction")
@@ -189,7 +191,7 @@ func TestSingleTxCrud(t *testing.T) {
 		queryResult := &AppUser{Id: record.Id}
 		err = ds.Find(txCtx, queryResult)
 		assert.NoError(err)
-		assert.Equal(record, queryResult)
+		assert.True(cmp.Equal(record, queryResult, cmpopts.IgnoreFields(AppUser{}, "CreatedAt", "UpdatedAt", "DeletedAt")))
 	}
 
 	t.Log("Verifying upsert and find in same transaction")
@@ -203,7 +205,7 @@ func TestSingleTxCrud(t *testing.T) {
 		queryResult := &AppUser{Id: record.Id}
 		err = ds.Find(txCtx, queryResult)
 		assert.NoError(err)
-		assert.Equal(record, queryResult)
+		assert.True(cmp.Equal(record, queryResult, cmpopts.IgnoreFields(AppUser{}, "CreatedAt", "UpdatedAt", "DeletedAt")))
 	}
 
 	t.Log("Verifying deletion and find in same transaction")

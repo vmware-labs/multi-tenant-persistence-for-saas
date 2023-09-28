@@ -647,7 +647,7 @@ func testProtoStoreCrud(t *testing.T, p protostore.ProtoStore, ctx context.Conte
 	assert := assert.New(t)
 	var err error
 	var rowsAffected int64
-	var metadata1, metadata2, metadata3 protostore.Metadata
+	var metadata1, metadata2, metadata3, metadata4, metadata5 protostore.Metadata
 
 	// Insert Protobuf record
 	cpuMsg1 := pb.CPU{}
@@ -724,6 +724,35 @@ func testProtoStoreCrud(t *testing.T, p protostore.ProtoStore, ctx context.Conte
 	assert.NoError(err)
 	assert.EqualValues(metadata2.Revision+1, revision, "Revision did not increment by 1 after an update")
 
+	// soft delete cpu msg
+	rowsAffected, metadata4, err = p.SoftDeleteById(ctx, P4, &pb.CPU{})
+	assert.NoError(err, "Failed to delete Protobuf message from ProtoStore")
+	assert.EqualValues(1, rowsAffected)
+	assert.EqualValues(metadata3.Revision+1, metadata4.Revision, "Revision did not increment by 1 after soft delete")
+
+	cpuMsg6 := pb.CPU{}
+	err = p.FindById(ctx, P4, &cpuMsg6, &metadata5)
+	assert.ErrorIs(err, ErrRecordNotFound)
+
+	cpuMsg6 = pb.CPU{}
+	err = p.FindByIdIncludingSoftDeleted(ctx, P4, &cpuMsg6, &metadata5)
+	assert.NoError(err)
+
+	// Query all Protobuf records
+	allCpus = make([]pb.CPU, 0)
+	metadataMap, err = p.FindAll(ctx, &allCpus, datastore.NoPagination())
+	assert.NoError(err)
+	assert.Len(allCpus, 0)
+	assert.Len(metadataMap, 0)
+
+	allCpus = make([]pb.CPU, 0)
+	metadataMap, err = p.FindAllIncludingSoftDeleted(ctx, &allCpus, datastore.NoPagination())
+	assert.NoError(err)
+	assert.Len(allCpus, 1)
+	assert.Len(metadataMap, 1)
+	assert.Contains(metadataMap, P4)
+	assert.EqualValues(metadata5.Revision, metadataMap[P4].Revision, "Revision did not increment by 1 after an update")
+
 	memMsg1 := pb.Memory{}
 	_ = faker.FakeData(&memMsg1)
 	if useUpsert {
@@ -769,20 +798,20 @@ func testProtoStoreCrud(t *testing.T, p protostore.ProtoStore, ctx context.Conte
 	assert.EqualValues(0, rowsAffected)
 
 	// Delete CPU message with an ID of P4. Memory message with an ID of P4 must remain intact
-	cpuMsg6 := pb.CPU{}
-	err = p.FindById(ctx, P4, &cpuMsg6, nil)
+	cpuMsg7 := pb.CPU{}
+	err = p.FindById(ctx, P4, &cpuMsg7, nil)
 	assert.ErrorIs(err, ErrRecordNotFound)
-	assert.Equal("", cpuMsg6.String(), "Found a Protobuf message that was supposed to be deleted")
+	assert.Equal("", cpuMsg7.String(), "Found a Protobuf message that was supposed to be deleted")
 
 	err = p.FindById(ctx, P4, &memMsg4, nil)
 	assert.NoError(err)
 	assert.Equal(memMsg3.String(), memMsg4.String(), "Protobuf message that was not supposed to be modified was still modified")
 
-	rowsAffected, err = p.SoftDeleteById(ctx, P4, &pb.Memory{})
+	rowsAffected, _, err = p.SoftDeleteById(ctx, P4, &pb.Memory{})
 	assert.NoError(err, "Failed to soft delete Protobuf message from ProtoStore")
 	assert.EqualValues(1, rowsAffected)
 
-	rowsAffected, err = p.SoftDeleteById(ctx, P4, &pb.Memory{})
+	rowsAffected, _, err = p.SoftDeleteById(ctx, P4, &pb.Memory{})
 	assert.NoError(err, "Soft Deleting a non-existent Protobuf message produced an error. SoftDeleteById() might be not idempotent.")
 	assert.EqualValues(0, rowsAffected)
 

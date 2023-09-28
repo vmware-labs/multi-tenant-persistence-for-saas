@@ -48,9 +48,11 @@ type ProtoStore interface {
 	Update(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, md Metadata, err error)
 	Upsert(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, md Metadata, err error)
 	FindById(ctx context.Context, id string, msg proto.Message, metadata *Metadata) error
+	FindByIdIncludingSoftDeleted(ctx context.Context, id string, msg proto.Message, metadata *Metadata) error
 	FindAll(ctx context.Context, msgs interface{}, pagination *datastore.Pagination) (metadataMap map[string]Metadata, err error)
+	FindAllIncludingSoftDeleted(ctx context.Context, msgs interface{}, pagination *datastore.Pagination) (metadataMap map[string]Metadata, err error)
 	FindAllAsMap(ctx context.Context, msgsMap interface{}, pagination *datastore.Pagination) (metadataMap map[string]Metadata, err error)
-	SoftDeleteById(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, err error)
+	SoftDeleteById(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, md Metadata, err error)
 	DeleteById(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, err error)
 
 	InsertWithMetadata(ctx context.Context, id string, msg proto.Message, metadata Metadata) (rowsAffected int64, md Metadata, err error)
@@ -58,6 +60,7 @@ type ProtoStore interface {
 	UpsertWithMetadata(ctx context.Context, id string, msg proto.Message, metadata Metadata) (rowsAffected int64, md Metadata, err error)
 
 	GetMetadata(ctx context.Context, id string, msg proto.Message) (md Metadata, err error)
+	GetSoftDeletedMetadata(ctx context.Context, id string, msg proto.Message) (md Metadata, err error)
 	GetRevision(ctx context.Context, id string, msg proto.Message) (rowsAffected int64, err error)
 
 	MsgToFilter(ctx context.Context, id string, msg proto.Message) (pMsg *ProtoStoreMsg, err error)
@@ -275,15 +278,24 @@ func (p ProtobufDataStore) UpsertWithMetadata(ctx context.Context, id string, ms
 // Finds a Protobuf message by ID.
 // If metadata arg. is non-nil, fills it with the metadata (parent ID & revision) of the Protobuf message that was found.
 func (p ProtobufDataStore) FindById(ctx context.Context, id string, msg proto.Message, metadata *Metadata) error {
+	return p.findById(ctx, id, msg, metadata, false)
+}
+
+func (p ProtobufDataStore) FindByIdIncludingSoftDeleted(ctx context.Context, id string, msg proto.Message, metadata *Metadata) error {
+	return p.findById(ctx, id, msg, metadata, true)
+}
+
+func (p ProtobufDataStore) findById(ctx context.Context, id string, msg proto.Message, metadata *Metadata, softDelete bool) error {
 	protoStoreMsg, err := p.MsgToFilter(ctx, id, msg)
 	if err != nil {
 		return err
 	}
 
-	err = p.ds.Find(ctx, protoStoreMsg)
+	err = p.ds.Helper().FindInTable(ctx, datastore.GetTableName(protoStoreMsg), protoStoreMsg, softDelete)
 	if err != nil {
 		return err
 	}
+
 	if metadata != nil {
 		*metadata = MetadataFrom(*protoStoreMsg)
 	}
@@ -291,11 +303,19 @@ func (p ProtobufDataStore) FindById(ctx context.Context, id string, msg proto.Me
 }
 
 func (p ProtobufDataStore) GetMetadata(ctx context.Context, id string, msg proto.Message) (md Metadata, err error) {
+	return p.getMetadata(ctx, id, msg, false)
+}
+
+func (p ProtobufDataStore) GetSoftDeletedMetadata(ctx context.Context, id string, msg proto.Message) (md Metadata, err error) {
+	return p.getMetadata(ctx, id, msg, true)
+}
+
+func (p ProtobufDataStore) getMetadata(ctx context.Context, id string, msg proto.Message, softDelete bool) (md Metadata, err error) {
 	protoStoreMsg, err := p.MsgToFilter(ctx, id, msg)
 	if err != nil {
 		return md, err
 	}
-	err = p.ds.Find(ctx, protoStoreMsg)
+	err = p.ds.Helper().FindInTable(ctx, datastore.GetTableName(protoStoreMsg), protoStoreMsg, softDelete)
 	return MetadataFrom(*protoStoreMsg), err
 }
 
@@ -333,9 +353,10 @@ func (p ProtobufDataStore) FindAllAsMap(ctx context.Context, msgsMap interface{}
 	}
 
 	tableName := datastore.GetTableName(reflect.New(elemType).Interface())
-
 	protoStoreMsgs := make([]ProtoStoreMsg, 0)
-	err = p.ds.Helper().FindAllInTable(ctx, tableName, &protoStoreMsgs, pagination)
+
+	// soft delete flag is false
+	err = p.ds.Helper().FindAllInTable(ctx, tableName, &protoStoreMsgs, pagination, false)
 	if err != nil {
 		return nil, err
 	}
@@ -362,11 +383,7 @@ func (p ProtobufDataStore) FindAllAsMap(ctx context.Context, msgsMap interface{}
 	return metadataMap, nil
 }
 
-// FindAll Finds all messages (of the same type as the element of msgs) in Protostore and stores the result in msgs.
-// msgs must be a pointer to a slice of Protobuf structs or a pointer to a slice of pointers to Protobuf structs.
-// It will be modified in-place.
-// Returns a map of Protobuf messages' IDs to their metadata (parent ID & revision).
-func (p ProtobufDataStore) FindAll(ctx context.Context, msgs interface{}, pagination *datastore.Pagination) (metadataMap map[string]Metadata, err error) {
+func (p ProtobufDataStore) findAll(ctx context.Context, msgs interface{}, pagination *datastore.Pagination, softDelete bool) (metadataMap map[string]Metadata, err error) {
 	if reflect.TypeOf(msgs).Kind() != reflect.Ptr || reflect.TypeOf(msgs).Elem().Kind() != reflect.Slice {
 		errMsg := "\"msgs\" argument has to be a pointer to a slice"
 		p.logger.Error(errMsg)
@@ -383,7 +400,8 @@ func (p ProtobufDataStore) FindAll(ctx context.Context, msgs interface{}, pagina
 	tableName := datastore.GetTableName(msgs)
 
 	protoStoreMsgs := make([]ProtoStoreMsg, 0)
-	err = p.ds.Helper().FindAllInTable(ctx, tableName, &protoStoreMsgs, pagination)
+
+	err = p.ds.Helper().FindAllInTable(ctx, tableName, &protoStoreMsgs, pagination, softDelete)
 	if err != nil {
 		return nil, err
 	}
@@ -415,12 +433,32 @@ func (p ProtobufDataStore) FindAll(ctx context.Context, msgs interface{}, pagina
 	return metadataMap, nil
 }
 
-func (p ProtobufDataStore) SoftDeleteById(ctx context.Context, id string, msg proto.Message) (int64, error) {
+// FindAll Finds all messages (of the same type as the element of msgs) in Protostore and stores the result in msgs.
+// msgs must be a pointer to a slice of Protobuf structs or a pointer to a slice of pointers to Protobuf structs.
+// It will be modified in-place.
+// Returns a map of Protobuf messages' IDs to their metadata (parent ID & revision).
+func (p ProtobufDataStore) FindAll(ctx context.Context, msgs interface{}, pagination *datastore.Pagination) (metadataMap map[string]Metadata, err error) {
+	return p.findAll(ctx, msgs, pagination, false)
+}
+
+func (p ProtobufDataStore) FindAllIncludingSoftDeleted(ctx context.Context, msgs interface{}, pagination *datastore.Pagination) (metadataMap map[string]Metadata, err error) {
+	return p.findAll(ctx, msgs, pagination, true)
+}
+
+func (p ProtobufDataStore) SoftDeleteById(ctx context.Context, id string, msg proto.Message) (int64, Metadata, error) {
 	protoStoreMsg, err := p.MsgToFilter(ctx, id, msg)
 	if err != nil {
-		return 0, err
+		return 0, Metadata{}, err
 	}
-	return p.ds.SoftDelete(ctx, protoStoreMsg)
+	rowsAffected, err := p.ds.SoftDelete(ctx, protoStoreMsg)
+	if err != nil {
+		return 0, Metadata{}, err
+	}
+	md, err := p.GetSoftDeletedMetadata(ctx, id, msg)
+	if err != nil {
+		return 0, Metadata{}, err
+	}
+	return rowsAffected, md, err
 }
 
 func (p ProtobufDataStore) DeleteById(ctx context.Context, id string, msg proto.Message) (int64, error) {
