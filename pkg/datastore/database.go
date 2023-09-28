@@ -255,21 +255,14 @@ func (db *relationalDb) FindInTable(ctx context.Context, tableName string, recor
 	}()
 
 	if softDelete {
-		if err = tx.Unscoped().Table(tableName).Where(record).First(record).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return ErrRecordNotFound.Wrap(err).WithValue("record", fmt.Sprintf("%+v", record)).WithValue(DB_NAME, db.dbName)
-			}
-			db.logger.Debug(err)
-			return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
+		tx = tx.Unscoped()
+	}
+	if err = tx.Table(tableName).Where(record).First(record).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrRecordNotFound.Wrap(err).WithValue("record", fmt.Sprintf("%+v", record)).WithValue(DB_NAME, db.dbName)
 		}
-	} else {
-		if err = tx.Table(tableName).Where(record).First(record).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return ErrRecordNotFound.Wrap(err).WithValue("record", fmt.Sprintf("%+v", record)).WithValue(DB_NAME, db.dbName)
-			}
-			db.logger.Debug(err)
-			return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
-		}
+		db.logger.Debug(err)
+		return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 	}
 	return db.commitWhenTxNotInsideCtx(ctx, tx)
 }
@@ -320,15 +313,11 @@ func (db *relationalDb) FindWithFilterInTable(ctx context.Context, tableName str
 	}
 
 	if softDelete {
-		if err = tx.Unscoped().Table(tableName).Where(record).Error; err != nil {
-			db.logger.Debug(err)
-			return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
-		}
-	} else {
-		if err = tx.Table(tableName).Where(record).Error; err != nil {
-			db.logger.Debug(err)
-			return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
-		}
+		tx = tx.Unscoped()
+	}
+	if err = tx.Table(tableName).Where(record).Error; err != nil {
+		db.logger.Debug(err)
+		return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 	}
 
 	if pagination != nil {
@@ -338,16 +327,9 @@ func (db *relationalDb) FindWithFilterInTable(ctx context.Context, tableName str
 		}
 	}
 
-	if softDelete {
-		if err = tx.Unscoped().Find(records).Error; err != nil {
-			db.logger.Debug(err)
-			return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
-		}
-	} else {
-		if err = tx.Find(records).Error; err != nil {
-			db.logger.Debug(err)
-			return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
-		}
+	if err = tx.Find(records).Error; err != nil {
+		db.logger.Debug(err)
+		return ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 	}
 
 	return db.commitWhenTxNotInsideCtx(ctx, tx)
@@ -426,16 +408,12 @@ func (db *relationalDb) delete(ctx context.Context, tableName string, record Rec
 		}
 	}()
 
-	if softDelete {
-		if err = tx.Delete(record).Error; err != nil {
-			db.logger.Debug(err)
-			return 0, ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
-		}
-	} else {
-		if err = tx.Unscoped().Delete(record).Error; err != nil {
-			db.logger.Debug(err)
-			return 0, ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
-		}
+	if !softDelete {
+		tx = tx.Unscoped()
+	}
+	if err = tx.Delete(record).Error; err != nil {
+		db.logger.Debug(err)
+		return 0, ErrExecutingSqlStmt.Wrap(err).WithValue(DB_NAME, db.dbName)
 	}
 	err = db.commitWhenTxNotInsideCtx(ctx, tx)
 	if err != nil {
