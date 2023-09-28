@@ -232,17 +232,18 @@ func rollbackTx(tx *gorm.DB, db *relationalDb) {
 // record argument must be a pointer to a struct and will be modified in-place.
 // Returns ErrRecordNotFound if a record could not be found.
 func (db *relationalDb) Find(ctx context.Context, record Record) error {
-	return db.find(ctx, GetTableName(record), record, false)
+	return db.FindInTable(ctx, record, false)
 }
 
 func (db *relationalDb) FindSoftDeleted(ctx context.Context, record Record) error {
-	return db.find(ctx, GetTableName(record), record, true)
+	return db.FindInTable(ctx, record, true)
 }
 
 // Finds a single record that has the same values as non-zero fields in the record.
 // record argument must be a pointer to a struct and will be modified in-place.
 // Returns ErrRecordNotFound if a record could not be found.
-func (db *relationalDb) find(ctx context.Context, tableName string, record Record, softDelete bool) (err error) {
+func (db *relationalDb) FindInTable(ctx context.Context, record Record, softDelete bool) (err error) {
+	tableName := GetTableName(record)
 	var tx *gorm.DB
 	if tx, err = db.GetDBTransaction(ctx, tableName, record); err != nil {
 		return err
@@ -277,64 +278,40 @@ func (db *relationalDb) find(ctx context.Context, tableName string, record Recor
 // Finds all records in a DB table.
 // records must be a pointer to a slice of structs and will be modified in-place.
 func (db *relationalDb) FindAll(ctx context.Context, records interface{}, pagination *Pagination) error {
-	return db.findAll(ctx, records, pagination, false)
+	return db.FindAllInTable(ctx, records, pagination, false)
 }
 
 func (db *relationalDb) FindAllIncludingSoftDeleted(ctx context.Context, records interface{}, pagination *Pagination) error {
-	return db.findAll(ctx, records, pagination, true)
+	return db.FindAllInTable(ctx, records, pagination, true)
 }
 
-func (db *relationalDb) findAll(ctx context.Context, records interface{}, pagination *Pagination, softDelete bool) error {
+func (db *relationalDb) FindAllInTable(ctx context.Context, records interface{}, pagination *Pagination, softDelete bool) error {
 	if reflect.TypeOf(records).Kind() != reflect.Ptr || reflect.TypeOf(records).Elem().Kind() != reflect.Slice {
 		errMsg := "\"records\" argument has to be a pointer to a slice of structs implementing \"Record\" interface"
 		err := ErrNotPtrToStructSlice.Wrap(fmt.Errorf(errMsg))
 		db.logger.Debug(err)
 		return err
 	}
-
 	tableName := GetTableName(records)
-	if softDelete {
-		return db.FindAllInTableIncludingSoftDeleted(ctx, tableName, records, pagination)
-	} else {
-		return db.FindAllInTable(ctx, tableName, records, pagination)
-	}
-}
-
-// FindAllInTable Finds all records in DB table tableName.
-// records must be a pointer to a slice of structs and will be modified in-place.
-func (db *relationalDb) FindAllInTable(ctx context.Context, tableName string, records interface{}, pagination *Pagination) error {
 	record := GetRecordInstanceFromSlice(records)
-	return db.FindWithFilterInTable(ctx, tableName, record, records, pagination)
-}
-
-func (db *relationalDb) FindAllInTableIncludingSoftDeleted(ctx context.Context, tableName string, records interface{}, pagination *Pagination) error {
-	record := GetRecordInstanceFromSlice(records)
-	return db.FindWithFilterInTableIncludingSoftDeleted(ctx, tableName, record, records, pagination)
+	return db.FindWithFilterInTable(ctx, tableName, record, records, pagination, softDelete)
 }
 
 // FindWithFilter Finds multiple records in a DB table.
 // If record argument is non-empty, uses the non-empty fields as criteria in a query.
 // records must be a pointer to a slice of structs and will be modified in-place.
 func (db *relationalDb) FindWithFilter(ctx context.Context, record Record, records interface{}, pagination *Pagination) error {
-	return db.FindWithFilterInTable(ctx, GetTableName(record), record, records, pagination)
+	return db.FindWithFilterInTable(ctx, GetTableName(record), record, records, pagination, false)
 }
 
 func (db *relationalDb) FindWithFilterIncludingSoftDeleted(ctx context.Context, record Record, records interface{}, pagination *Pagination) error {
-	return db.FindWithFilterInTableIncludingSoftDeleted(ctx, GetTableName(record), record, records, pagination)
+	return db.FindWithFilterInTable(ctx, GetTableName(record), record, records, pagination, true)
 }
 
 // Finds multiple records in DB table tableName.
 // If record argument is non-empty, uses the non-empty fields as criteria in a query.
 // records must be a pointer to a slice of structs and will be modified in-place.
-func (db *relationalDb) FindWithFilterInTable(ctx context.Context, tableName string, record Record, records interface{}, pagination *Pagination) (err error) {
-	return db.findWithFilterInTable(ctx, tableName, record, records, pagination, false)
-}
-
-func (db *relationalDb) FindWithFilterInTableIncludingSoftDeleted(ctx context.Context, tableName string, record Record, records interface{}, pagination *Pagination) (err error) {
-	return db.findWithFilterInTable(ctx, tableName, record, records, pagination, true)
-}
-
-func (db *relationalDb) findWithFilterInTable(ctx context.Context, tableName string, record Record, records interface{}, pagination *Pagination, softDelete bool) (err error) {
+func (db *relationalDb) FindWithFilterInTable(ctx context.Context, tableName string, record Record, records interface{}, pagination *Pagination, softDelete bool) (err error) {
 	if reflect.TypeOf(records).Kind() != reflect.Ptr || reflect.TypeOf(records).Elem().Kind() != reflect.Slice {
 		return ErrNotPtrToStruct.WithValue(TYPE, TypeName(records))
 	}
