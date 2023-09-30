@@ -707,9 +707,9 @@ func (db *relationalDb) GetInstancer() authorizer.Instancer {
 
 // Uses an authorizer to get user's org. ID and a matching DB role.
 // With the default MetadataBasedAuthorizer, does the following:
-// Gets user's org ID and a DB role that matches one of its CSP roles.
-// Returns an error if there are no role mappings for the given table, if user's org. ID cannot be retrieved from CSP,
-// or if there is no matching DB role for any one of the user's CSP roles.
+// Gets user's org ID and a DB role that matches one of its user roles.
+// Returns an error if there are no role mappings for the given table, if user's org. ID cannot be retrieved from AuthProvider
+// or if there is no matching DB role for any one of the user's roles.
 func (db *relationalDb) getTenancyInfoFromCtx(ctx context.Context, tableNames ...string) (err error, tenancyInfo TenancyInfo) {
 	// Get the matching DB role
 	tenancyInfo.DbRole, err = db.authorizer.GetMatchingDbRole(ctx, tableNames...)

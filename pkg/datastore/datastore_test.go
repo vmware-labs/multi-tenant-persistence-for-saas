@@ -45,8 +45,6 @@ import (
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/test/pb"
 )
 
-var LOG *logrus.Entry
-
 // TODO - add a test that would show that the DB users are not able to create, drop, or truncate tables
 
 func TestHasTable(t *testing.T) {
@@ -479,10 +477,10 @@ func TestDALRegistration(t *testing.T) {
 /*
 Checks if DAL is able to select the least restrictive available DB role to perform SQL operations on one table.
 */
-func TestDeleteWithMultipleCSPRoles(t *testing.T) {
+func TestDeleteWithMultipleUserRoles(t *testing.T) {
 	const APP_ADMIN = "app_admin"
 	assert := assert.New(t)
-	ds, _ := SetupDataStore("TestDeleteWithMultipleCSPRoles")
+	ds, _ := SetupDataStore("TestDeleteWithMultipleUserRoles")
 	defer ds.Reset()
 
 	// Create context for custom admin who will have 2 service roles
