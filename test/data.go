@@ -24,9 +24,14 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 
 	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/datastore"
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/dbrole"
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/protostore"
+	"github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/realization_store"
 )
 
 const (
@@ -142,4 +147,52 @@ func (g Group) String() string {
 	} else {
 		return string(bytes)
 	}
+}
+
+// TODO: Get rid of global variables.
+var (
+	LOG     *logrus.Entry
+	DS      datastore.DataStore
+	PS      protostore.ProtoStore
+	RS      realization_store.IRealizationStore
+	NO_ROLE dbrole.DbRole
+
+	TestAuthorizer authorizer.Authorizer
+)
+
+func InitTestData(dbName string) {
+	InitLog()
+	var err error
+	NO_ROLE = dbrole.DbRole("")
+	InitMetadataAuthorizer()
+	InitAuthContexts()
+
+	LOG.Info("Initializing data/proto/realization stores")
+	DS, err = datastore.FromEnvWithDB(LOG, TestAuthorizer, nil, dbName)
+	if err != nil {
+		LOG.Fatalf("Failed to get default datastore: %e", err)
+	}
+	PS = protostore.GetProtoStore(LOG, DS)
+	RS = realization_store.GetRealizationStore(DS, PS, LOG)
+	LOG.Info("Initialized data/proto/realization stores successfully")
+}
+
+func InitLog() *logrus.Logger {
+	logger := logrus.New()
+	LOG = logger.WithFields(logrus.Fields{
+		"service": "gotest",
+	})
+	return logger
+}
+
+func InitMetadataAuthorizer() {
+	TestAuthorizer = &authorizer.MetadataBasedAuthorizer{}
+}
+
+func InitAuthContexts() {
+	ServiceAdminCtx = TestAuthorizer.GetAuthContext("", SERVICE_ADMIN)
+	CokeAdminCtx = TestAuthorizer.GetAuthContext(COKE, TENANT_ADMIN)
+	CokeAuditorCtx = TestAuthorizer.GetAuthContext(COKE, TENANT_AUDITOR)
+	PepsiAdminCtx = TestAuthorizer.GetAuthContext(PEPSI, TENANT_ADMIN)
+	PepsiAuditorCtx = TestAuthorizer.GetAuthContext(PEPSI, TENANT_AUDITOR)
 }

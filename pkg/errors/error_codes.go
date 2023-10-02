@@ -217,4 +217,8 @@ var (
 	ErrNoUserContext     = ErrBaseDb.With("Permission denied because userInformation is missing")
 	ErrUserNotAuthorized = ErrBaseDb.With("User is not authorized to access this API")
 	ErrMissingInstanceId = ErrBaseDb.With("Instance ID is not configured in the context")
+
+	ErrMarkingEnforcementFailed = ErrBaseDb.With("Failed to mark resource's enforcement status")
+	ErrGettingRealizationStatus = ErrBaseDb.With("Failed to get resource's realization status")
+	ErrResourceStillExists      = ErrBaseDb.With("Resource still exists")
 )

@@ -6,7 +6,6 @@
 [![Code Coverage](https://codecov.io/gh/vmware-labs/multi-tenant-persistence-for-saas/branch/main/graph/badge.svg?token=F7TQPSFEMCN)](https://app.codecov.io/gh/vmware-labs/multi-tenant-persistence-for-saas)
 [![Daily](https://github.com/vmware-labs/multi-tenant-persistence-for-saas/actions/workflows/daily.yml/badge.svg)](https://github.com/vmware-labs/multi-tenant-persistence-for-saas/actions/workflows/daily.yml)
 
-
 ## Overview
 
 Multi-tenant Persistence for SaaS services acts as data abstraction layer for
@@ -68,6 +67,92 @@ sequenceDiagram
     end
 ```
 
+Sample use case of the realization store where two threads T1, T2 that are parallelly
+realizing the resource that just got updated at two different enforcement points
+E1, E2 looks as follows,
+
+```mermaid
+sequenceDiagram
+    actor T0
+    actor T1
+    actor T2
+    participant E1
+    participant E2
+    participant RS as RealizationStore
+    participant R as ResourceTable
+    participant O as OverallStatusTable
+    participant E as EnforcementStatusTable
+
+    rect rgb(200,220,240)
+    T0 ->>+ RS: PersistIntent P1
+    RS -->> R: UPSERT ID=P1
+    RS -->> O: Set OverallStatus ID=P1 Status=Pending
+    RS ->>- T0: Done
+
+    T0 ->>+ RS: GetOverallStatus P1
+    RS -->> O: SELECT ID=P1
+    O -->> RS: |P1|PENDING|
+    RS ->>- T0: Return PENDING
+    end
+
+    rect rgb(220,240,260)
+    note right of T1: T1 realizing P1 at E1
+    T1 ->>+ RS: MarkPending P1 at E1
+    RS -->> E: Set Status ID=P1 Enforcement=E1 Status=Pending
+    RS -->> O: Set Status ID=P1 Status=Pending
+    RS ->>- T1: Return
+
+    T1 ->> E1: Realize Resource P1 at E1
+    note right of T1: T1 SUCCEEDED realizing at E1
+    T1 ->>+ RS: MarkSuccess P1 at E1
+    RS -->> E: Set Status ID=P1 Enforcement=E1 Status=REALIZED
+    RS -->> E: List Status ID=P1 Enforcement=*
+    E -->> RS: |P1|E1|REALIZED|, |P1|E2|PENDING|
+    RS -->> O: Set OverallStatus ID=P1 Status=Pending
+    RS ->>- T1: Return
+    note right of T1: T1 COMPLETED realizing P1 at E1
+    end
+
+    rect rgb(240,260,280)
+    note right of T2: T2 realizing P1 at E2
+    T2 ->>+ RS: MarkPending P1 at E2
+    RS -->> E: Set Status ID=P1 Enforcement=E2 Status=Pending
+    RS -->> O: Set OverallStatus ID=P1 Status=Pending
+    RS ->>- T2: Return
+    T2 ->> E2: Realize Resource P1 at E2
+    end
+
+    rect rgb(200,220,240)
+    note right of T0: T0 Fetching OverallStatus of P1
+    T0 ->>+ RS: GetOverallStatus P1
+    RS -->> O: SELECT ID=P1
+    O -->> RS: |P1|PENDING|
+    RS ->>- T0: Return PENDING
+    end
+
+    rect rgb(240,260,280)
+    note right of T2: T2 SUCCEEDED realizing at E2
+    T2 ->>+  RS: MarkSuccess P1 at E2
+    RS -->> E: Set Status ID=P1 Enforcement=E2 Status=REALIZED
+    RS -->> E: List Status ID=P1 Enforcement=*
+    E -->> RS: |P1|E1|REALIZED|, |P1|E2|REALIZED|
+    RS -->> O: Set OverallStatus ID=P1 Status=REALIZED
+    RS ->>- T2: Return
+    note right of T2: T2 COMPLETED realizing P1 at E2
+    end
+
+    rect rgb(200,220,240)
+    note right of T0: T0 Fetching OverallStatus of P1
+    T0 ->>+ RS: GetOverallStatus P1
+    RS -->> O: SELECT ID=P1
+    O -->> RS: |P1|REALIZED|
+    RS ->>- T0: Return REALIZED
+    end
+```
+
+Note that in the scenarios above, it is not necessary for the consumers of
+`IRealizationStore` to be the same software component.
+
 ## Features
 
 Currently, following features are supported:
@@ -96,11 +181,10 @@ Currently, following features are supported:
  .If instancer is not configured `instance_id` column doesnt have any special meaning
  .and treated as normal attribute.
 
-
-
 ## Documentation
 
-Refer to [DOCUMENTATION.md](docs/DOCUMENTATION.md) for the interfaces exposed like `Datastore`, `Authorizer`, `Protostore`
+Refer to [DOCUMENTATION.md](docs/DOCUMENTATION.md) for the interfaces exposed like
+`Datastore`, `Authorizer`, `Protostore`, `Realization Store`
 
 ## Future Support
 
@@ -108,11 +192,12 @@ Refer to [DOCUMENTATION.md](docs/DOCUMENTATION.md) for the interfaces exposed li
 
 ## Contributing
 
-The multi-tenant-persistence-for-saas project team welcomes contributions from the community. Before you start
-working with multi-tenant-persistence-for-saas, please read our [CONTRIBUTING.md](CONTRIBUTING_CLA.md). All
-contributions to this repository must be signed as described on that page. Your signature certifies that you
-wrote the patch or have the right to pass it on as an open-source patch. For more detailed information,
-refer to [CONTRIBUTING.md](CONTRIBUTING_CLA.md).
+The multi-tenant-persistence-for-saas project team welcomes contributions from the
+community. Before you start working with multi-tenant-persistence-for-saas, please
+read our [CONTRIBUTING.md](CONTRIBUTING_CLA.md). All contributions to this repository
+must be signed as described on that page. Your signature certifies that you wrote
+the patch or have the right to pass it on as an open-source patch. For more detailed
+information, refer to [CONTRIBUTING.md](CONTRIBUTING_CLA.md).
 
 ## License
 

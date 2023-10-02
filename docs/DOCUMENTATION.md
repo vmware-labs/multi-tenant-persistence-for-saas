@@ -989,6 +989,10 @@ var (
     ErrNoUserContext     = ErrBaseDb.With("Permission denied because userInformation is missing")
     ErrUserNotAuthorized = ErrBaseDb.With("User is not authorized to access this API")
     ErrMissingInstanceId = ErrBaseDb.With("Instance ID is not configured in the context")
+
+    ErrMarkingEnforcementFailed = ErrBaseDb.With("Failed to mark resource's enforcement status")
+    ErrGettingRealizationStatus = ErrBaseDb.With("Failed to get resource's realization status")
+    ErrResourceStillExists      = ErrBaseDb.With("Resource still exists")
 )
 ```
 
@@ -1448,6 +1452,345 @@ func (p ProtobufDataStore) UpsertWithMetadata(ctx context.Context, id string, ms
 ```
 
 Upserts a Protobuf record in the DB \(if the record exists, it is updated; if it does not, it is inserted\). Returns, rowsAffected \- 0 if upsert fails; 1 otherwise md \- metadata of the upserted Protobuf record err \- error that occurred during upsert, if any.
+
+# realization\_store
+
+```go
+import "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/realization_store"
+```
+
+This package exposes IRealizationStore interface that will be used to support managing statuses of resources being realized at different enforcement points and aggregating it OverallStatus to represent the state of resource.
+
+\#\# Implementation
+
+Two database tables will be used to track realization status of each resource type. The first one, \`EnforcementStatus\`, stores realization status of a resource at specific enforcement points, where an enforcement point is a workload where a resource is actually realized and where its status can be queried. The second one, \`OverallStatus\`, stores overall realization status of a resource across all enforcement points. The following ER diagrams show the DB schema for resource as an example.
+
+\#\#\# ER diagram
+
+\`\`\`mermaid erDiagram
+
+```
+Resource ||--|| ResourceOverallStatus : "Overall Status"
+Resource ||--o{ ResourceEnforcementStatus : "Status Per Enforcement Point"
+
+Resource {
+    string id
+    string org_id
+    byte[] msg
+    string parent_id
+    bigint revision
+}
+
+ResourceOverallStatus {
+    string id
+    string org_id
+    enum status "DELETION_REALIZED|REALIZED|DELETION_IN_PROGRESS|DELETION_PENDING|IN_PROGRESS|PENDING|ERROR"
+    string additional_details
+    created_at timestamptz
+    updated_at timestamptz
+    bigint revision
+}
+
+ResourceEnforcementStatus {
+    string id
+    string org_id
+    string enforcement_point_id
+    enum status  "DELETION_REALIZED|REALIZED|DELETION_IN_PROGRESS|DELETION_PENDING|IN_PROGRESS|PENDING|ERROR"
+    string additional_details
+    created_at timestamptz
+    updated_at timestamptz
+    bigint revision
+}
+```
+
+\`\`\`
+
+\#\# Common workflows
+
+The common workflows related to realization status support would be these: \*\*Scenario: A resource is created\*\* End user issues a request to persist an intent for resource \_R1\_. It needs to be realized at enforcement points \_E1\_ & \_E2\_. Consumer\(s\) would call these methods:
+
+```
+PersistIntent(R1)
+MarkEnforcementAsPending(E1, R1)
+MarkEnforcementAsPending(E2, R1)
+//R1 is successfully realized at E1
+MarkEnforcementAsSuccess(E1, R1)
+//R1 is successfully realized at E2
+MarkEnforcementAsSuccess(E2, R1)
+```
+
+\*\*Scenario: A resource is modified. Its status is queried\*\* End user issues a request to perist a modified intent for resource \_R1\_. The modified resource needs to be realized at enforcement points \_E1\_ & \_E2\_. Consumer\(s\) would call these methods:
+
+```
+PersistIntent(R1)
+MarkEnforcementAsPending(E1, R1)
+MarkEnforcementAsPending(E2, R1)
+//R1 is successfully realized at E1
+MarkEnforcementAsSuccess(E1, R1)
+//R1 is successfully realized at E2
+MarkEnforcementAsSuccess(E2, R1)
+GetOverallStatusWithEnforcementDetails(R1)
+```
+
+\*\*Scenario: A resource is deleted\*\* End user issues a request to delete an intent for resource \_R1\_. The deleted resource needs to be "unenforced" at enforcement points \_E1\_ & \_E2\_. Consumer\(s\) would call these methods:
+
+```
+Delete(R1)
+MarkEnforcementAsDeletionPending(E1, R1)
+MarkEnforcementAsDeletionPending(E1, R1)
+//R1 is successfully "unenforced" at E1
+MarkEnforcementAsDeletionRealized(E1, R1) //TBD
+//R1 is successfully "unenforced" at E2
+MarkEnforcementAsDeletionRealized(E2, R1) //TBD
+//Cleanup mechanism deletes stale status records for deleted resources - TBD
+```
+
+\*\*Scenario: A resource is created but fails to be realized at some enforcement points\*\* End user issues a request to persist an intent for resource \_R1\_. It needs to be realized at enforcement points \_E1\_ & \_E2\_. Consumer\(s\) would call these methods:
+
+```
+PersistIntent(R1)
+MarkEnforcementAsPending(E1, R1)
+MarkEnforcementAsPending(E2, R1)
+//R1 fails to be realized at E1 due to error err
+MarkEnforcementAsError(E1, err, R1)
+//R1 is successfully realized at E2
+MarkEnforcementAsSuccess(E2, R1)
+```
+
+\*\*Scenario: A new enforcement point is added\*\* An enforcement point \_E3\_ is added \(by end\-user or an admin\). Resources \_R1\_ and \_R2\_ need to be enforced on it. Consumer\(s\) would call these methods:
+
+```
+//Enforcement point is added
+MarkEnforcementAsPending(E3, R1, R2)
+//R1 is successfully realized at E3
+MarkEnforcementAsSuccess(E3, R1)
+//R2 is successfully realized at E3
+MarkEnforcementAsSuccess(E3, R2)
+```
+
+\*\*Scenario: An enforcement point is removed\*\* An enforcement point \_E3\_ is added \(by end\-user or an admin\). Resources \_R1\_ and \_R2\_ need to be "unenforced" on it. Consumer\(s\) would call these methods:
+
+```
+//Enforcement point is removed
+MarkEnforcementAsDeletionRealized(E3, R1, R2) //TBD
+```
+
+## Index
+
+- [Constants](<#constants>)
+- [func GetEnforcementStatusTableName(msg proto.Message) string](<#func-getenforcementstatustablename>)
+- [func GetOverallStatusTableName(msg proto.Message) string](<#func-getoverallstatustablename>)
+- [type EnforcementStatus](<#type-enforcementstatus>)
+  - [func GetModelEnforcementStatusRecord(resource *ProtobufWithMetadata, orgId string) *EnforcementStatus](<#func-getmodelenforcementstatusrecord>)
+  - [func GetModelEnforcementStatusRecordWithoutRevision(resource *ProtobufWithMetadata, orgId string) *EnforcementStatus](<#func-getmodelenforcementstatusrecordwithoutrevision>)
+  - [func (e *EnforcementStatus) TableName() string](<#func-enforcementstatus-tablename>)
+- [type IRealizationStore](<#type-irealizationstore>)
+  - [func GetRealizationStore(d datastore.DataStore, p protostore.ProtoStore, logger *logrus.Entry) IRealizationStore](<#func-getrealizationstore>)
+- [type OverallStatus](<#type-overallstatus>)
+  - [func GetModelOverallStatusRecord(resource *ProtobufWithMetadata, orgId string) *OverallStatus](<#func-getmodeloverallstatusrecord>)
+  - [func (o *OverallStatus) TableName() string](<#func-overallstatus-tablename>)
+- [type ProtobufWithMetadata](<#type-protobufwithmetadata>)
+- [type Status](<#type-status>)
+  - [func (i Status) String() string](<#func-status-string>)
+
+
+## Constants
+
+Constants for logger field names & values.
+
+```go
+const (
+    ORG_ID            = "orgId"
+    RESOURCE_ID       = "resourceId"
+    ENFORCEMENT_POINT = "enforcementPoint"
+    ALL               = "*"
+)
+```
+
+Logging statements.
+
+```go
+const (
+    RESOURCE           = "resource"
+    OVERALL_STATUS     = "overall status"
+    ENFORCEMENT_STATUS = "enforcement status"
+    ENFORCEMENT        = "enforcement"
+    INTENT             = "intent"
+
+    PERSISTING    = "Persisting"
+    SETTING       = "Setting"
+    RESETTING     = "Resetting"
+    SOFT_DELETING = "Soft-Deleting"
+    DELETING      = "Deleting"
+    PURGING       = "Purging"
+    FETCHING      = "Fetching"
+    REGISTERING   = "Registering"
+    MARKING       = "Marking"
+
+    STARTED  = "..."
+    FAILED   = "failed: "
+    ERRORED  = "errored: "
+    FINISHED = "finished."
+
+    AS_PENDING           = "as pending"
+    AS_SUCCESS           = "as success"
+    AS_ERROR             = "as error"
+    AS_DELETION_PENDING  = "as deletion pending"
+    AS_DELETION_REALIZED = "as deletion realized"
+)
+```
+
+```go
+const (
+    ADDITIONAL_DETAILS_LENGTH_CAP = 1024
+)
+```
+
+## func [GetEnforcementStatusTableName](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/realization_store/models.go#L71>)
+
+```go
+func GetEnforcementStatusTableName(msg proto.Message) string
+```
+
+## func [GetOverallStatusTableName](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/realization_store/models.go#L67>)
+
+```go
+func GetOverallStatusTableName(msg proto.Message) string
+```
+
+## type [EnforcementStatus](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/realization_store/models.go#L51-L61>)
+
+```go
+type EnforcementStatus struct {
+    Id                 string `gorm:"primaryKey"`
+    OrgId              string `gorm:"primaryKey"`
+    EnforcementPointId string `gorm:"primaryKey"`
+    RealizationStatus  Status
+    AdditionalDetails  string
+    Revision           int64  `gorm:"column:resource_revision"`
+    XTableName         string `gorm:"-"`
+    CreatedAt          time.Time
+    UpdatedAt          time.Time
+}
+```
+
+### func [GetModelEnforcementStatusRecord](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/realization_store/models.go#L84>)
+
+```go
+func GetModelEnforcementStatusRecord(resource *ProtobufWithMetadata, orgId string) *EnforcementStatus
+```
+
+### func [GetModelEnforcementStatusRecordWithoutRevision](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/realization_store/models.go#L75>)
+
+```go
+func GetModelEnforcementStatusRecordWithoutRevision(resource *ProtobufWithMetadata, orgId string) *EnforcementStatus
+```
+
+### func \(\*EnforcementStatus\) [TableName](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/realization_store/models.go#L63>)
+
+```go
+func (e *EnforcementStatus) TableName() string
+```
+
+## type [IRealizationStore](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/realization_store/realization_store.go#L163-L188>)
+
+```go
+type IRealizationStore interface {
+    Register(ctx context.Context, roleMapping map[string]dbrole.DbRole, msgs ...proto.Message) error
+
+    FindById(ctx context.Context, id string, resource *ProtobufWithMetadata) error
+
+    PersistIntent(ctx context.Context, resource *ProtobufWithMetadata) (rowsAffected int64, metadata protostore.Metadata, err error)
+    MarkEnforcementAsPending(ctx context.Context, enforcementPoint string, resources ...*ProtobufWithMetadata) error
+    MarkEnforcementAsInProgress(ctx context.Context, enforcementPoint string, resources ...*ProtobufWithMetadata) error
+    MarkEnforcementAsSuccess(ctx context.Context, enforcementPoint string, resources ...*ProtobufWithMetadata) error
+    MarkEnforcementAsError(ctx context.Context, enforcementPoint string, errStr string, resources ...*ProtobufWithMetadata) error
+
+    SoftDelete(ctx context.Context, resource *ProtobufWithMetadata) (rowsAffected int64, err error)
+    Delete(ctx context.Context, resource *ProtobufWithMetadata) (rowsAffected int64, err error)
+    Purge(ctx context.Context, resource *ProtobufWithMetadata) (rowsAffected int64, err error)
+    MarkEnforcementAsDeletionPending(ctx context.Context, enforcementPoint string, resources ...*ProtobufWithMetadata) error
+    MarkEnforcementAsDeletionInProgress(ctx context.Context, enforcementPoint string, resources ...*ProtobufWithMetadata) error
+    MarkEnforcementAsDeletionRealized(ctx context.Context, enforcementPoint string, resources ...*ProtobufWithMetadata) error
+
+    GetOverallStatus(ctx context.Context, resource *ProtobufWithMetadata) (Status, error)
+    GetOverallStatusWithEnforcementDetails(ctx context.Context, resource *ProtobufWithMetadata) (Status, map[string]Status, error)
+    GetEnforcementStatusMap(ctx context.Context, resource *ProtobufWithMetadata) (overallStatus OverallStatus, enforcementStatusMap map[string]EnforcementStatus, err error)
+
+    // To handle error scenarios and for intrumentation cases
+    PurgeStaleStatusRecords(ctx context.Context, resource *ProtobufWithMetadata) (rowsAffected int64, err error)
+    PurgeStaleEnforcementStatusRecords(ctx context.Context, resource *ProtobufWithMetadata, enforcementStatusRecordMap map[string]EnforcementStatus) (rowsAffected int64, err error)
+}
+```
+
+### func [GetRealizationStore](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/realization_store/configure.go#L28>)
+
+```go
+func GetRealizationStore(d datastore.DataStore, p protostore.ProtoStore, logger *logrus.Entry) IRealizationStore
+```
+
+## type [OverallStatus](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/realization_store/models.go#L36-L45>)
+
+```go
+type OverallStatus struct {
+    Id                string `gorm:"primaryKey"`
+    OrgId             string `gorm:"primaryKey"`
+    RealizationStatus Status
+    AdditionalDetails string
+    Revision          int64  `gorm:"column:resource_revision"`
+    XTableName        string `gorm:"-"`
+    CreatedAt         time.Time
+    UpdatedAt         time.Time
+}
+```
+
+### func [GetModelOverallStatusRecord](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/realization_store/models.go#L94>)
+
+```go
+func GetModelOverallStatusRecord(resource *ProtobufWithMetadata, orgId string) *OverallStatus
+```
+
+### func \(\*OverallStatus\) [TableName](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/realization_store/models.go#L47>)
+
+```go
+func (o *OverallStatus) TableName() string
+```
+
+## type [ProtobufWithMetadata](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/realization_store/models.go#L31-L34>)
+
+```go
+type ProtobufWithMetadata struct {
+    proto.Message
+    protostore.Metadata
+}
+```
+
+## type [Status](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/realization_store/status.go#L22>)
+
+```go
+type Status int
+```
+
+The values are ordered in th priority order, where the highest value is set as overall status for given resource, from the list of enforcement statuses for that resource NOTE: Do not reorder or change the values of the statuses.
+
+```go
+const (
+    UNKNOWN              Status = 0
+    DELETION_REALIZED    Status = 100
+    REALIZED             Status = 200
+    DELETION_IN_PROGRESS Status = 300
+    DELETION_PENDING     Status = 400
+    IN_PROGRESS          Status = 600
+    PENDING              Status = 800
+    ERROR                Status = 1000
+)
+```
+
+### func \(Status\) [String](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/realization_store/status_string.go#L50>)
+
+```go
+func (i Status) String() string
+```
 
 
 
