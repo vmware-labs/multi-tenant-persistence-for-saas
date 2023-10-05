@@ -679,8 +679,16 @@ func TestRealizationWorkflow(t *testing.T) {
 		{expected: REALIZED, actual: enforcementStatusMap["e2"]},
 	})
 
-	_, err = RS.SoftDelete(ctx, cpu)
+	err = RS.FindById(ctx, cpu.Id, cpu)
 	assert.NoError(err)
+	metadataBeforeSoftDelete := cpu.Metadata
+	previousRevision := cpu.Revision
+	rowAffected, metadata, err := RS.SoftDelete(ctx, cpu)
+	assert.NoError(err)
+	assert.Equal(metadataBeforeSoftDelete.Revision+1, metadata.Revision)
+	assert.Equal(previousRevision+1, metadata.Revision)
+	assert.Equal(metadata.Revision, cpu.Metadata.Revision)
+	assert.Equal(int64(1), rowAffected)
 	overallStatus, enforcementStatusMap, err = RS.GetOverallStatusWithEnforcementDetails(ctx, cpu)
 	assert.NoError(err)
 	checkStatuses(t, []StatusPair{
@@ -798,8 +806,16 @@ func TestPurgeStaleRecords(t *testing.T) {
 		{expected: IN_PROGRESS, actual: enforcementStatusMap["e2"]},
 	})
 
-	_, err = RS.SoftDelete(ctx, cpu)
+	err = RS.FindById(ctx, cpu.Id, cpu)
 	assert.NoError(err)
+	metadataBeforeSoftDelete := cpu.Metadata
+	previousRevision := cpu.Revision
+	rowAffected, metadata, err := RS.SoftDelete(ctx, cpu)
+	assert.NoError(err)
+	assert.Equal(metadataBeforeSoftDelete.Revision+1, metadata.Revision)
+	assert.Equal(previousRevision+1, metadata.Revision)
+	assert.Equal(metadata.Revision, cpu.Metadata.Revision)
+	assert.Equal(int64(1), rowAffected)
 	overallStatus, enforcementStatusMap, err = RS.GetOverallStatusWithEnforcementDetails(ctx, cpu)
 	assert.NoError(err)
 	checkStatuses(t, []StatusPair{
