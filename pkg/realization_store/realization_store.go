@@ -171,12 +171,13 @@ type IRealizationStore interface {
 	MarkEnforcementAsSuccess(ctx context.Context, enforcementPoint string, resources ...*ProtobufWithMetadata) error
 	MarkEnforcementAsError(ctx context.Context, enforcementPoint string, errStr string, resources ...*ProtobufWithMetadata) error
 
-	SoftDelete(ctx context.Context, resource *ProtobufWithMetadata) (rowsAffected int64, err error)
+	SoftDelete(ctx context.Context, resource *ProtobufWithMetadata) (rowsAffected int64, metadata protostore.Metadata, err error)
 	Delete(ctx context.Context, resource *ProtobufWithMetadata) (rowsAffected int64, err error)
 	Purge(ctx context.Context, resource *ProtobufWithMetadata) (rowsAffected int64, err error)
 	MarkEnforcementAsDeletionPending(ctx context.Context, enforcementPoint string, resources ...*ProtobufWithMetadata) error
 	MarkEnforcementAsDeletionInProgress(ctx context.Context, enforcementPoint string, resources ...*ProtobufWithMetadata) error
 	MarkEnforcementAsDeletionRealized(ctx context.Context, enforcementPoint string, resources ...*ProtobufWithMetadata) error
+	MarkEnforcementAsDeletionError(ctx context.Context, enforcementPoint string, errStr string, resources ...*ProtobufWithMetadata) error
 
 	GetOverallStatus(ctx context.Context, resource *ProtobufWithMetadata) (Status, error)
 	GetOverallStatusWithEnforcementDetails(ctx context.Context, resource *ProtobufWithMetadata) (Status, map[string]Status, error)
@@ -391,7 +392,17 @@ Operation fails if any resource's revision is out-of-date.
 func (r *realizationStoreV0) MarkEnforcementAsError(ctx context.Context, enforcementPoint string, errStr string, resources ...*ProtobufWithMetadata) error {
 	for i := range resources {
 		resource := resources[i]
-		if err := r.markEnforcementAsError(ctx, enforcementPoint, errStr, resource); err != nil {
+		if err := r.markEnforcementAsError(ctx, enforcementPoint, errStr, false, resource); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *realizationStoreV0) MarkEnforcementAsDeletionError(ctx context.Context, enforcementPoint string, errStr string, resources ...*ProtobufWithMetadata) error {
+	for i := range resources {
+		resource := resources[i]
+		if err := r.markEnforcementAsError(ctx, enforcementPoint, errStr, true, resource); err != nil {
 			return err
 		}
 	}
@@ -406,7 +417,7 @@ Operation fails if resource's revision is out-of-date.
 
 TODO consider prepending to additional_details column and capping its length using a SQL statement rather than through Golang.
 */
-func (r *realizationStoreV0) markEnforcementAsError(ctx context.Context, enforcementPoint string, errStr string, resource *ProtobufWithMetadata) error {
+func (r *realizationStoreV0) markEnforcementAsError(ctx context.Context, enforcementPoint string, errStr string, softDeleted bool, resource *ProtobufWithMetadata) error {
 	orgId, err := r.dataStore.GetAuthorizer().GetOrgFromContext(ctx)
 	if err != nil {
 		return err
@@ -417,16 +428,18 @@ func (r *realizationStoreV0) markEnforcementAsError(ctx context.Context, enforce
 	logger.Debugln(MARKING, ENFORCEMENT, status.String(), STARTED)
 
 	if !r.doesResourceExist(ctx, resource) {
-		err = ErrRecordNotFound.WithValue("Revision", strconv.FormatInt(resource.Revision, 10))
-		err = ErrMarkingEnforcementFailed.WithValue("status", status.String()).Wrap(err)
-		logger.Errorln(MARKING, ENFORCEMENT, status.String(), FAILED, err)
-		return err
+		if !softDeleted {
+			err = ErrRecordNotFound.WithValue("Revision", strconv.FormatInt(resource.Revision, 10))
+			err = ErrMarkingEnforcementFailed.WithValue("status", status.String()).Wrap(err)
+			logger.Errorln(MARKING, ENFORCEMENT, status.String(), FAILED, err)
+			return err
+		}
 	}
 
 	// Change enforcement status to error
 	enforcementStatusRecord := GetModelEnforcementStatusRecord(resource, orgId)
 	enforcementStatusRecord.EnforcementPointId = enforcementPoint
-	_ = r.dataStore.Find(ctx, enforcementStatusRecord)
+	_ = r.dataStore.Helper().FindInTable(ctx, datastore.GetTableName(enforcementStatusRecord), enforcementStatusRecord, softDeleted)
 	additionalDetails := fmt.Sprintf("ERROR %s at revision %d; %s", errStr, resource.Revision, enforcementStatusRecord.AdditionalDetails)
 	if len(additionalDetails) > ADDITIONAL_DETAILS_LENGTH_CAP {
 		additionalDetails = additionalDetails[:ADDITIONAL_DETAILS_LENGTH_CAP]
@@ -439,7 +452,7 @@ func (r *realizationStoreV0) markEnforcementAsError(ctx context.Context, enforce
 
 	// Change overall status to error
 	overallStatusRecord := GetModelOverallStatusRecord(resource, orgId)
-	_ = r.dataStore.Find(ctx, overallStatusRecord)
+	_ = r.dataStore.Helper().FindInTable(ctx, datastore.GetTableName(overallStatusRecord), overallStatusRecord, softDeleted)
 	additionalDetails = fmt.Sprintf("ERROR %s at revision %d; %s", errStr, resource.Revision, overallStatusRecord.AdditionalDetails)
 	if len(additionalDetails) > ADDITIONAL_DETAILS_LENGTH_CAP {
 		additionalDetails = additionalDetails[:ADDITIONAL_DETAILS_LENGTH_CAP]
@@ -457,36 +470,37 @@ func (r *realizationStoreV0) markEnforcementAsError(ctx context.Context, enforce
 /*
 Soft Deletes a resource from the DB. Sets overall status and enforcement status to DELETION_PENDING.
 */
-func (r *realizationStoreV0) SoftDelete(ctx context.Context, resource *ProtobufWithMetadata) (rowsAffected int64, err error) {
+func (r *realizationStoreV0) SoftDelete(ctx context.Context, resource *ProtobufWithMetadata) (rowsAffected int64, metadata protostore.Metadata, err error) {
 	orgId, err := r.dataStore.GetAuthorizer().GetOrgFromContext(ctx)
 	if err != nil {
-		return 0, err
+		return 0, protostore.Metadata{}, err
 	}
 
 	logger := r.logger.WithFields(logrus.Fields{ORG_ID: orgId, RESOURCE_ID: resource.Id})
 
 	logger.Debugln(SOFT_DELETING, RESOURCE, STARTED)
-	if rowsAffected, _, err = r.protoStore.SoftDeleteById(ctx, resource.Id, resource.Message); err != nil {
+	if rowsAffected, metadata, err = r.protoStore.SoftDeleteById(ctx, resource.Id, resource.Message); err != nil {
 		logger.Errorln(SOFT_DELETING, RESOURCE, FAILED, err)
-		return 0, err
+		return 0, protostore.Metadata{}, err
 	} else if rowsAffected == 0 {
 		err = ErrRecordNotFound.WithValue("Revision", strconv.FormatInt(resource.Revision, 10))
 		logger.Warnln(err)
 	}
+	resource.Metadata.Revision = metadata.Revision
 
 	if err = r.resetAllEnforcementStatus(ctx, resource, DELETION_PENDING); err != nil {
 		logger.Errorln(SOFT_DELETING, RESOURCE, FAILED, err)
-		return 0, err
+		return 0, protostore.Metadata{}, err
 	}
 
 	// In single transaction this computation can be skipped here and we can setOverallStatus.
 	if err = r.computeOverallStatus(ctx, resource, DELETION_PENDING); err != nil {
 		logger.Errorln(SOFT_DELETING, RESOURCE, FAILED, err)
-		return rowsAffected, err
+		return 0, protostore.Metadata{}, err
 	}
 
 	logger.Infoln(SOFT_DELETING, RESOURCE, FINISHED)
-	return rowsAffected, nil
+	return rowsAffected, metadata, nil
 }
 
 /*
@@ -882,7 +896,7 @@ func (r *realizationStoreV0) GetEnforcementStatusMap(ctx context.Context, resour
 	filter := GetModelEnforcementStatusRecordWithoutRevision(resource, orgId)
 	enforcementStatuses := make([]EnforcementStatus, 0)
 	err = r.dataStore.Helper().FindWithFilterInTable(
-		ctx, GetEnforcementStatusTableName(resource.Message), filter, &enforcementStatuses, datastore.NoPagination(), true)
+		ctx, GetEnforcementStatusTableName(resource.Message), filter, &enforcementStatuses, datastore.NoPagination(), false)
 	if err != nil {
 		err = ErrGettingRealizationStatus.Wrap(err)
 		logger.Errorln(FETCHING, ENFORCEMENT_STATUS, FAILED, err)
