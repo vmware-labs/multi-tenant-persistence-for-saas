@@ -417,7 +417,7 @@ Operation fails if resource's revision is out-of-date.
 
 TODO consider prepending to additional_details column and capping its length using a SQL statement rather than through Golang.
 */
-func (r *realizationStoreV0) markEnforcementAsError(ctx context.Context, enforcementPoint string, errStr string, resourceDeleted bool, resource *ProtobufWithMetadata) error {
+func (r *realizationStoreV0) markEnforcementAsError(ctx context.Context, enforcementPoint string, errStr string, softDeleted bool, resource *ProtobufWithMetadata) error {
 	orgId, err := r.dataStore.GetAuthorizer().GetOrgFromContext(ctx)
 	if err != nil {
 		return err
@@ -427,21 +427,19 @@ func (r *realizationStoreV0) markEnforcementAsError(ctx context.Context, enforce
 	logger := r.logger.WithFields(logrus.Fields{ORG_ID: orgId, RESOURCE_ID: resource.Id, ENFORCEMENT_POINT: enforcementPoint})
 	logger.Debugln(MARKING, ENFORCEMENT, status.String(), STARTED)
 
-	if !r.doesResourceExist(ctx, resource) && !resourceDeleted {
-		err = ErrRecordNotFound.WithValue("Revision", strconv.FormatInt(resource.Revision, 10))
-		err = ErrMarkingEnforcementFailed.WithValue("status", status.String()).Wrap(err)
-		logger.Errorln(MARKING, ENFORCEMENT, status.String(), FAILED, err)
-		return err
+	if !r.doesResourceExist(ctx, resource) {
+		if !softDeleted {
+			err = ErrRecordNotFound.WithValue("Revision", strconv.FormatInt(resource.Revision, 10))
+			err = ErrMarkingEnforcementFailed.WithValue("status", status.String()).Wrap(err)
+			logger.Errorln(MARKING, ENFORCEMENT, status.String(), FAILED, err)
+			return err
+		}
 	}
 
 	// Change enforcement status to error
 	enforcementStatusRecord := GetModelEnforcementStatusRecord(resource, orgId)
 	enforcementStatusRecord.EnforcementPointId = enforcementPoint
-	if resourceDeleted {
-		_ = r.dataStore.FindSoftDeleted(ctx, enforcementStatusRecord)
-	} else {
-		_ = r.dataStore.Find(ctx, enforcementStatusRecord)
-	}
+	_ = r.dataStore.Helper().FindInTable(ctx, datastore.GetTableName(enforcementStatusRecord), enforcementStatusRecord, softDeleted)
 	additionalDetails := fmt.Sprintf("ERROR %s at revision %d; %s", errStr, resource.Revision, enforcementStatusRecord.AdditionalDetails)
 	if len(additionalDetails) > ADDITIONAL_DETAILS_LENGTH_CAP {
 		additionalDetails = additionalDetails[:ADDITIONAL_DETAILS_LENGTH_CAP]
@@ -454,11 +452,7 @@ func (r *realizationStoreV0) markEnforcementAsError(ctx context.Context, enforce
 
 	// Change overall status to error
 	overallStatusRecord := GetModelOverallStatusRecord(resource, orgId)
-	if resourceDeleted {
-		_ = r.dataStore.FindSoftDeleted(ctx, overallStatusRecord)
-	} else {
-		_ = r.dataStore.Find(ctx, overallStatusRecord)
-	}
+	_ = r.dataStore.Helper().FindInTable(ctx, datastore.GetTableName(overallStatusRecord), overallStatusRecord, softDeleted)
 	additionalDetails = fmt.Sprintf("ERROR %s at revision %d; %s", errStr, resource.Revision, overallStatusRecord.AdditionalDetails)
 	if len(additionalDetails) > ADDITIONAL_DETAILS_LENGTH_CAP {
 		additionalDetails = additionalDetails[:ADDITIONAL_DETAILS_LENGTH_CAP]
