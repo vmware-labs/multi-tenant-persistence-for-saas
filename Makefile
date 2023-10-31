@@ -26,7 +26,7 @@ build:
 	build/build.sh
 
 clean:  ## Clean up the temporary files
-	rm -rf vendor test-results
+	rm -rf vendor test-results markdownlint.summary.txt
 
 update: ## updates all the go module versions
 	build/go_update.sh

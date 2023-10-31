@@ -1,5 +1,6 @@
 all
 
+exclude_rule 'MD007'  # Unordered list indentation
 exclude_rule 'MD009'  # Trailing spaces
 exclude_rule 'MD010'  # Hard tabs
 exclude_rule 'MD012'  # Multiple consecutive blank lines
