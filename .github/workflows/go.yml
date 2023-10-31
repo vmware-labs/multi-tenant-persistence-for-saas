@@ -11,10 +11,6 @@ on:
       - main
       - release-*
       - feature/*
-  workflow_run:
-    workflows: ["Build"]
-    types:
-      - complete
   workflow_dispatch:
     inputs:
       logLevel:
