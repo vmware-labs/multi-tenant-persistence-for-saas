@@ -17,6 +17,12 @@ import "github.com/vmware-labs/multi-tenant-persistence-for-saas/pkg/authorizer"
 - [Constants](<#constants>)
 - [type Authorizer](<#Authorizer>)
 - [type ContextKey](<#ContextKey>)
+- [type ContextLessAuthorizer](<#ContextLessAuthorizer>)
+  - [func \(s \*ContextLessAuthorizer\) Configure\(tableName string, roleMapping map\[string\]dbrole.DbRole\)](<#ContextLessAuthorizer.Configure>)
+  - [func \(s \*ContextLessAuthorizer\) GetAuthContext\(orgId string, roles ...string\) context.Context](<#ContextLessAuthorizer.GetAuthContext>)
+  - [func \(s \*ContextLessAuthorizer\) GetDefaultOrgAdminContext\(\) context.Context](<#ContextLessAuthorizer.GetDefaultOrgAdminContext>)
+  - [func \(s \*ContextLessAuthorizer\) GetMatchingDbRole\(\_ context.Context, tableNames ...string\) \(dbrole.DbRole, error\)](<#ContextLessAuthorizer.GetMatchingDbRole>)
+  - [func \(s \*ContextLessAuthorizer\) GetOrgFromContext\(\_ context.Context\) \(string, error\)](<#ContextLessAuthorizer.GetOrgFromContext>)
 - [type Instancer](<#Instancer>)
 - [type MetadataBasedAuthorizer](<#MetadataBasedAuthorizer>)
   - [func \(s \*MetadataBasedAuthorizer\) Configure\(tableName string, roleMapping map\[string\]dbrole.DbRole\)](<#MetadataBasedAuthorizer.Configure>)
@@ -92,6 +98,62 @@ type Authorizer interface {
 ```go
 type ContextKey string
 ```
+
+<a name="ContextLessAuthorizer"></a>
+## type [ContextLessAuthorizer](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/context_less_authorizer.go#L27-L29>)
+
+
+
+```go
+type ContextLessAuthorizer struct {
+    // contains filtered or unexported fields
+}
+```
+
+<a name="ContextLessAuthorizer.Configure"></a>
+### func \(\*ContextLessAuthorizer\) [Configure](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/context_less_authorizer.go#L55>)
+
+```go
+func (s *ContextLessAuthorizer) Configure(tableName string, roleMapping map[string]dbrole.DbRole)
+```
+
+
+
+<a name="ContextLessAuthorizer.GetAuthContext"></a>
+### func \(\*ContextLessAuthorizer\) [GetAuthContext](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/context_less_authorizer.go#L62>)
+
+```go
+func (s *ContextLessAuthorizer) GetAuthContext(orgId string, roles ...string) context.Context
+```
+
+
+
+<a name="ContextLessAuthorizer.GetDefaultOrgAdminContext"></a>
+### func \(\*ContextLessAuthorizer\) [GetDefaultOrgAdminContext](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/context_less_authorizer.go#L66>)
+
+```go
+func (s *ContextLessAuthorizer) GetDefaultOrgAdminContext() context.Context
+```
+
+
+
+<a name="ContextLessAuthorizer.GetMatchingDbRole"></a>
+### func \(\*ContextLessAuthorizer\) [GetMatchingDbRole](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/context_less_authorizer.go#L35>)
+
+```go
+func (s *ContextLessAuthorizer) GetMatchingDbRole(_ context.Context, tableNames ...string) (dbrole.DbRole, error)
+```
+
+
+
+<a name="ContextLessAuthorizer.GetOrgFromContext"></a>
+### func \(\*ContextLessAuthorizer\) [GetOrgFromContext](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/context_less_authorizer.go#L31>)
+
+```go
+func (s *ContextLessAuthorizer) GetOrgFromContext(_ context.Context) (string, error)
+```
+
+
 
 <a name="Instancer"></a>
 ## type [Instancer](<https://github.com/vmware-labs/multi-tenant-persistence-for-saas/blob/main/pkg/authorizer/instancer.go#L16-L19>)
