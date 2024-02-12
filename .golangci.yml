@@ -18,7 +18,7 @@ linters:
     - cyclop
     # deadcode Replaced by unused.
     - decorder
-    - depguard
+    # depguard Need to be fixed with new depguard version
     - dupword
     - durationcheck
     - errcheck
