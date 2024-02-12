@@ -23,11 +23,11 @@ jobs:
     runs-on: [ubuntu-latest]
     strategy:
       matrix:
-        go: ['1.19', '1.20', '1.21']
+        go: ['1.19', '1.20', '1.21', '1.22']
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up Go using version for latest ${{ matrix.go }} version
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go }}
           check-latest: true
@@ -38,7 +38,7 @@ jobs:
           mkdir -p $(go env GOCACHE)
           sudo make test
       - name: Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           file: test-results/coverage.out
@@ -49,11 +49,11 @@ jobs:
     runs-on: [ubuntu-latest]
     strategy:
       matrix:
-        go: ['1.19', '1.20', '1.21']
+        go: ['1.19', '1.20', '1.21', '1.22']
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up Go using version for latest ${{ matrix.go }} version
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go }}
           check-latest: true
